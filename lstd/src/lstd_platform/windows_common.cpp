@@ -133,7 +133,10 @@ void uninit_win32_state() {
 #endif
 }
 
-/*
+void win32_common_init_context();
+void win32_common_init_global_state();
+void win32_monitor_init();
+
 // We use to do this on MSVC but since then we no longer link the CRT and do all of this ourselves. (take a look at no_crt/exe_main.cpp)
 //
 // This trick makes all of the above requirements work on the MSVC compiler.
@@ -142,25 +145,21 @@ void uninit_win32_state() {
 // https://www.codeguru.com/cpp/misc/misc/applicationcontrol/article.php/c6945/Running-Code-Before-and-After-Main.htm#page-2
 #if COMPILER == MSVC
 s32 c_init() {
-    init_mutexes();
-    init_context();
+    win32_common_init_context();
+    win32_common_init_global_state();
+    win32_monitor_init();
     return 0;
 }
 
 // We need to reinit the context after the TLS initalizer fires and resets our state.. sigh.
 // We can't just do it once because global variables might still use the context and TLS fires a bit later.
 s32 tls_init() {
-    init_context();
-    return 0;
-}
-
-s32 cpp_init() {
-    init_win32_state();
+    win32_common_init_context();
     return 0;
 }
 
 s32 pre_termination() {
-    call_exit_functions();
+    exit_call_scheduled_functions();
     uninit_win32_state();
     return 0;
 }
@@ -177,9 +176,9 @@ __declspec(allocate(".CRT$XIU")) cb *g_CInit = c_init;
 __declspec(allocate(".CRT$XDU")) cb *g_TLSInit = tls_init;
 #pragma const_seg()
 
-#pragma const_seg(".CRT$XCU")
-__declspec(allocate(".CRT$XCU")) cb *g_CPPInit = cpp_init;
-#pragma const_seg()
+// #pragma const_seg(".CRT$XCU")
+// __declspec(allocate(".CRT$XCU")) cb *g_CPPInit = cpp_init;
+// #pragma const_seg()
 
 #pragma const_seg(".CRT$XPU")
 __declspec(allocate(".CRT$XPU")) cb *g_PreTermination = pre_termination;
@@ -194,7 +193,7 @@ __declspec(allocate(".CRT$XTU")) cb *g_Termination = NULL;
 #else
 #error @TODO: See how this works on other compilers!
 #endif
-*/
+
 
 bool dynamic_library::load(const string &name) {
     // @Bug value.Length is not enough (2 wide chars for one char)

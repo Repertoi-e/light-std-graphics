@@ -9,7 +9,7 @@ struct console_writer : writer {
     // If you don't use seperate threads and aim for maximum console output performance, set this to false.
     bool LockMutex = true;
 
-    byte *Buffer, *Current;
+    byte *Buffer = null, *Current = null;
     s64 Available = 0, BufferSize = 0;
 
     enum output_type {

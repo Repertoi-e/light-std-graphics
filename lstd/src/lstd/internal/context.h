@@ -91,7 +91,7 @@ struct context {
     // This can be used to view the stack trace before the program terminates.
     // The default handler prints the crash message and stack trace to _Log_.
     panic_handler_t PanicHandler = default_panic_handler;
-    bool HandlingPanic;  // Don't set. Used to avoid infinite looping when handling panics. Don't touch!
+    bool HandlingPanic = false;  // Don't set. Used to avoid infinite looping when handling panics. Don't touch!
 
     // When printing you should use this variable.
     // This makes it so users can redirect logging output.

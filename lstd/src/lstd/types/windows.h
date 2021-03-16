@@ -771,7 +771,6 @@ LONG WINAPI DispatchMessageW(CONST MSG *lpMsg);
 
 LRESULT WINAPI CallWindowProc(WNDPROC lpPrevWndFunc, HWND hwnd, UINT Msg,
                               WPARAM wParam, LPARAM lParam);
-LRESULT WINAPI SendMessage(HWND hwnd, UINT Msg, WPARAM wParam, LPARAM lParam);
 BOOL WINAPI PostMessage(HWND hwnd, UINT Msg, WPARAM wParam, LPARAM lParam);
 BOOL WINAPI PostThreadMessage(DWORD dwThreadId, UINT Msg, WPARAM wParam,
                               LPARAM lParam);
@@ -3086,6 +3085,15 @@ typedef struct tagSIZE {
 
 #define WM_SETCURSOR 0x0020
 
+typedef struct tagCOMPOSITIONFORM {
+    DWORD dwStyle;
+    POINT ptCurrentPos;
+    RECT rcArea;
+} COMPOSITIONFORM, *PCOMPOSITIONFORM, *NPCOMPOSITIONFORM, *LPCOMPOSITIONFORM;
+
+typedef DWORD HIMC;
+typedef DWORD HIMCC;
+
 extern "C" {
 BOOL DragQueryPoint(
     HDROP hDrop,
@@ -3102,4 +3110,17 @@ void DragFinish(
 
 BOOL DestroyCursor(
     HCURSOR hCursor);
+
+HIMC ImmGetContext(
+    HWND Arg1);
+
+BOOL ImmSetCompositionWindow(
+    HIMC,
+    LPCOMPOSITIONFORM lpCompForm);
+
+BOOL ImmReleaseContext(
+    HWND,
+    HIMC);
 }
+
+#define CFS_FORCE_POSITION 32

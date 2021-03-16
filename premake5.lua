@@ -35,17 +35,20 @@ function common_settings()
     
         buildoptions { "/Gs9999999" }
         
-        links { "dwmapi.lib", "dbghelp.lib" }
-        flags { "OmitDefaultLibrary", "NoRuntimeChecks", "NoBufferSecurityCheck" }
+		
+		-- @TODO We are linking with the CRT for now... 
+        -- flags { "OmitDefaultLibrary", "NoRuntimeChecks", "NoBufferSecurityCheck" }
     filter { "system:windows", "not kind:StaticLib" }
-        linkoptions { "/nodefaultlib", "/subsystem:windows", "/stack:\"0x100000\",\"0x100000\"" }
-        links { "kernel32", "shell32", "winmm", "ole32" }
+		-- @TODO We are linking with the CRT for now... 
+        -- linkoptions { "/nodefaultlib", "/subsystem:windows", "/stack:\"0x100000\",\"0x100000\"" }
+        links { "kernel32", "shell32", "winmm", "ole32", "dwmapi", "dbghelp" }
         
+	excludes "%{prj.name}/**/windows_no_crt/**.cpp"
     -- Setup entry point
-    filter { "system:windows", "kind:SharedLib" }
-        entrypoint "main_no_crt_dll"
-    filter { "system:windows", "kind:ConsoleApp or WindowedApp" }
-        entrypoint "main_no_crt"
+    -- filter { "system:windows", "kind:SharedLib" }
+    --     entrypoint "main_no_crt_dll"
+    -- filter { "system:windows", "kind:ConsoleApp or WindowedApp" }
+    --     entrypoint "main_no_crt"
 
     -- Setup configurations and optimization level
     filter "configurations:Debug"
@@ -84,35 +87,17 @@ project "lstd"
         "%{prj.name}/src/**.ixx",
         "%{prj.name}/src/**.obj"
     }
-    
-	includedirs { "%{prj.name}/src/vendor/linasm/include" }
-    
-    common_settings()
-
-
-project "lstd_graphics"
-    location "%{prj.name}"
-    kind "StaticLib"
-
-    targetdir("bin/" .. outputFolder .. "/%{prj.name}")
-    objdir("bin-int/" .. outputFolder .. "/%{prj.name}")
-
-    files {
-        "%{prj.name}/src/**.h",
-        "%{prj.name}/src/**.inc",
-        "%{prj.name}/src/**.c",
-        "%{prj.name}/src/**.cpp",
-        "%{prj.name}/src/**.def",
-        "%{prj.name}/src/**.ixx"
-    }
-
-    includedirs { "lstd/src", "lstd/src/vendor/linasm/include" } -- @TODO
-    
-    links { "lstd" } -- This adds a reference in VS, doesn't actually link (they are static libs).
 	
-    pchheader "pch.h"
-    pchsource "%{prj.name}/src/pch.cpp"
-    forceincludes { "pch.h" }
+	excludes {
+		"%{prj.name}/src/vendor/imguizmo/*.cpp"
+	}
+    
+	filter "not system:windows"
+		-- Exclude directx files on non-windows platforms 
+        excludes  { "%{prj.name}/src/lstd_graphics_platform/d3d_*.cpp" }
+	filter {}
+	
+	includedirs { "%{prj.name}/src/vendor/linasm/include" }
     
     common_settings()
 
@@ -131,18 +116,18 @@ project "graph"
         "%{prj.name}/src/**.def",
         "%{prj.name}/src/**.ixx"
     }
-	
-	-- Exclude directx files on non-windows platforms 
-    filter "not system:windows"
-        excludes  { "%{prj.name}/src/d3d_*.h", "%{prj.name}/src/d3d_*.cpp" }
-	filter {}
-	
-	includedirs { "lstd/src", "lstd_graphics/src", "lstd/src/vendor/linasm/include" } -- @TODO
+
+	includedirs { "lstd/src", "lstd/src/vendor/linasm/include" } -- @TODO
     
-    links { "lstd", "lstd_graphics" }
-    --pchheader "pch.h"
-    --pchsource "%{prj.name}/src/pch.cpp"
-    --forceincludes { "pch.h" }
+    links { "lstd" }
+	
+    pchheader "game.h"
+    pchsource "%{prj.name}/src/game.cpp"
+    forceincludes { "game.h" }
     
     common_settings()
+	
+	filter "system:windows"
+		links { "imm32", "dxgi.lib", "d3d11.lib", "d3dcompiler.lib", "d3d11.lib", "d3d10.lib" }
+	
 	

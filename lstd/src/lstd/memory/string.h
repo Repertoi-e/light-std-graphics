@@ -16,8 +16,8 @@ LSTD_BEGIN_NAMESPACE
 // the end of the string, so -1 is the last code point -2 the one before that, etc. (Python-style)
 struct string : public array_view<utf8> {
     struct code_point_ref {
-        string *Parent;
-        s64 Index;
+        string *Parent = null;
+        s64 Index = -1;
 
         code_point_ref() {}
         code_point_ref(string *parent, s64 index) : Parent(parent), Index(index) {}
