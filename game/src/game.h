@@ -81,7 +81,7 @@ struct game_memory {
 };
 
 // Makes get_state less error-prone and less verbose. The name used is just a string version of the variable name.
-#define MANAGE_STATE(variable) variable = GameMemory->get_state<remove_pointer_t<decltype(variable)>>(#variable)
+#define MANAGE_STATE(variable) variable = GameMemory->get_state<types::remove_pointer_t<decltype(variable)>>(#variable)
 
 // This is the API with which the exe and the dll interface
 #define GAME_UPDATE_AND_RENDER(name, ...) void name(game_memory *memory, graphics *g)

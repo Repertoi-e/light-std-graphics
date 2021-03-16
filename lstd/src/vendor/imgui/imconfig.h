@@ -37,7 +37,7 @@
 // empty)
 // It is very strongly recommended to NOT disable the demo windows during development. Please read the comments in
 // imgui_demo.cpp.
-//#define IMGUI_DISABLE_DEMO_WINDOWS
+#define IMGUI_DISABLE_DEMO_WINDOWS
 //#define IMGUI_DISABLE_METRICS_WINDOW
 
 //---- Don't implement some functions to reduce linkage requirements.
@@ -58,7 +58,7 @@
 // Don't implement ImFormatString/ImFormatStringV so you can implement them yourself if you don't want to link with
 // vsnprintf.
 //
-#define IMGUI_DISABLE_MATH_FUNCTIONS
+#define IMGUI_DISABLE_DEFAULT_MATH_FUNCTIONS
 // Don't implement ImFabs/ImSqrt/ImPow/ImFmod/ImCos/ImSin/ImAcos/ImAtan2 wrapper so you can implement them yourself.
 // Declare your prototypes in imconfig.h.
 //
@@ -67,7 +67,7 @@
 // Don't implement default allocators calling malloc()/free() to avoid linking with them.
 // You will need to call ImGui::SetAllocatorFunctions().
 
-#define IMGUI_USE_STB_SPRINTF
+// #define IMGUI_USE_STB_SPRINTF
 
 //---- Include imgui_user.h at the end of imgui.h as a convenience
 //#define IMGUI_INCLUDE_IMGUI_USER_H
@@ -77,8 +77,8 @@
 
 //---- Avoid multiple STB libraries implementations, or redefine path/filenames to prioritize another version
 // By default the embedded implementations are declared static and not available outside of imgui cpp files.
-#define IMGUI_STB_TRUETYPE_FILENAME "../stb/stb_truetype.h"
-#define IMGUI_STB_RECT_PACK_FILENAME "../stb/stb_rect_pack.h"
+// #define IMGUI_STB_TRUETYPE_FILENAME "../stb/stb_truetype.h"
+// #define IMGUI_STB_RECT_PACK_FILENAME "../stb/stb_rect_pack.h"
 // #define IMGUI_DISABLE_STB_TRUETYPE_IMPLEMENTATION
 // #define IMGUI_DISABLE_STB_RECT_PACK_IMPLEMENTATION
 
@@ -128,27 +128,12 @@ namespace ImGui {
 }  // namespace ImGui
 */
 
-#define memset LSTD_NAMESPACE::fill_memory
-#define memcpy LSTD_NAMESPACE::copy_memory
-#define memmove LSTD_NAMESPACE::copy_memory
-
-inline int strcmp(const char *s1, const char *s2) {
-    while (*s1 && (*s1 == *s2)) s1++, s2++;
-    return *(const unsigned char *) s1 - *(const unsigned char *) s2;
-}
-
-inline int memcmp(const void *css, const void *cts, u32 n) {
-    auto *s1 = (const char *) css;
-    auto *s2 = (const char *) cts;
-    while (n-- > 0) {
-        if (*s1++ != *s2++) return s1[-1] < s2[-1] ? -1 : 1;
-    }
-    return 0;
-}
-
+#define ImAbs Math_Abs_flt32
 #define ImSqrt Math_Sqrt_flt32
 #define ImFabs Math_Abs_flt32
 #define ImPow Math_ExpB_flt32
+
+#define ImLog Math_Log_flt32
 
 // https://git.musl-libc.org/cgit/musl/tree/src/math/fmod.c
 inline double ImFmod(double x, double y) {
@@ -191,7 +176,7 @@ inline double ImFmod(double x, double y) {
         uy.i |= 1ULL << 52;
     }
 
-    /* x mod y */
+    /* x mod y */    
     for (; ex > ey; ex--) {
         i = uxi - uy.i;
         if (i >> 63 == 0) {
@@ -221,6 +206,7 @@ inline double ImFmod(double x, double y) {
     ux.i = uxi;
     return ux.f;
 }
+
 static inline float ImFmod(float x, float y) { return (float) ImFmod((double) x, (double) y); }
 
 #define ImCos Math_Cos_flt32
@@ -232,6 +218,51 @@ static inline float ImFmod(float x, float y) { return (float) ImFmod((double) x,
 
 // We include the CRT ... sigh
 #define ImAtof atof
+
+
+/*
+NOTE:
+
+Despite my best effort I gave up because I don't have enough time to deal with this.
+
+We are relying on the CRT for the following functions:
+
+2>lstd.lib(Math.obj) : warning LNK4078: multiple '.text' sections found with different attributes (20500000)
+2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp___acrt_iob_func referenced in function "void __cdecl ImGui::LogToTTY(int)" (?LogToTTY@ImGui@@YAXH@Z)
+2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp__wfopen referenced in function "struct _iobuf * __cdecl ImFileOpen(char const *,char const *)" (?ImFileOpen@@YAPEAU_iobuf@@PEBD0@Z)
+2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_fclose referenced in function "void __cdecl ImGui::LogFinish(void)" (?LogFinish@ImGui@@YAXXZ)
+2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_fflush referenced in function "void __cdecl ImGui::LogFinish(void)" (?LogFinish@ImGui@@YAXXZ)
+2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_fread referenced in function "void * __cdecl ImFileLoadToMemory(char const *,char const *,unsigned __int64 *,int)" (?ImFileLoadToMemory@@YAPEAXPEBD0PEA_KH@Z)
+2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_fseek referenced in function "void * __cdecl ImFileLoadToMemory(char const *,char const *,unsigned __int64 *,int)" (?ImFileLoadToMemory@@YAPEAXPEBD0PEA_KH@Z)
+2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_ftell referenced in function "void * __cdecl ImFileLoadToMemory(char const *,char const *,unsigned __int64 *,int)" (?ImFileLoadToMemory@@YAPEAXPEBD0PEA_KH@Z)
+2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_fwrite referenced in function "void __cdecl ImGui::SaveIniSettingsToDisk(char const *)" (?SaveIniSettingsToDisk@ImGui@@YAXPEBD@Z)
+2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp___stdio_common_vfprintf referenced in function _vfprintf_l
+2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp___stdio_common_vsscanf referenced in function _vsscanf_l
+2>lstd.lib(imgui_widgets.obj) : error LNK2001: unresolved external symbol __imp___stdio_common_vsscanf
+2>lstd.lib(imgui_draw.obj) : error LNK2019: unresolved external symbol __chkstk referenced in function "public: void __cdecl ImDrawList::AddPolyline(struct ImVec2 const *,int,unsigned int,bool,float)" (?AddPolyline@ImDrawList@@QEAAXPEBUImVec2@@HI_NM@Z)
+2>lstd.lib(imgui_widgets.obj) : error LNK2019: unresolved external symbol __imp_atof referenced in function "int __cdecl ImGui::RoundScalarWithFormatT<int,int>(char const *,int,int)" (??$RoundScalarWithFormatT@HH@ImGui@@YAHPEBDHH@Z)
+2>lstd.lib(pixel_buffer.obj) : error LNK2019: unresolved external symbol stbi_load referenced in function "public: __cdecl lstd::pixel_buffer::pixel_buffer(struct lstd::string const &,bool,enum lstd::pixel_format)" (??0pixel_buffer@lstd@@QEAA@AEBUstring@1@_NW4pixel_format@1@@Z)
+
+*/
+
+#define memset LSTD_NAMESPACE::fill_memory
+#define memcpy LSTD_NAMESPACE::copy_memory
+#define memmove LSTD_NAMESPACE::copy_memory
+
+inline int strcmp(const char *s1, const char *s2) {
+    while (*s1 && (*s1 == *s2)) s1++, s2++;
+    return *(const unsigned char *) s1 - *(const unsigned char *) s2;
+}
+
+inline int memcmp(const void *css, const void *cts, u32 n) {
+    auto *s1 = (const char *) css;
+    auto *s2 = (const char *) cts;
+    while (n-- > 0) {
+        if (*s1++ != *s2++) return s1[-1] < s2[-1] ? -1 : 1;
+    }
+    return 0;
+}
+
 
 #define strlen LSTD_NAMESPACE::c_string_length
 
@@ -282,35 +313,3 @@ inline const char *memchr(const char *str, char ch, u64 textSize) {
     if (r == -1) return null;
     return str + r;
 }
-
-#define FLT_MAX F32_MAX
-#define FLT_MIN F32_MIN
-
-#define DBL_MAX F64_MAX
-#define DBL_MIN F64_MIN
-
-
-/*
-NOTE:
-
-Despite my best effort I gave up because I don't have enough time to deal with this.
-
-We are relying on the CRT for the following functions:
-
-2>lstd.lib(Math.obj) : warning LNK4078: multiple '.text' sections found with different attributes (20500000)
-2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp___acrt_iob_func referenced in function "void __cdecl ImGui::LogToTTY(int)" (?LogToTTY@ImGui@@YAXH@Z)
-2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp__wfopen referenced in function "struct _iobuf * __cdecl ImFileOpen(char const *,char const *)" (?ImFileOpen@@YAPEAU_iobuf@@PEBD0@Z)
-2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_fclose referenced in function "void __cdecl ImGui::LogFinish(void)" (?LogFinish@ImGui@@YAXXZ)
-2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_fflush referenced in function "void __cdecl ImGui::LogFinish(void)" (?LogFinish@ImGui@@YAXXZ)
-2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_fread referenced in function "void * __cdecl ImFileLoadToMemory(char const *,char const *,unsigned __int64 *,int)" (?ImFileLoadToMemory@@YAPEAXPEBD0PEA_KH@Z)
-2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_fseek referenced in function "void * __cdecl ImFileLoadToMemory(char const *,char const *,unsigned __int64 *,int)" (?ImFileLoadToMemory@@YAPEAXPEBD0PEA_KH@Z)
-2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_ftell referenced in function "void * __cdecl ImFileLoadToMemory(char const *,char const *,unsigned __int64 *,int)" (?ImFileLoadToMemory@@YAPEAXPEBD0PEA_KH@Z)
-2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp_fwrite referenced in function "void __cdecl ImGui::SaveIniSettingsToDisk(char const *)" (?SaveIniSettingsToDisk@ImGui@@YAXPEBD@Z)
-2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp___stdio_common_vfprintf referenced in function _vfprintf_l
-2>lstd.lib(imgui.obj) : error LNK2019: unresolved external symbol __imp___stdio_common_vsscanf referenced in function _vsscanf_l
-2>lstd.lib(imgui_widgets.obj) : error LNK2001: unresolved external symbol __imp___stdio_common_vsscanf
-2>lstd.lib(imgui_draw.obj) : error LNK2019: unresolved external symbol __chkstk referenced in function "public: void __cdecl ImDrawList::AddPolyline(struct ImVec2 const *,int,unsigned int,bool,float)" (?AddPolyline@ImDrawList@@QEAAXPEBUImVec2@@HI_NM@Z)
-2>lstd.lib(imgui_widgets.obj) : error LNK2019: unresolved external symbol __imp_atof referenced in function "int __cdecl ImGui::RoundScalarWithFormatT<int,int>(char const *,int,int)" (??$RoundScalarWithFormatT@HH@ImGui@@YAHPEBDHH@Z)
-2>lstd.lib(pixel_buffer.obj) : error LNK2019: unresolved external symbol stbi_load referenced in function "public: __cdecl lstd::pixel_buffer::pixel_buffer(struct lstd::string const &,bool,enum lstd::pixel_format)" (??0pixel_buffer@lstd@@QEAA@AEBUstring@1@_NW4pixel_format@1@@Z)
-
-*/

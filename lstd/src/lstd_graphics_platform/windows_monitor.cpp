@@ -421,7 +421,7 @@ void win32_poll_monitors() {
 
     For(Monitors) {
         get_display_modes(it->DisplayModes, it);
-        quick_sort(it->DisplayModes.Data, it->DisplayModes.Data + it->DisplayModes.Count);
+        quick_sort(it->DisplayModes.Data, it->DisplayModes.Data + it->DisplayModes.Count - 1);
     }
 }
 

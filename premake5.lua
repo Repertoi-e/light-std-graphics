@@ -43,7 +43,6 @@ function common_settings()
         -- linkoptions { "/nodefaultlib", "/subsystem:windows", "/stack:\"0x100000\",\"0x100000\"" }
         links { "kernel32", "shell32", "winmm", "ole32", "dwmapi", "dbghelp" }
         
-	excludes "%{prj.name}/**/windows_no_crt/**.cpp"
     -- Setup entry point
     -- filter { "system:windows", "kind:SharedLib" }
     --     entrypoint "main_no_crt_dll"
@@ -89,7 +88,8 @@ project "lstd"
     }
 	
 	excludes {
-		"%{prj.name}/src/vendor/imguizmo/*.cpp"
+		"%{prj.name}/src/vendor/imguizmo/*.cpp",
+		"%{prj.name}/src/lstd_platform/windows_no_crt/**.cpp" -- @TODO
 	}
     
 	filter "not system:windows"
@@ -101,7 +101,7 @@ project "lstd"
     
     common_settings()
 
-project "graph"
+project "game"
 	location "%{prj.name}"
     kind "ConsoleApp"
     
@@ -110,16 +110,20 @@ project "graph"
 
     files {
         "%{prj.name}/src/**.h",
-        "%{prj.name}/src/**.inc",
-        "%{prj.name}/src/**.c",
-        "%{prj.name}/src/**.cpp",
-        "%{prj.name}/src/**.def",
-        "%{prj.name}/src/**.ixx"
+        "%{prj.name}/src/**.cpp"
     }
+	
+	excludes { 
+        "%{prj.name}/src/graph/**.h", 
+        "%{prj.name}/src/graph/**.cpp"
+    }
+	
 
 	includedirs { "lstd/src", "lstd/src/vendor/linasm/include" } -- @TODO
     
     links { "lstd" }
+	
+	dependson { "graph" }
 	
     pchheader "game.h"
     pchsource "%{prj.name}/src/game.cpp"
@@ -129,5 +133,33 @@ project "graph"
 	
 	filter "system:windows"
 		links { "imm32", "dxgi.lib", "d3d11.lib", "d3dcompiler.lib", "d3d11.lib", "d3d10.lib" }
-	
+
+
+project "graph"
+    location "game"
+    kind "SharedLib"
+
+    targetdir("bin/" .. outputFolder .. "/game")
+    objdir("bin-int/" .. outputFolder .. "/game/%{prj.name}")
+
+    files {
+        "game/src/graph/**.h", 
+        "game/src/graph/**.cpp"
+    }
+
+    defines { "LE_BUILDING_GAME" }
+
+    links { "lstd" }
+    includedirs { "lstd/src", "game/src", "game/src/graph", "lstd/src/vendor/linasm/include" } -- @TODO
+
+    pchheader "pch.h"
+    pchsource "game/src/graph/pch.cpp"
+    forceincludes { "pch.h" }
+    
+    common_settings()
+
+    -- Unique PDB name each time we build (in order to support debugging while hot-swapping the game dll)
+    filter "system:windows"
+        symbolspath '$(OutDir)$(TargetName)-$([System.DateTime]::Now.ToString("ddMMyyyy_HHmmss_fff")).pdb'
+        links { "dxgi.lib", "d3d11.lib", "d3dcompiler.lib", "d3d11.lib", "d3d10.lib" }
 	
