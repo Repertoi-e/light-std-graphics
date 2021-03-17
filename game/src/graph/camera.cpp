@@ -23,10 +23,10 @@ void camera_update(camera *cam) {
     static vec2<s32> lastMouse = zero();
 
     f32 S = Math_Sin_flt32(cam->Roll);
-    f32 C = Math_Sin_flt32(cam->Roll);
+    f32 C = Math_Cos_flt32(cam->Roll);
 
-    v2 up(-S, C);
-    v2 right(C, S);
+    v2 up = normalize(v2(-S, C));
+    v2 right = normalize(v2(C, S));
 
     if (win->Keys[Key_LeftControl]) {
         vec2<s32> mouse = win->get_cursor_pos();
@@ -34,12 +34,12 @@ void camera_update(camera *cam) {
         lastMouse = mouse;
 
         if (win->MouseButtons[Mouse_Button_Middle]) {
+            cam->Roll += delta.x * cam->RotationSpeed;
+        } else if (win->MouseButtons[Mouse_Button_Left]) {
             f32 speed = cam->PanSpeed * cam->ZoomMax / cam->Scale.x;
 
             cam->Position += -right * delta.x * speed;
             cam->Position += -up * delta.y * speed;
-        } else if (win->MouseButtons[Mouse_Button_Left]) {
-            cam->Roll += delta.x * cam->RotationSpeed;
         } else if (win->MouseButtons[Mouse_Button_Right]) {
             // We map our scale range [ZoomMin, ZoomMax] to the range [1, ZoomSpeedup]
             // and then we speedup our scaling by a cubic factor.

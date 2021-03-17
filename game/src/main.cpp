@@ -12,7 +12,7 @@ import path;
 
 // These can be modified with command line arguments.
 s64 GameMemoryInMiB = 32;
-u32 GameWidth = 1200, GameHeight = 600, GameFPS = 60;
+u32 GameWidth = 800, GameHeight = 400, GameFPS = 60;
 string GameFileName = "graph.dll";
 
 allocator GameAlloc;  // Imgui uses this, it needs to be global
@@ -238,10 +238,18 @@ s32 main() {
     setup_game_paths();
 
     WITH_ALLOC(GameAlloc) {
-        string windowTitle = sprint("Graphics Engine | {}", GameFileName);
+        // string windowTitle = sprint("Graphics Engine | {}", GameFileName);
+        string windowTitle = "Quadratic Calculator";
 
         auto windowFlags = window::SHOWN | window::RESIZABLE | window::VSYNC | window::FOCUS_ON_SHOW | window::CLOSE_ON_ALT_F4;
         gameMemory.MainWindow = allocate<window>()->init(windowTitle, window::DONT_CARE, window::DONT_CARE, GameWidth, GameHeight, windowFlags);
+
+        // Didn't work?
+        // auto icon = pixel_buffer("data/icon.ico", false, pixel_format::RGBA);
+        // array<pixel_buffer> icons;
+        // append(icons, icon);
+        // gameMemory.MainWindow->set_icon(icons);
+        // free(icons);
 
         gameMemory.MainWindow->Event.connect(main_window_event);
 

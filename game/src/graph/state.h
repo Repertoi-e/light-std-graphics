@@ -19,7 +19,7 @@ void camera_reset_constants(camera *cam);
 void camera_update(camera *cam);
 
 struct game_state {
-    v4 ClearColor = {0.0f, 0.017f, 0.099f, 1.0f};
+    v4 ClearColor = {0.92f, 0.92f, 0.92f, 1.0f};
 
     camera Camera;
 
@@ -30,20 +30,13 @@ struct game_state {
     v2 ViewportPos;
     v2 ViewportSize;
 
-    bool EditorShowShapeType = false;
-    bool EditorShowDrawAABB = false;
-    bool EditorShowPositionalCorrection = false;
-    bool EditorShowDebugIntersections = false;
-    bool EditorShowIterations = false;
-
-    s32 EditorShapeType = false;
-    bool EditorDrawAABB = false;
-    bool EditorPositionalCorrection = false;
-    bool EditorDebugIntersections = false;
-    s32 EditorIterations = 5;
-
     // We scale coordinates by this amount to appear better on the screen
     f32 PixelsPerMeter = 50;
+
+    f32 QuadraticA = 0;
+    f32 QuadraticB = 0;
+    f32 QuadraticC = 0;
+    bool InputSlider = false;
 
     game_memory *Memory;
 };
