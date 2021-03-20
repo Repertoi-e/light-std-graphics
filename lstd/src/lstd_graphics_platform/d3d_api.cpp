@@ -42,7 +42,7 @@ void d3d_init(graphics *g) {
 
     string adapterStr;  // @Bug c_string_length * 2 is not enough
     reserve(adapterStr, c_string_length(adapterDesc.Description) * 2);
-    utf16_to_utf8(adapterDesc.Description, const_cast<char *>(adapterStr.Data), &adapterStr.Count);
+    utf16_to_utf8(adapterDesc.Description, (char *) adapterStr.Data, &adapterStr.Count); // @Constcast
     adapterStr.Length = utf8_length(adapterStr.Data, adapterStr.Count);
 
     print("{!YELLOW}----------------------------------\n");

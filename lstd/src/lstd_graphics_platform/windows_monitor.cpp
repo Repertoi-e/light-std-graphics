@@ -146,7 +146,7 @@ file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *di
     if (display) name = display->DeviceString;
 
     reserve(mon->Name, c_string_length(name) * 2);  // @Bug c_string_length * 2 is not enough
-    utf16_to_utf8(name, const_cast<char *>(mon->Name.Data), &mon->Name.Count);
+    utf16_to_utf8(name, (char *) mon->Name.Data, &mon->Name.Count); // @Constcast
     mon->Name.Length = utf8_length(mon->Name.Data, mon->Name.Count);
 
     if (adapter->StateFlags & DISPLAY_DEVICE_MODESPRUNED) mon->PlatformData.Win32.ModesPruned = true;
@@ -297,7 +297,7 @@ bool os_set_display_mode(monitor *mon, display_mode desired) {
         if (result == DISP_CHANGE_NOTUPDATED) description = "Failed to write to registry";
         if (result == DISP_CHANGE_RESTART) description = "Computer restart required";
 
-        print("(windows_monitor.cpp): Failed to set video mode: {!YELLOW}{}{!}\n", description);
+        print(">>> Failed to set video mode: {!YELLOW}{}{!}\n", description);
         return false;
     }
 

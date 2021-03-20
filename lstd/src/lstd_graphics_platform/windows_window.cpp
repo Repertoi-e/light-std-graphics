@@ -156,7 +156,7 @@ window *window::init(const string &title, s32 x, s32 y, s32 width, s32 height, u
     PlatformData.Win32.hWnd = CreateWindowExW(exStyle, WindowClassName, L"", style, xpos, ypos, fullSize.x, fullSize.y, null, null, GetModuleHandleW(null), null);
 
     if (!PlatformData.Win32.hWnd) {
-        print("(windows_window.cpp): Failed to create window\n");
+        print(">>> {}:{} Failed to create window.\n", __FILE__, __LINE__);
         return null;
     }
 
@@ -505,14 +505,14 @@ file_scope HICON create_icon(const pixel_buffer &image, int xhot, int yhot, bool
     ReleaseDC(null, dc);
 
     if (!color) {
-        print("(windows_window.cpp): Failed to create RGBA bitmap\n");
+        print(">>> {}:{} Failed to create RGBA bitmap.\n", __FILE__, __LINE__);
         return null;
     }
     defer(DeleteObject(color));
 
     HBITMAP mask = CreateBitmap(image.Width, image.Height, 1, 1, null);
     if (!mask) {
-        print("(windows_window.cpp): Failed to create mask bitmap\n");
+        print(">>> {}:{} Failed to create mask bitmap.\n", __FILE__, __LINE__);
         return null;
     }
     defer(DeleteObject(mask));
@@ -540,9 +540,9 @@ file_scope HICON create_icon(const pixel_buffer &image, int xhot, int yhot, bool
     HICON handle = CreateIconIndirect(&ii);
     if (!handle) {
         if (icon) {
-            print("(windows_window.cpp): Failed to create RGBA icon\n");
+            print(">>> {}:{} Failed to create RGBA icon.\n", __FILE__, __LINE__);
         } else {
-            print("(windows_window.cpp): Failed to create RGBA cursor\n");
+            print(">>> {}:{} Failed to create RGBA cursor.\n", __FILE__, __LINE__);
         }
     }
     return handle;
@@ -619,7 +619,7 @@ file_scope void update_cursor_image(window *win) {
 file_scope void enable_raw_mouse_motion(window *win) {
     RAWINPUTDEVICE rid = {0x01, 0x02, 0, win->PlatformData.Win32.hWnd};
     if (!RegisterRawInputDevices(&rid, 1, sizeof(rid))) {
-        print("(windows_window.cpp): Failed to register raw input device. Raw mouse input may be unsupported.\n");
+        print(">>> {}:{} Failed to register raw input device. Raw mouse input may be unsupported.\n", __FILE__, __LINE__);
     }
 }
 
@@ -627,7 +627,7 @@ file_scope void enable_raw_mouse_motion(window *win) {
 file_scope void disable_raw_mouse_motion(window *win) {
     RAWINPUTDEVICE rid = {0x01, 0x02, RIDEV_REMOVE, null};
     if (!RegisterRawInputDevices(&rid, 1, sizeof(rid))) {
-        print("(windows_window.cpp): Failed to remove raw input device\n");
+        print(">>> {}:{} Failed to remove raw input device.\n", __FILE__, __LINE__);
     }
 }
 
@@ -746,7 +746,7 @@ rect window::get_adjusted_bounds() {
 void window::set_size_limits(vec2<s32> minDimension, vec2<s32> maxDimension) {
     if (minDimension.x != DONT_CARE && minDimension.y != DONT_CARE) {
         if (minDimension.x < 0 || minDimension.y < 0) {
-            print("(windows_window.cpp): Invalid window minimum size ({}x{})\n", minDimension.x, minDimension.y);
+            print(">>> {}:{} Invalid window minimum size ({}x{}).\n", __FILE__, __LINE__, minDimension.x, minDimension.y);
             return;
         }
     }
@@ -754,7 +754,7 @@ void window::set_size_limits(vec2<s32> minDimension, vec2<s32> maxDimension) {
     if (maxDimension.x != DONT_CARE && maxDimension.y != DONT_CARE) {
         if (maxDimension.x < 0 || maxDimension.y < 0 || maxDimension.x < minDimension.x ||
             maxDimension.y < minDimension.y) {
-            print("(windows_window.cpp): Invalid window maximum size ({}x{})\n", maxDimension.x, maxDimension.y);
+            print(">>> {}:{} Invalid window maximum size ({}x{}).\n", __FILE__, __LINE__, maxDimension.x, maxDimension.y);
             return;
         }
     }
@@ -791,7 +791,7 @@ file_scope void apply_aspect_ratio(window *win, s32 edge, RECT *area) {
 void window::set_forced_aspect_ratio(s32 numerator, s32 denominator) {
     if (numerator != DONT_CARE && denominator != DONT_CARE) {
         if (numerator <= 0 || denominator <= 0) {
-            print("(windows_window.cpp): Invalid window aspect ratio ({}:{})\n", numerator, denominator);
+            print(">>> {}:{} Invalid window aspect ratio ({}:{}).\n", __FILE__, __LINE__, numerator, denominator);
             return;
         }
     }
@@ -1185,7 +1185,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
 
             auto *rawInput = allocate_array<RAWINPUT>(size / sizeof(RAWINPUT), {.Alloc = Context.Temp});
             if (GetRawInputData(ri, RID_INPUT, rawInput, &size, sizeof(RAWINPUTHEADER)) == (u32) -1) {
-                print("(windows_window.cpp): Failed to retrieve raw input data\n");
+                print(">>> {}:{} Failed to retrieve raw input data.\n", __FILE__, __LINE__);
                 break;
             }
 
@@ -1482,7 +1482,7 @@ file_scope void register_window_class() {
     }
 
     if (!RegisterClassExW(&wc)) {
-        print("(windows_window.cpp): Failed to register window class\n");
+        print(">>> {}:{} Failed to register window class.\n", __FILE__, __LINE__);
         assert(false);
     }
 }
@@ -1516,7 +1516,7 @@ cursor::cursor(os_cursor osCursor) {
 
     PlatformData.Win32.hCursor = (HICON) LoadImageW(null, id, IMAGE_CURSOR, 0, 0, LR_DEFAULTSIZE | LR_SHARED);
     if (!PlatformData.Win32.hCursor) {
-        print("(windows_window.cpp): Failed to create os cursor\n");
+        print(">>> {}:{} Failed to create os cursor.\n", __FILE__, __LINE__);
     }
     PlatformData.Win32.ShouldDestroy = false;
 

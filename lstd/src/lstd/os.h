@@ -111,20 +111,20 @@ bytes os_read_from_console();
 #if OS == WINDOWS
 
 // Logs a formatted error message.
-void windows_report_hresult_error(long hresult, const string &call, const string &file, s32 line);
+void windows_report_hresult_error(long hresult, const string &call, source_location loc = source_location::current());
 
 // CHECKHR checks the return value of _call_ and if the returned HRESULT is less than zero, reports an error.
-#define WIN32_CHECKHR(call)                                                              \
-    {                                                                                    \
-        long result = call;                                                              \
-        if (result < 0) windows_report_hresult_error(result, #call, __FILE__, __LINE__); \
+#define WIN32_CHECKHR(call)                                          \
+    {                                                                \
+        long result = call;                                          \
+        if (result < 0) windows_report_hresult_error(result, #call); \
     }
 
 // CHECKHR_BOOL checks the return value of _call_ and if the returned is false, reports an error.
-#define WIN32_CHECKBOOL(call)                                                                                     \
-    {                                                                                                             \
-        bool result = call;                                                                                       \
-        if (!result) windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), #call, __FILE__, __LINE__); \
+#define WIN32_CHECKBOOL(call)                                                                 \
+    {                                                                                         \
+        bool result = call;                                                                   \
+        if (!result) windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), #call); \
     }
 
 // DX_CHECK is used for checking directx calls. The difference from WIN32_CHECKHR is that

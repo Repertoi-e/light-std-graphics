@@ -245,13 +245,13 @@ utf16 *utf8_to_utf16_temp(const string &str) {
     return result;
 }
 
-#define CREATE_FILE_HANDLE_CHECKED(handleName, call, returnOnFail)                                              \
-    HANDLE handleName = call;                                                                                   \
-    if (handleName == INVALID_HANDLE_VALUE) {                                                                   \
-        string extendedCallSite = sprint("{}\n        (the path was: {!YELLOW}\"{}\"{!GRAY})\n", #call, path);  \
-        defer(free(extendedCallSite));                                                                          \
-        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), extendedCallSite, __FILE__, __LINE__); \
-        return returnOnFail;                                                                                    \
+#define CREATE_FILE_HANDLE_CHECKED(handleName, call, returnOnFail)                                             \
+    HANDLE handleName = call;                                                                                  \
+    if (handleName == INVALID_HANDLE_VALUE) {                                                                  \
+        string extendedCallSite = sprint("{}\n        (the path was: {!YELLOW}\"{}\"{!GRAY})\n", #call, path); \
+        defer(free(extendedCallSite));                                                                         \
+        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), extendedCallSite);                    \
+        return returnOnFail;                                                                                   \
     }
 
 #define GET_READONLY_EXISTING_HANDLE(x, fail)                                                                                                                                       \
@@ -369,16 +369,17 @@ export {
     }
 
     [[nodiscard("Leak")]] string path_normalize(const string &path) {
+        string result;
+        reserve(result, path.Length);
+
         if (match_beginning(path, "\\\\.\\") || match_beginning(path, "\\\\?\\")) {
             // In the case of paths with these prefixes:
             // \\.\ -> device names
             // \\?\ -> literal paths
             // do not do any normalization, but return the path unchanged.
-            return path;
+            clone(&result, path);
+            return result;
         }
-
-        string result;
-        reserve(result, path.Length);
 
         auto [DriveOrUNC, rest] = path_split_drive(path);
         if (DriveOrUNC) {
@@ -607,17 +608,17 @@ export {
                 CREATE_FILE_HANDLE_CHECKED(f, FindFirstFileW(walker.Path16, (WIN32_FIND_DATAW *) walker.PlatformFileInfo), ;);
                 walker.Handle = (void *) f;
             } else {
-#define CHECK_FIND_NEXT(call)                                                                            \
-    if (!call) {                                                                                         \
-        if (GetLastError() != ERROR_NO_MORE_FILES) {                                                     \
-            windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), #call, __FILE__, __LINE__); \
-        }                                                                                                \
-        if (walker.Handle != INVALID_HANDLE_VALUE) {                                                     \
-            WIN32_CHECKBOOL(FindClose((HANDLE) walker.Handle));                                          \
-        }                                                                                                \
-                                                                                                         \
-        walker.Handle = null; /* No more files.. terminate */                                            \
-        return;                                                                                          \
+#define CHECK_FIND_NEXT(call)                                                        \
+    if (!call) {                                                                     \
+        if (GetLastError() != ERROR_NO_MORE_FILES) {                                 \
+            windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), #call); \
+        }                                                                            \
+        if (walker.Handle != INVALID_HANDLE_VALUE) {                                 \
+            WIN32_CHECKBOOL(FindClose((HANDLE) walker.Handle));                      \
+        }                                                                            \
+                                                                                     \
+        walker.Handle = null; /* No more files.. terminate */                        \
+        return;                                                                      \
     }
                 CHECK_FIND_NEXT(FindNextFileW((HANDLE) walker.Handle, (WIN32_FIND_DATAW *) walker.PlatformFileInfo));
             }
@@ -626,8 +627,8 @@ export {
             free(walker.CurrentFileName);
 
             auto *fileName = ((WIN32_FIND_DATAW *) walker.PlatformFileInfo)->cFileName;
-            reserve(walker.CurrentFileName, c_string_length(fileName) * 2);  // @Bug c_string_length * 2 is not enough
-            utf16_to_utf8(fileName, const_cast<utf8 *>(walker.CurrentFileName.Data), &walker.CurrentFileName.Count);
+            reserve(walker.CurrentFileName, c_string_length(fileName) * 2);                                // @Bug c_string_length * 2 is not enough
+            utf16_to_utf8(fileName, (utf8 *) walker.CurrentFileName.Data, &walker.CurrentFileName.Count);  // @Constcast
             walker.CurrentFileName.Length = utf8_length(walker.CurrentFileName.Data, walker.CurrentFileName.Count);
         } while (walker.CurrentFileName == ".." || walker.CurrentFileName == ".");
         assert(walker.CurrentFileName != ".." && walker.CurrentFileName != ".");

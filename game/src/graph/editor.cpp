@@ -36,8 +36,6 @@ void editor_main() {
             ImGui::TextUnformatted("      Ctrl + Middle Mouse -> dvijenie");
             ImGui::TextUnformatted("      Ctrl + Right Mouse -> zoom");
             ImGui::TextUnformatted("");
-            ImGui::TextUnformatted(" Samo deto nyamashe wreme i kamerata ne prawi nishto :#");
-            ImGui::TextUnformatted("");
             ImGui::TextUnformatted("Tozi proekt juridicheski e zashiten sus swobodniya MIT licens, t.e. mozhesh da prawish kakwoto si iskash s nego.");
             ImGui::TextUnformatted("Eto kachen e tyk: github.com/Repertoi-e/light-std-graphics/");
             ImGui::PopTextWrapPos();

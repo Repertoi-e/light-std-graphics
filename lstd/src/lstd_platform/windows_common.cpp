@@ -18,11 +18,6 @@ extern "C" IMAGE_DOS_HEADER __ImageBase;
 #define MODULE_HANDLE ((HMODULE) &__ImageBase)
 
 struct win32_common_state {
-    utf16 *HelperClassName;
-
-    HWND HelperWindowHandle;
-    HDEVNOTIFY DeviceNotificationHandle;
-
     static constexpr s64 CONSOLE_BUFFER_SIZE = 1_KiB;
 
     byte CinBuffer[CONSOLE_BUFFER_SIZE];
@@ -38,12 +33,11 @@ struct win32_common_state {
     LARGE_INTEGER PerformanceFrequency;  // Used to time stuff
 
     string ModuleName;  // Caches the module name (retrieve this with os_get_current_module())
+
     string WorkingDir;  // Caches the working dir (query/modify this with os_get_working_dir(), os_set_working_dir())
     thread::mutex WorkingDirMutex;
 
     array<string> Argv;
-
-    string ClipboardString;
 };
 
 // We create a byte array which large enough to hold all global variables because
@@ -57,6 +51,23 @@ file_scope byte State[sizeof(win32_common_state)];
 
 // Short-hand macro for sanity
 #define S ((win32_common_state *) &State[0])
+
+// This is used before the Context is initted.
+void report_warning_no_allocations(string message) {
+    DWORD ignored;
+
+    string preMessage = ">>> Warning (in windows_common.cpp): ";
+    WriteFile(S->CerrHandle, preMessage.Data, (DWORD) preMessage.Count, &ignored, null);
+
+    WriteFile(S->CerrHandle, message.Data, (DWORD) message.Count, &ignored, null);
+
+    string postMessage = ".\n";
+    WriteFile(S->CerrHandle, postMessage.Data, (DWORD) postMessage.Count, &ignored, null);
+}
+
+void report_error(string message, source_location loc = source_location::current()) {
+    print(">>> {!RED}Platform error{!} {}:{} (in function: {}): {}.\n", loc.File, loc.Line, loc.Function, message);
+}
 
 // This zeroes out the global variables (stored in State) and initializes the mutexes
 void init_global_vars() {
@@ -120,8 +131,6 @@ void uninit_win32_state() {
         DEBUG_memory_info::report_leaks();
     }
 #endif
-
-    DestroyWindow(S->HelperWindowHandle);
 
     // Uninit mutexes
     S->CinMutex.release();
@@ -194,12 +203,34 @@ __declspec(allocate(".CRT$XTU")) cb *g_Termination = NULL;
 #error @TODO: See how this works on other compilers!
 #endif
 
+// Utf16.. Sigh...
+utf16 *utf8_to_utf16_temp(const string &str) {
+    if (!str.Length) return null;
+
+    // src.Length * 2 because one unicode character might take 2 wide chars.
+    // This is just an approximation, not all space will be used!
+    auto *result = allocate_array<utf16>(str.Length * 2 + 1, {.Alloc = Context.Temp});
+    utf8_to_utf16(str.Data, str.Length, result);
+    return result;
+}
+
+string utf16_to_utf8_temp(const utf16 *str) {
+    string result;
+
+    WITH_ALLOC(Context.Temp) {
+        // String length * 4 because one unicode character might take 4 bytes in utf8.
+        // This is just an approximation, not all space will be used!
+        reserve(result, c_string_length(str) * 4);
+    }
+
+    utf16_to_utf8(str, (utf8 *) result.Data, &result.Count);
+    result.Length = utf8_length(result.Data, result.Count);
+
+    return result;
+}
 
 bool dynamic_library::load(const string &name) {
-    // @Bug value.Length is not enough (2 wide chars for one char)
-    auto *buffer = allocate_array<utf16>(name.Length + 1, {.Alloc = Context.Temp});
-    utf8_to_utf16(name.Data, name.Length, buffer);
-    Handle = (void *) LoadLibraryW(buffer);
+    Handle = (void *) LoadLibraryW(utf8_to_utf16_temp(name));
     return Handle;
 }
 
@@ -213,36 +244,6 @@ void dynamic_library::close() {
     if (Handle) {
         FreeLibrary((HMODULE) Handle);
         Handle = null;
-    }
-}
-
-// This registeres a dummy window class which is used for some os_ functions
-file_scope void register_helper_window_class() {
-    GUID guid;
-    WIN32_CHECKHR(CoCreateGuid(&guid));
-    WIN32_CHECKHR(StringFromCLSID(guid, &S->HelperClassName));
-
-    WNDCLASSEXW wc;
-    zero_memory(&wc, sizeof(wc));
-    {
-        wc.cbSize = sizeof(wc);
-        wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-        wc.lpfnWndProc = DefWindowProcW;
-        wc.hInstance = MODULE_HANDLE;
-        wc.hCursor = LoadCursorW(null, IDC_ARROW);
-        wc.lpszClassName = S->HelperClassName;
-
-        // Load user-provided icon if available
-        wc.hIcon = (HICON) LoadImageW(MODULE_HANDLE, L"WINDOW ICON", IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_SHARED);
-        if (!wc.hIcon) {
-            // No user-provided icon found, load default icon
-            wc.hIcon = (HICON) LoadImageW(null, IDI_APPLICATION, IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_SHARED);
-        }
-    }
-
-    if (!RegisterClassExW(&wc)) {
-        print("(windows_common.cpp): Failed to register helper window class\n");
-        assert(false);
     }
 }
 
@@ -264,10 +265,7 @@ void win32_common_init_global_state() {
     S->CerrHandle = GetStdHandle(STD_ERROR_HANDLE);
 
     if (!SetConsoleOutputCP(CP_UTF8)) {
-        string warning = ">>> Warning: Couldn't set console code page to UTF8. Some characters might be messed up.\n";
-
-        DWORD ignored;
-        WriteFile(S->CerrHandle, warning.Data, (DWORD) warning.Count, &ignored, null);
+        report_warning_no_allocations("Couldn't set console code page to UTF8 - some characters might be messed up");
     }
 
     // Enable ANSI escape sequences
@@ -297,84 +295,28 @@ void win32_common_init_global_state() {
         break;
     }
 
-    WITH_CONTEXT_VAR(AllocOptions, Context.AllocOptions | LEAK) {
-        reserve(S->ModuleName, reserved * 2);  // @Bug reserved * 2 is not enough
+    string moduleName = utf16_to_utf8_temp(buffer);
+    WITH_ALLOC(Context.Temp) {
+        S->ModuleName = path_normalize(moduleName);
     }
-
-    utf16_to_utf8(buffer, const_cast<utf8 *>(S->ModuleName.Data), &S->ModuleName.Count);
-    S->ModuleName.Length = utf8_length(S->ModuleName.Data, S->ModuleName.Count);
-
-    // :UnifyPath
-    replace_all(S->ModuleName, '\\', '/');
 
     // Get the arguments
     utf16 **argv;
     s32 argc;
 
-    // @Cleanup: Parse the arguments ourselves and use our temp allocator
-    // and don't bother with cleaning up this functions memory.
+    // @Cleanup @DependencyCleanup: Parse arguments ourselves? We depend on this function which
+    // is in a library we reference ONLY because of this one function.
     argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argv == null) {
-        string warning = ">>> Warning: Couldn't parse command line arguments, os_get_command_line_arguments() will return an empty array in all cases.\n";
-
-        DWORD ignored;
-        WriteFile(S->CerrHandle, warning.Data, (DWORD) warning.Count, &ignored, null);
+        report_warning_no_allocations("Couldn't parse command line arguments, os_get_command_line_arguments() will return an empty array in all cases");
     } else {
-        WITH_CONTEXT_VAR(AllocOptions, Context.AllocOptions | LEAK) {
+        WITH_ALLOC(Context.Temp) {
             reserve(S->Argv, argc - 1);
         }
 
-        For(range(1, argc)) {
-            auto *warg = argv[it];
-
-            auto *arg = append(S->Argv);
-            WITH_CONTEXT_VAR(AllocOptions, Context.AllocOptions | LEAK) {
-                reserve(*arg, c_string_length(warg) * 2);  // @Bug c_string_length * 2 is not enough
-            }
-            utf16_to_utf8(warg, const_cast<utf8 *>(arg->Data), &arg->Count);
-            arg->Length = utf8_length(arg->Data, arg->Count);
-        }
-
+        // Skip the .exe name
+        For(range(1, argc)) append(S->Argv, utf16_to_utf8_temp(argv[it]));
         LocalFree(argv);
-    }
-
-    // Create helper window
-    register_helper_window_class();
-
-    {
-        MSG msg;
-
-        S->HelperWindowHandle = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW, S->HelperClassName, L"LSTD Message Window", WS_CLIPSIBLINGS | WS_CLIPCHILDREN, 0, 0, 1, 1, null, null, MODULE_HANDLE, null);
-        if (!S->HelperWindowHandle) {
-            print("(windows_monitor.cpp): Failed to create helper window\n");
-            assert(false);
-        }
-
-        ShowWindow(S->HelperWindowHandle, SW_HIDE);
-
-        // The guid for GUID_DEVINTERFACE_HID.
-        //
-        // GUID_DEVINTERFACE_HID = {4D1E55B2-F16F-11CF-88CB-001111000030};
-        // b2551e4d6ff1cf1188cb001111000030
-        // b2551e4d, 6ff1, cf11, {88, cb, 00, 11, 11, 00, 00, 30}
-        //
-
-        // Register for HID device notifications
-        {
-            DEV_BROADCAST_DEVICEINTERFACE_W dbi;
-            zero_memory(&dbi, sizeof(dbi));
-            {
-                dbi.dbcc_size = sizeof(dbi);
-                dbi.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
-                dbi.dbcc_classguid = {0xb2551e4d, 0x6ff1, 0xcf11, {0x88, 0xcb, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30}};  // GUID_DEVINTERFACE_HID
-            }
-            S->DeviceNotificationHandle = RegisterDeviceNotificationW(S->HelperWindowHandle, (DEV_BROADCAST_HDR *) &dbi, DEVICE_NOTIFY_WINDOW_HANDLE);
-        }
-
-        while (PeekMessageW(&msg, S->HelperWindowHandle, 0, 0, PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
     }
 }
 
@@ -477,7 +419,7 @@ void *os_resize_block(void *ptr, s64 newSize) {
     if (newSize < oldSize && !is_contraction_possible(oldSize)) return ptr;
 
     if (reportError) {
-        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "HeapReAlloc", __FILE__, __LINE__);
+        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "HeapReAlloc");
     }
     return null;
 }
@@ -485,33 +427,28 @@ void *os_resize_block(void *ptr, s64 newSize) {
 s64 os_get_block_size(void *ptr) {
     s64 result = HeapSize(GetProcessHeap(), 0, ptr);
     if (result == -1) {
-        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "HeapSize", __FILE__, __LINE__);
+        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "HeapSize");
         return 0;
     }
     return result;
 }
 
-#define CREATE_MAPPING_CHECKED(handleName, call, returnOnFail)                                                  \
-    HANDLE handleName = call;                                                                                   \
-    if (!handleName) {                                                                                          \
-        string extendedCallSite = sprint("{}\n        (the name was: {!YELLOW}\"{}\"{!GRAY})\n", #call, name);  \
-        defer(free(extendedCallSite));                                                                          \
-        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), extendedCallSite, __FILE__, __LINE__); \
-        return returnOnFail;                                                                                    \
+#define CREATE_MAPPING_CHECKED(handleName, call, returnOnFail)                                                 \
+    HANDLE handleName = call;                                                                                  \
+    if (!handleName) {                                                                                         \
+        string extendedCallSite = sprint("{}\n        (the name was: {!YELLOW}\"{}\"{!GRAY})\n", #call, name); \
+        defer(free(extendedCallSite));                                                                         \
+        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), extendedCallSite);                    \
+        return returnOnFail;                                                                                   \
     }
 
 void os_write_shared_block(const string &name, void *data, s64 size) {
-    // @Bug name.Length is not enough (2 wide chars for one char)
-    auto *name16 = allocate_array<utf16>(name.Length + 1, {.Alloc = Context.Temp});
-    utf8_to_utf16(name.Data, name.Length, name16);
-
-    CREATE_MAPPING_CHECKED(h,
-                           CreateFileMappingW(INVALID_HANDLE_VALUE, null, PAGE_READWRITE, 0, (DWORD) size, name16), );
+    CREATE_MAPPING_CHECKED(h, CreateFileMappingW(INVALID_HANDLE_VALUE, null, PAGE_READWRITE, 0, (DWORD) size, utf8_to_utf16_temp(name)), );
     defer(CloseHandle(h));
 
     void *result = MapViewOfFile(h, FILE_MAP_WRITE, 0, 0, size);
     if (!result) {
-        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "MapViewOfFile", __FILE__, __LINE__);
+        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "MapViewOfFile");
         return;
     }
     copy_memory(result, data, size);
@@ -519,16 +456,12 @@ void os_write_shared_block(const string &name, void *data, s64 size) {
 }
 
 void os_read_shared_block(const string &name, void *out, s64 size) {
-    // @Bug name.Length is not enough (2 wide chars for one char)
-    auto *name16 = allocate_array<utf16>(name.Length + 1, {.Alloc = Context.Temp});
-    utf8_to_utf16(name.Data, name.Length, name16);
-
-    CREATE_MAPPING_CHECKED(h, OpenFileMappingW(FILE_MAP_READ, false, name16), );
+    CREATE_MAPPING_CHECKED(h, OpenFileMappingW(FILE_MAP_READ, false, utf8_to_utf16_temp(name)), );
     defer(CloseHandle(h));
 
     void *result = MapViewOfFile(h, FILE_MAP_READ, 0, 0, size);
     if (!result) {
-        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "MapViewOfFile", __FILE__, __LINE__);
+        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "MapViewOfFile");
         return;
     }
 
@@ -556,9 +489,13 @@ time_t os_get_time() {
     return count.QuadPart;
 }
 
-f64 os_time_to_seconds(time_t time) { return (f64) time / S->PerformanceFrequency.QuadPart; }
+f64 os_time_to_seconds(time_t time) {
+    return (f64) time / S->PerformanceFrequency.QuadPart;
+}
 
-string os_get_current_module() { return S->ModuleName; }
+string os_get_current_module() {
+    return S->ModuleName;
+}
 
 string os_get_working_dir() {
     thread::scoped_lock _(&S->WorkingDirMutex);
@@ -567,20 +504,14 @@ string os_get_working_dir() {
     auto *dir16 = allocate_array<utf16>(required + 1, {.Alloc = Context.Temp});
 
     if (!GetCurrentDirectoryW(required + 1, dir16)) {
-        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "GetCurrentDirectory", __FILE__, __LINE__);
+        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "GetCurrentDirectory");
         return "";
     }
 
-    WITH_CONTEXT_VAR(AllocOptions, Context.AllocOptions | LEAK) {
-        reserve(S->WorkingDir, required * 2);  // @Bug required * 2 is not enough
+    string workingDir = utf16_to_utf8_temp(dir16);
+    WITH_ALLOC(Context.Alloc) {
+        S->WorkingDir = path_normalize(workingDir);
     }
-
-    utf16_to_utf8(dir16, const_cast<utf8 *>(S->WorkingDir.Data), &S->WorkingDir.Count);
-    S->WorkingDir.Length = utf8_length(S->WorkingDir.Data, S->WorkingDir.Count);
-
-    // :UnifyPath
-    replace_all(S->WorkingDir, '\\', '/');
-
     return S->WorkingDir;
 }
 
@@ -590,19 +521,14 @@ void os_set_working_dir(const string &dir) {
 
     thread::scoped_lock _(&S->WorkingDirMutex);
 
-    // @Bug
-    auto *dir16 = allocate_array<utf16>(dir.Length + 1, {.Alloc = Context.Temp});
-    utf8_to_utf16(dir.Data, dir.Length, dir16);
-
-    WIN32_CHECKBOOL(SetCurrentDirectoryW(dir16));
+    WIN32_CHECKBOOL(SetCurrentDirectoryW(utf8_to_utf16_temp(dir)));
 
     S->WorkingDir = dir;
 }
 
 os_get_env_result os_get_env(const string &name, bool silent) {
     // @Bug name.Length is not enough (2 wide chars for one char)
-    auto *name16 = allocate_array<utf16>(name.Length + 1, {.Alloc = Context.Temp});
-    utf8_to_utf16(name.Data, name.Length, name16);
+    auto *name16 = utf8_to_utf16_temp(name);
 
     DWORD bufferSize = 65535;  // Limit according to http://msdn.microsoft.com/en-us/library/ms683188.aspx
 
@@ -611,7 +537,7 @@ os_get_env_result os_get_env(const string &name, bool silent) {
 
     if (r == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
         if (!silent) {
-            print(">>> Warning: Couldn't find environment variable with value \"{}\"\n", name);
+            report_error(tsprint("Couldn't find environment variable with value \"{}\"", name));
         }
         return {"", false};
     }
@@ -625,89 +551,64 @@ os_get_env_result os_get_env(const string &name, bool silent) {
         // Possible to fail a second time ?
     }
 
-    string result;
-    reserve(result, bufferSize * 2);  // @Bug bufferSize * 2 is not enough
-    utf16_to_utf8(buffer, const_cast<utf8 *>(result.Data), &result.Count);
-    result.Length = utf8_length(result.Data, result.Count);
-
-    return {result, true};
+    return {utf16_to_utf8_temp(buffer), true};
 }
 
 void os_set_env(const string &name, const string &value) {
-    // @Bug name.Length is not enough (2 wide chars for one char)
-    auto *name16 = allocate_array<utf16>(name.Length + 1, {.Alloc = Context.Temp});
-    utf8_to_utf16(name.Data, name.Length, name16);
-
-    // @Bug value.Length is not enough (2 wide chars for one char)
-    auto *value16 = allocate_array<utf16>(value.Length + 1, {.Alloc = Context.Temp});
-    utf8_to_utf16(value.Data, value.Length, value16);
-
     if (value.Length > 32767) {
-        // assert(false);
-        // @Cleanup
-        // The docs say windows doesn't allow that but we should test it.
+        // @Cleanup: The docs say windows doesn't allow that but we should test it.
+        assert(false);
     }
 
-    WIN32_CHECKBOOL(SetEnvironmentVariableW(name16, value16));
+    WIN32_CHECKBOOL(SetEnvironmentVariableW(utf8_to_utf16_temp(name), utf8_to_utf16_temp(value)));
 }
 
 void os_remove_env(const string &name) {
-    // @Bug name.Length is not enough (2 wide chars for one char)
-    auto *name16 = allocate_array<utf16>(name.Length + 1, {.Alloc = Context.Temp});
-    utf8_to_utf16(name.Data, name.Length, name16);
-
-    WIN32_CHECKBOOL(SetEnvironmentVariableW(name16, null));
+    WIN32_CHECKBOOL(SetEnvironmentVariableW(utf8_to_utf16_temp(name), null));
 }
 
 string os_get_clipboard_content() {
-    if (!OpenClipboard(S->HelperWindowHandle)) {
-        print("(windows_monitor.cpp): Failed to open clipboard\n");
+    if (!OpenClipboard(null)) {
+        report_error("Failed to open clipboard");
         return "";
     }
     defer(CloseClipboard());
 
     HANDLE object = GetClipboardData(CF_UNICODETEXT);
     if (!object) {
-        print("(windows_monitor.cpp): Failed to convert clipboard to string\n");
+        report_error("Failed to convert clipboard to string");
         return "";
     }
 
-    auto *buffer = (utf16 *) GlobalLock(object);
-    if (!buffer) {
-        print("(windows_monitor.cpp): Failed to lock global handle\n");
+    auto *clipboard16 = (utf16 *) GlobalLock(object);
+    if (!clipboard16) {
+        report_error("Failed to lock global handle");
         return "";
     }
     defer(GlobalUnlock(object));
 
-    WITH_CONTEXT_VAR(AllocOptions, Context.AllocOptions | LEAK) {
-        reserve(S->ClipboardString, c_string_length(buffer) * 2);  // @Bug c_string_length * 2 is not enough
-    }
-
-    utf16_to_utf8(buffer, const_cast<utf8 *>(S->ClipboardString.Data), &S->ClipboardString.Count);
-    S->ClipboardString.Length = utf8_length(S->ClipboardString.Data, S->ClipboardString.Count);
-
-    return S->ClipboardString;
+    return utf16_to_utf8_temp(clipboard16);
 }
 
 void os_set_clipboard_content(const string &content) {
     HANDLE object = GlobalAlloc(GMEM_MOVEABLE, content.Length * 2 * sizeof(utf16));
     if (!object) {
-        print("(windows_monitor.cpp): Failed to open clipboard\n");
+        report_error("Failed to open clipboard");
         return;
     }
     defer(GlobalFree(object));
 
-    auto *buffer = (utf16 *) GlobalLock(object);
-    if (!buffer) {
-        print("(windows_monitor.cpp): Failed to lock global handle\n");
+    auto *clipboard16 = (utf16 *) GlobalLock(object);
+    if (!clipboard16) {
+        report_error("Failed to lock global handle");
         return;
     }
 
-    utf8_to_utf16(content.Data, content.Length, buffer);
+    utf8_to_utf16(content.Data, content.Length, clipboard16);
     GlobalUnlock(object);
 
-    if (!OpenClipboard(S->HelperWindowHandle)) {
-        print("(windows_monitor.cpp): Failed to open clipboard\n");
+    if (!OpenClipboard(null)) {
+        report_error("Failed to open clipboard.");
         return;
     }
     defer(CloseClipboard());

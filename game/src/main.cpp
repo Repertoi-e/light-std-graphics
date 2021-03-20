@@ -244,12 +244,11 @@ s32 main() {
         auto windowFlags = window::SHOWN | window::RESIZABLE | window::VSYNC | window::FOCUS_ON_SHOW | window::CLOSE_ON_ALT_F4;
         gameMemory.MainWindow = allocate<window>()->init(windowTitle, window::DONT_CARE, window::DONT_CARE, GameWidth, GameHeight, windowFlags);
 
-        // Didn't work?
-        // auto icon = pixel_buffer("data/icon.ico", false, pixel_format::RGBA);
-        // array<pixel_buffer> icons;
-        // append(icons, icon);
-        // gameMemory.MainWindow->set_icon(icons);
-        // free(icons);
+        auto icon = pixel_buffer("data/calc.png", false, pixel_format::RGBA);
+        array<pixel_buffer> icons;
+        append(icons, icon);
+        gameMemory.MainWindow->set_icon(icons);
+        free(icons);
 
         gameMemory.MainWindow->Event.connect(main_window_event);
 
