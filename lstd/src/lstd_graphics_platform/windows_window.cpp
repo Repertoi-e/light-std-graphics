@@ -1370,9 +1370,6 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
         case WM_NCHITTEST:
             if (win->Flags & window::MOUSE_PASS_THROUGH) return HTTRANSPARENT;
             break;
-        case WM_DWMCOMPOSITIONCHANGED:
-            if (win->Flags & window::ALPHA) update_framebuffer_transparency(win);
-            return 0;
         case WM_GETDPISCALEDSIZE: {
             // Adjust the window size to keep the content area size constant
             if (IS_WINDOWS_10_CREATORS_UPDATE_OR_GREATER()) {
@@ -1406,6 +1403,18 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             (void) win->Event.emit(e);
             break;
         }
+        case WM_THEMECHANGED:
+        case WM_SETTINGCHANGE:
+        case WM_DWMCOMPOSITIONCHANGED:
+            // @TODO: Handle font size change here!
+            
+            InvalidateRect(hWnd, null, true);
+
+            if (message == WM_DWMCOMPOSITIONCHANGED) {
+                if (win->Flags & window::ALPHA) update_framebuffer_transparency(win);
+                return 0;
+            }
+            break;
         case WM_SETCURSOR:
             if (LOWORD(lParam) == HTCLIENT) {
                 update_cursor_image(win);

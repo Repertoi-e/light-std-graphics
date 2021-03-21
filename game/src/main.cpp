@@ -239,7 +239,7 @@ s32 main() {
 
     WITH_ALLOC(GameAlloc) {
         // string windowTitle = sprint("Graphics Engine | {}", GameFileName);
-        string windowTitle = "Quadratic Calculator";
+        string windowTitle = "Calculator";
 
         auto windowFlags = window::SHOWN | window::RESIZABLE | window::VSYNC | window::FOCUS_ON_SHOW | window::CLOSE_ON_ALT_F4;
         gameMemory.MainWindow = allocate<window>()->init(windowTitle, window::DONT_CARE, window::DONT_CARE, GameWidth, GameHeight, windowFlags);
@@ -337,6 +337,8 @@ static void update_modifiers() {
     io.KeyAlt = io.KeysDown[Key_LeftAlt] || io.KeysDown[Key_RightAlt];
     io.KeySuper = io.KeysDown[Key_LeftGUI] || io.KeysDown[Key_RightGUI];
 }
+
+void imgui_update_monitors();
 
 static bool common_event_callback(const event &e) {
     ImGuiIO &io = ImGui::GetIO();
@@ -490,7 +492,7 @@ static void update_monitors(const monitor_event &e) {
 }
 
 static void init_imgui_for_our_windows(window *mainWindow) {
-    os_poll_monitors();
+    os_poll_monitors();  // @Cleanup: In the ideal case we shouldn't need this.
 
     ImGui::CreateContext();
 
@@ -525,6 +527,8 @@ static void init_imgui_for_our_windows(window *mainWindow) {
     io.SetClipboardTextFn = [](auto, const char *text) { os_set_clipboard_content(string(text)); };
     io.GetClipboardTextFn = [](auto) {
         static array<char> buffer;
+
+        // ImGui expects a null-terminated string.
 
         auto content = os_get_clipboard_content();
         reserve(buffer, content.Count + 1);

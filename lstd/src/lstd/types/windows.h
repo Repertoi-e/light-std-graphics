@@ -383,6 +383,11 @@ int ReleaseDC(
     HWND hWnd,
     HDC hDC);
 
+BOOL InvalidateRect(
+    HWND hWnd,
+    const RECT *lpRect,
+    BOOL bErase);
+
 HMONITOR MonitorFromWindow(
     HWND hwnd,
     DWORD dwFlags);
@@ -2577,6 +2582,8 @@ BOOL ChangeWindowMessageFilterEx(
 #define WM_PRINTCLIENT 0x0318
 #define WM_APPCOMMAND 0x0319
 #define WM_THEMECHANGED 0x031A
+#define WM_WININICHANGE 0x001A
+#define WM_SETTINGCHANGE WM_WININICHANGE
 #define WM_CLIPBOARDUPDATE 0x031d
 #define WM_DWMCOMPOSITIONCHANGED 0x031e
 #define WM_DWMNCRENDERINGCHANGED 0x031f
