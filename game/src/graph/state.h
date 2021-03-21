@@ -2,6 +2,8 @@
 
 #include <game.h>
 
+#include "ast.h"
+
 struct camera {
     //
     // Note: We used to use these properties to build a view matrix which transforms all geometry in the viewport
@@ -31,6 +33,7 @@ struct game_state {
     char Formula[FORMULA_INPUT_BUFFER_SIZE]{};
 
     string FormulaMessage;
+    ast *FormulaRoot = null;
 
     camera Camera;
 };
