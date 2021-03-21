@@ -106,43 +106,47 @@ struct token {
                 PARENTHESIS,
                 VARIABLE };
 
-    type Type = NONE;
+    type Type;
+    string Str;  // Always gets set to the initial representation of the token, used for error reporting
+
     union {
-        string StrValue;
         u32 U32Value;
         f64 F64Value;
     };
 
-    constexpr token() : StrValue(string()) {}
-    constexpr token(type t, string s) : Type(t), StrValue(s) {}
-    constexpr token(type t, f64 f) : Type(t), F64Value(f) {}
-    constexpr token(type t, u32 u) : Type(t), U32Value(u) {}
+    constexpr token(type t = NONE, string s = " ") : Type(t), Str(s) {}
+    constexpr token(type t, string s, f64 f) : Type(t), Str(s), F64Value(f) {}
+    constexpr token(type t, string s, u32 u) : Type(t), Str(s), U32Value(u) {}
 };
 
 // Only makes sense for Token_Type.OPERATOR.
 // Decides if one operator should take precedence over the other
 // and also takes into account operator associativity(left vs right).
 bool operator>(const token &a, const token &b) {
-    s32 p1 = op_precedence(a.StrValue);
-    s32 p2 = op_precedence(b.StrValue);
+    s32 p1 = op_precedence(a.Str);
+    s32 p2 = op_precedence(b.Str);
 
-    s32 a1 = op_associativity(a.StrValue);
-    s32 a2 = op_associativity(b.StrValue);
+    s32 a1 = op_associativity(a.Str);
+    s32 a2 = op_associativity(b.Str);
 
     if (p1 > p2) return true;
     if (p1 == p2 && a1 == LEFT_ASSOCIATIVE) return true;
     return false;
 }
 
-bool operator==(const token &a, const token &b) { return a.Type == b.Type && a.StrValue == b.StrValue; }
+bool operator==(const token &a, const token &b) { return a.Type == b.Type && a.Str == b.Str; }
 bool operator!=(const token &a, const token &b) { return !(a == b); }
 
 constexpr auto OP_SENTINEL = token(token::OPERATOR, "sentinel");
 
 struct token_stream {
-    array<token> Tokens, It;
+    string Expression;  // The original tokenized expression, used for error reporting.
 
-    string Error = "";
+    array<token> Tokens;
+    array<token> It;  // We eat tokens from here, initially it equals Tokens, we must save Tokens in order to free the array.
+                      // Note: We free the array, the tokens themselves are substrings and point in _Expression_ so they shouldn't be freed
+
+    string Error = "";  // If there was an error, it gets stored here
 };
 
 void free(token_stream &stream) {
@@ -153,37 +157,30 @@ bool is_op(utf32 ch) { return ch == '+' || ch == '-' || ch == '*' || ch == '/' |
 bool is_unary_op(utf32 ch) { return ch == '+' || ch == '-'; }
 bool is_parenthesis(utf32 ch) { return ch == '(' || ch == ')'; }
 
-template <>
-struct lstd::formatter<token> {
-    void format(const token &t, fmt_context *f) {
-        if (t.Type == token::NONE) {
-            format_tuple(f, "Token").field("None")->finish();
-        } else if (t.Type == token::REAL_NUMBER) {
-            format_tuple(f, "Token").field("REAL_NUMBER")->field(t.F64Value)->finish();
-        } else if (t.Type == token::WHOLE_NUMBER) {
-            format_tuple(f, "Token").field("WHOLE_NUMBER")->field(t.U32Value)->finish();
+// errorPos = -1 means we calculate from _It_,
+// if we are tokenizing, then the caller must pass the correct position (since we don't have a full token array yet!)
+void error(token_stream &stream, string message, s64 errorPos = -1) {
+    if (stream.Error) return;
+    append_string(stream.Error, message);
+    append_string(stream.Error, "\n  ");
+    append_string(stream.Error, stream.Expression);
+
+    if (errorPos == -1) {
+        if (stream.It) {
+            errorPos = stream.It[0].Str.Data - stream.Expression.Data;
         } else {
-            string typeStr = "INVALID";
-            if (t.Type == token::OPERATOR) typeStr = "OPERATOR";
-            if (t.Type == token::PARENTHESIS) typeStr = "PARENTHESIS";
-            if (t.Type == token::VARIABLE) typeStr = "VARIABLE";
-            format_tuple(f, "Token").field(typeStr)->field(t.StrValue)->finish();
+            errorPos = stream.Expression.Length;
         }
     }
-};
-
-void error(token_stream &stream, string message) {
-    append_string(stream.Error, message);
-    auto tokens = stream.It;
-    if (tokens) {
-        append_string(stream.Error, tsprint(", remaining tokens: ", tokens));
-    }
+    append_string(stream.Error, tsprint("\n  {: >{}}", "^", errorPos + 1));
 }
 
+// @Cleanup
 extern "C" double strtod(const char *str, char **endptr);
 
 [[nodiscard("Leak")]] token_stream tokenize(string s) {
-    token_stream result;
+    token_stream stream;
+    stream.Expression = s;
 
     s = trim_end(s);
 
@@ -196,11 +193,11 @@ extern "C" double strtod(const char *str, char **endptr);
             auto [value, status, rest] = parse_int<u32, parse_int_options{.ParseSign = false, .LookForBasePrefix = true}>(s);
 
             if (status == PARSE_INVALID || status == PARSE_EXHAUSTED) {
-                error(result, tsprint("Invalid number while parsing: \"{}\"", s));
-                return result;
+                error(stream, "Invalid number while parsing", s.Data - stream.Expression.Data - 1);
+                return stream;
             } else if (status == PARSE_TOO_MANY_DIGITS) {
-                error(result, tsprint("Number was too large: \"{}\"", s));
-                return result;
+                error(stream, "Number was too large", s.Data - stream.Expression.Data - 1);
+                return stream;
             } else {
                 // PARSE_SUCCESS
                 if (rest && rest[0] == '.') {
@@ -208,44 +205,74 @@ extern "C" double strtod(const char *str, char **endptr);
 
                     auto *ch = to_c_string(s);
                     char *end;
+
                     f64 fltValue = strtod(ch, &end);
                     // u32 read = Numbers_DecToNum_flt64(&fltValue, to_c_string(s));
                     // if (read == 0) {
-                    //     error(result, "Number was too large");
-                    //     return result;
+                    //     error(stream, "Number was too large", ..);
+                    //     return stream;
                     // } else if (read == -1) {
-                    //     error(result, "Invalid number");
-                    //     return result;
+                    //     error(stream, "Invalid number", ..);
+                    //     return stream;
                     // }
 
+                    auto str = s(0, end - ch);
+
                     s = s(end - ch, s.Length);
-                    append(result.Tokens, {token::REAL_NUMBER, fltValue});
+                    append(stream.Tokens, {token::REAL_NUMBER, str, fltValue});
                 } else {
                     // There was no dot.
+                    auto str = s(0, -string(rest).Length);
+
                     s = rest;
-                    append(result.Tokens, {token::WHOLE_NUMBER, value});
+                    append(stream.Tokens, {token::WHOLE_NUMBER, str, value});
                 }
             }
         } else if (is_op(s[0])) {
-            append(result.Tokens, {token::OPERATOR, s(0, 1)});
+            append(stream.Tokens, {token::OPERATOR, s(0, 1)});
             s = s(1, s.Length);
         } else if (is_parenthesis(s[0])) {
-            append(result.Tokens, {token::PARENTHESIS, s(0, 1)});
+            append(stream.Tokens, {token::PARENTHESIS, s(0, 1)});
             s = s(1, s.Length);
         } else if (is_alpha(s[0])) {
-            append(result.Tokens, {token::VARIABLE, s(0, 1)});
+            append(stream.Tokens, {token::VARIABLE, s(0, 1)});
             s = s(1, s.Length);
         } else {
-            error(result, tsprint("Unexpected character when parsing: \"{}\"", s));
-            return result;
+            error(stream, tsprint("Unexpected character when parsing", s.Data - stream.Expression.Data - 1));
+            return stream;
         }
     }
 
-    result.It = result.Tokens;
+    stream.It = stream.Tokens;
 
-    return result;
+    return stream;
 }
 
+token peek(token_stream &stream) {
+    if (stream.It) return stream.It[0];
+    return token();
+}
+
+token consume(token_stream &stream) {
+    auto next = peek(stream);
+    if (next.Type != token::NONE) {
+        stream.It.Data++, stream.It.Count--;
+    }
+    return next;
+}
+
+void expect(token_stream &stream, token t) {
+    auto next = peek(stream);
+    if (next == t) {
+        consume(stream);
+    } else {
+        string message = tsprint("Expected \"{}\"", t.Str);
+        if (t.Type == token::NONE) message = "Unexpected token";
+        error(stream, message);
+    }
+}
+
+//
 // Grammar:
 //
 //    v      --> Number literal | Variable (letter)
@@ -257,39 +284,46 @@ extern "C" double strtod(const char *str, char **endptr);
 //    E      --> P {Binary P}
 //    P      --> v | "(" E ")" | Unary P
 //
+bool is_token_a_number(token t) {
+    return t.Type == token::WHOLE_NUMBER || t.Type == token::REAL_NUMBER;
+}
 
-/*
-def validate_p(tokens):
-    next_token = tokens.peek()
-    if next_token.type in {Token_Type.VARIABLE, Token_Type.NUMBER}:
-        tokens.consume()
-    elif next_token.value == "(":
-        tokens.consume()
-        validate_e(tokens)
-        tokens.expect(Token(Token_Type.PARENTHESIS, ")"))
-    elif is_unary_op(next_token.value):
-        tokens.consume()
-        validate_p(tokens)
-    else:
-        tokens.error("Unexpected token")
-    
-def validate_e(tokens):
-    validate_p(tokens)
+void validate_e(token_stream &stream);
 
-    # "(" without operator beforehand means implicit * 
-    while is_op(tokens.peek().value) or tokens.peek().value == "(":
-        # We consume the operator but not the ( since that is part of "p"
-        if tokens.peek().value != "(":
-            tokens.consume()
-        validate_p(tokens)
+void validate_p(token_stream &stream) {
+    auto next = peek(stream);
+    if (next.Type == token::VARIABLE || is_token_a_number(next)) {
+        consume(stream);
+    } else if (next.Str == "(") {
+        consume(stream);
+        validate_e(stream);
+        expect(stream, token(token::PARENTHESIS, ")"));
+    } else if (is_unary_op(next.Str[0])) {
+        consume(stream);
+        validate_p(stream);
+    } else if (next.Type == token::NONE) {
+        error(stream, "Unexpected end of expression");
+    } else {
+        error(stream, "Unexpected token");
+    }
+}
 
-def validate_expression(tokens):
-    validate_e(tokens)
-    tokens.expect(Token(Token_Type.NONE))
+void validate_e(token_stream &stream) {
+    validate_p(stream);
 
-                */
+    // "(" without operator beforehand means implicit *
+    while (!stream.Error && (peek(stream).Type == token::OPERATOR || peek(stream).Str == "(")) {
+        // We consume the operator but not the "(" since that is part of "p"
+        if (peek(stream).Type == token::OPERATOR) {
+            consume(stream);
+        }
+        validate_p(stream);
+    }
+}
 
-void validate_expression() {
+void validate_expression(token_stream &stream) {
+    validate_e(stream);
+    expect(stream, token());
 }
 
 void ui_functions() {
@@ -303,7 +337,12 @@ void ui_functions() {
                 if (tokens.Error) {
                     msg = tokens.Error;
                 } else {
-                    msg = "Success!";
+                    validate_expression(tokens);
+                    if (tokens.Error) {
+                        msg = tokens.Error;
+                    } else {
+                        msg = "Success!";
+                    }
                 }
             }
             clone(&GameState->FormulaMessage, msg);

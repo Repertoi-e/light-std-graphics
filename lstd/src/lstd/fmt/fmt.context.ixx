@@ -276,15 +276,15 @@ export {
         write_no_specs(F, Name);
         write_no_specs(F, " {");
 
-        auto *begin = Fields.begin();
-        if (begin != Fields.end()) {
+        auto *p = Fields.begin();
+        if (p != Fields.end()) {
             write_no_specs(F, " ");
-            write_field(begin);
-            ++begin;
-            while (begin != Fields.end()) {
+            write_field(p);
+            ++p;
+            while (p != Fields.end()) {
                 write_no_specs(F, ", ");
-                write_field(begin);
-                ++begin;
+                write_field(p);
+                ++p;
             }
         }
         write_no_specs(F, " }");
@@ -295,14 +295,14 @@ export {
         write_no_specs(F, Name);
         write_no_specs(F, "(");
 
-        auto *begin = Fields.begin();
-        if (begin != Fields.end()) {
-            fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *begin);
-            ++begin;
-            while (begin != Fields.end()) {
+        auto *p = Fields.begin();
+        if (p != Fields.end()) {
+            fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *p);
+            ++p;
+            while (p != Fields.end()) {
                 write_no_specs(F, ", ");
-                fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *begin);
-                ++begin;
+                fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *p);
+                ++p;
             }
         }
         write_no_specs(F, ")");
@@ -312,14 +312,14 @@ export {
     void format_list<FC>::finish() {
         write_no_specs(F, "[");
 
-        auto *begin = Fields.begin();
-        if (begin != Fields.end()) {
-            fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *begin);
-            ++begin;
-            while (begin != Fields.end()) {
+        auto *p = Fields.begin();
+        if (p != Fields.end()) {
+            fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *p);
+            ++p;
+            while (p != Fields.end()) {
                 write_no_specs(F, ", ");
-                fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *begin);
-                ++begin;
+                fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *p);
+                ++p;
             }
         }
         write_no_specs(F, "]");
