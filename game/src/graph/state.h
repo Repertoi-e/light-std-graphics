@@ -28,15 +28,20 @@ struct game_state {
     v4 ClearColor = {0.92f, 0.92f, 0.92f, 1.0f};
 
     camera Camera;
-
-    game_memory *Memory;
 };
 
 void reload_global_state();
 
-void editor_main();
-void editor_scene_properties();
+void ui_main();
+void ui_scene_properties();
+void ui_functions();
 
-void viewport_render();
+inline void render_ui() {
+    ui_main();
+    ui_scene_properties();
+    ui_functions();
+}
+
+void render_viewport();
 
 inline game_state *GameState = null;

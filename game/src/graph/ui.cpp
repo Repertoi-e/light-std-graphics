@@ -1,6 +1,6 @@
 #include "state.h"
 
-void editor_main() {
+void ui_main() {
     ImGuiViewport *viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->Pos);
     ImGui::SetNextWindowSize(viewport->Size);
@@ -9,11 +9,7 @@ void editor_main() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
-    ImGui::Begin("CDock Window", null,
-                 ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
-                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
-                     ImGuiWindowFlags_NoBackground);
+    ImGui::Begin("CDock Window", null, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground);
     ImGui::PopStyleVar(3);
 
     ImGuiID dockspaceID = ImGui::GetID("CDock");
@@ -46,9 +42,7 @@ void editor_main() {
     ImGui::End();
 }
 
-import fmt;
-
-void editor_scene_properties() {
+void ui_scene_properties() {
     auto *cam = &GameState->Camera;
 
     ImGui::Begin("Scene", null);
@@ -72,11 +66,13 @@ void editor_scene_properties() {
         ImGui::InputFloat2("Zoom min/max", &cam->ZoomMin);
         if (ImGui::Button("Default camera constants")) camera_reset_constants(cam);
     }
-
     ImGui::End();
+}
 
-    ImGui::Begin("Main", null);
+void ui_functions() {
+    ImGui::Begin("Functions", null);
     {
+        ImGui::Text((const char *) u8"Здравейте?");
     }
     ImGui::End();
 }

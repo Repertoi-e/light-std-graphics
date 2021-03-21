@@ -40,26 +40,15 @@ file_scope auto MonitorCallback = [](const monitor_event &e) {
     }
 };
 
-void register_window_class();
+file_scope bool MonitorCallbackAdded = false;
 
-struct win32_window_initter {
-    win32_window_initter() {
-        register_window_class();
-
-        g_MonitorEvent.connect(&MonitorCallback);
+void win32_window_uninit() {
+    auto *win = WindowsList;
+    while (win) {
+        win->release();
+        win = win->Next;
     }
-
-    ~win32_window_initter() {
-        auto *win = WindowsList;
-        while (win) {
-            win->release();
-            win = win->Next;
-        }
-        g_MonitorEvent.release();
-    }
-};
-
-file_scope win32_window_initter Initter;
+}
 
 file_scope DWORD get_window_style(window *win) {
     DWORD style = WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
@@ -136,6 +125,11 @@ file_scope vec2<s32> get_full_window_size(DWORD style, DWORD exStyle, s32 conten
 }
 
 window *window::init(const string &title, s32 x, s32 y, s32 width, s32 height, u32 flags) {
+    if (!MonitorCallbackAdded) {
+        g_MonitorEvent.connect(&MonitorCallback);
+        MonitorCallbackAdded = true;
+    }
+
     DisplayMode.Width = width;
     DisplayMode.Height = height;
     DisplayMode.RedBits = DisplayMode.GreenBits = DisplayMode.BlueBits = 8;
@@ -1458,7 +1452,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
     return DefWindowProcW(hWnd, message, wParam, lParam);
 }
 
-file_scope void register_window_class() {
+void win32_window_init() {
     GUID guid;
     WIN32_CHECKHR(CoCreateGuid(&guid));
     WIN32_CHECKHR(StringFromCLSID(guid, &WindowClassName));

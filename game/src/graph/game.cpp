@@ -19,18 +19,14 @@ LE_GAME_API GAME_UPDATE_AND_RENDER(game_update_and_render, game_memory *memory, 
     camera_update(cam);
 
     if (GameMemory->MainWindow->is_visible()) {
-        editor_main();
-        editor_scene_properties();
-        if (memory->ReloadedThisFrame) ImGui::SetWindowFocus("Python");
+        render_ui();
+        render_viewport();
     }
-
-    viewport_render();
 
     free_all(Context.Temp);
 }
 
 LE_GAME_API GAME_MAIN_WINDOW_EVENT(game_main_window_event, const event &e) {
     if (!GameState) return false;
-
     return false;
 }

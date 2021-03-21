@@ -87,12 +87,25 @@ void os_restore_display_mode(monitor *mon);
 vec2<s32> os_get_monitor_pos(monitor *mon);
 v2 os_get_monitor_content_scale(monitor *mon);
 
+// You usually don't need to do this, but if for some reason _os_get_monitors()_ returns an empty array, call this.
+// Note: We register windows to receive notifications on device connected/disconnected, which means this will get
+// called automatically if your window is already running.
+// The problem described above might happen when initializing code.
+// @Cleanup: Figure this out!
+void os_poll_monitors();
+
+// Returns a pointer to the monitor which contains the window _win_.
+// 
 // Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
 monitor *os_monitor_from_window(window *win);
 
+// Returns an array of all available monitors connected to the computer.
+//
 // Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
 array<monitor *> os_get_monitors();
 
+// Returns os_get_monitors()[0]
+// 
 // Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
 monitor *os_get_primary_monitor();
 

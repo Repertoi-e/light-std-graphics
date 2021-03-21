@@ -78,7 +78,9 @@ file_scope DWORD ForegroundLockTimeout;
 
 void win32_poll_monitors();
 
-void uninit_monitors() {
+void win32_monitor_uninit() {
+    g_MonitorEvent.release();
+
     For(Monitors) free(it);
     free(Monitors);
 
@@ -113,10 +115,6 @@ void win32_monitor_init() {
     } else {
         SetProcessDPIAware();
     }
-
-    win32_poll_monitors();
-
-    exit_schedule(uninit_monitors);
 }
 
 file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *display) {
@@ -145,8 +143,8 @@ file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *di
     wchar_t *name = adapter->DeviceString;
     if (display) name = display->DeviceString;
 
-    reserve(mon->Name, c_string_length(name) * 2);  // @Bug c_string_length * 2 is not enough
-    utf16_to_utf8(name, (char *) mon->Name.Data, &mon->Name.Count); // @Constcast
+    reserve(mon->Name, c_string_length(name) * 2);                   // @Bug c_string_length * 2 is not enough
+    utf16_to_utf8(name, (char *) mon->Name.Data, &mon->Name.Count);  // @Constcast
     mon->Name.Length = utf8_length(mon->Name.Data, mon->Name.Count);
 
     if (adapter->StateFlags & DISPLAY_DEVICE_MODESPRUNED) mon->PlatformData.Win32.ModesPruned = true;
@@ -424,6 +422,8 @@ void win32_poll_monitors() {
         quick_sort(it->DisplayModes.Data, it->DisplayModes.Data + it->DisplayModes.Count - 1);
     }
 }
+
+void os_poll_monitors() { win32_poll_monitors(); }
 
 array<monitor *> os_get_monitors() { return Monitors; }
 

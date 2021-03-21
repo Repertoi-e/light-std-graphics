@@ -12,6 +12,30 @@
 import path;
 import fmt;
 
+//
+// This is here to assist cases where you want to share the memory between two modules (e.g. an exe and a dll or multiple dlls, etc.)
+// By default, when you link lstd with the dll, each dll gets its own global state (global allocator, debug memory info, etc.),
+// which means that allocations done in different modules are incompatible. If you provide a symbol lstd_dont_initialize_global_state_stub
+// with the value "true" we don't initialize that global state (instead we leave it as null). That means that YOU MUST initialize it yourself!
+// You must initialize the following global variables by passing the values from the "host" to the "guest" module:
+//  - DefaultAlloc     (a global variable)
+//  - Context.Alloc    (member of the context, by default we initialize it to DefaultAlloc)
+//  - DEBUG_memory     (a global pointer, by default we allocates)
+//
+// @Volatile: As we add more global state.
+//
+// Why do we do this?
+// In another project (light-std-graphics) I have an exe which serves as the engine, and loads dlls (the game). We do this to support hot-loading
+// so we can change the game code without closing the window. The game (dll) allocates memory and needs to do that from the engine's allocator,
+// otherwise problems occur when hot-loading a new dll.
+//
+extern "C" bool lstd_init_global();
+
+// If the user didn't provide a definition for lstd_init_global, the linker shouldn't complain,
+// but instead provide a stub function which returns true.
+extern "C" bool lstd_init_global_stub() { return true; }
+#pragma comment(linker, "/ALTERNATENAME:lstd_init_global=lstd_init_global_stub")
+
 LSTD_BEGIN_NAMESPACE
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
@@ -79,7 +103,13 @@ void init_global_vars() {
     S->ExitScheduleMutex.init();
     S->WorkingDirMutex.init();
 #if defined DEBUG_MEMORY
-    DEBUG_memory_info::Mutex.init();
+    if (lstd_init_global()) {
+        DEBUG_memory = (debug_memory *) os_allocate_block(sizeof(debug_memory));  // @Leak This is ok
+        new (DEBUG_memory) debug_memory;
+        DEBUG_memory->Mutex.init();
+    } else {
+        DEBUG_memory = null;
+    }
 #endif
 }
 
@@ -89,7 +119,14 @@ void win32_common_init_context() {
 
     c->ThreadID = thread::id((u64) GetCurrentThreadId());
 
-    c->Alloc = {default_allocator, null};
+    if (lstd_init_global()) {
+        DefaultAlloc = {default_allocator, null};
+        c->Alloc = DefaultAlloc;
+    } else {
+        // Set to null so we catch if the programmer forgot to initialize it himself
+        DefaultAlloc = {};
+        c->Alloc = {};
+    }
 
     auto startingSize = 8_KiB;
     c->TempAllocData.Base.Storage = (byte *) os_allocate_block(startingSize);  // @XXX @TODO: Allocate this with malloc (the general purpose allocator)!
@@ -120,15 +157,16 @@ array<delegate<void()>> *exit_get_scheduled_functions() {
 
 void uninit_win32_state() {
 #if defined DEBUG_MEMORY
-    release_temporary_allocator();
-
-    // Now we check for memory leaks.
-    // Yes, the OS claims back all the memory the program has allocated anyway, and we are not promoting C++ style RAII
-    // which make even program termination slow, we are just providing this information to the user because they might
-    // want to load/unload DLLs during the runtime of the application, and those DLLs might use all kinds of complex
-    // cross-boundary memory stuff things, etc. This is useful for debugging crashes related to that.
-    if (DEBUG_memory_info::CheckForLeaksAtTermination) {
-        DEBUG_memory_info::report_leaks();
+    if (lstd_init_global()) {
+    } else {
+        // Now we check for memory leaks.
+        // Yes, the OS claims back all the memory the program has allocated anyway, and we are not promoting C++ style RAII
+        // which make even program termination slow, we are just providing this information to the user because they might
+        // want to load/unload DLLs during the runtime of the application, and those DLLs might use all kinds of complex
+        // cross-boundary memory stuff things, etc. This is useful for debugging crashes related to that.
+        if (DEBUG_memory->CheckForLeaksAtTermination) {
+            DEBUG_memory->report_leaks();
+        }
     }
 #endif
 
@@ -138,13 +176,20 @@ void uninit_win32_state() {
     S->ExitScheduleMutex.release();
     S->WorkingDirMutex.release();
 #if defined DEBUG_MEMORY
-    DEBUG_memory_info::Mutex.release();
+    if (lstd_init_global()) {
+        DEBUG_memory->Mutex.release();
+    }
 #endif
 }
 
 void win32_common_init_context();
 void win32_common_init_global_state();
+
 void win32_monitor_init();
+void win32_monitor_uninit();
+
+void win32_window_init();
+void win32_window_uninit();
 
 // We use to do this on MSVC but since then we no longer link the CRT and do all of this ourselves. (take a look at no_crt/exe_main.cpp)
 //
@@ -156,7 +201,10 @@ void win32_monitor_init();
 s32 c_init() {
     win32_common_init_context();
     win32_common_init_global_state();
+
     win32_monitor_init();
+    win32_window_init();
+
     return 0;
 }
 
@@ -169,6 +217,10 @@ s32 tls_init() {
 
 s32 pre_termination() {
     exit_call_scheduled_functions();
+    
+    win32_window_uninit();
+    win32_monitor_uninit();
+    
     uninit_win32_state();
     return 0;
 }

@@ -10,7 +10,7 @@
 
 #include "catalog.h"
 
-using namespace lstd;  //   The library is in it's own namespace for the sake of not being too invasive. I don't really want a namespace though!
+using namespace lstd;  // The library is in it's own namespace for the sake of not being too invasive. I don't really want a namespace though!
 
 // LE_GAME_API is used to export functions from the game dll
 #if OS == WINDOWS
@@ -37,10 +37,18 @@ struct game_memory {
     // Gets triggered the first time the game loads as well!
     bool ReloadedThisFrame = false;
 
-    // This gets set by the dll
+    // This gets set by the dll, tells the exe to reload.
     bool RequestReloadNextFrame = false;
 
     window *MainWindow = null;
+
+    // The ImGui context must be shared, because we submit the geometry to the GPU in the exe
+    void *ImGuiContext = null;
+
+    // This also needs to be shared... @TODO: Comment on sharing the memory between the two modules
+#if defined DEBUG_MEMORY
+    debug_memory *DEBUG_memory = null;
+#endif
 
     // The exe provides us with a free list allocator that is faster than malloc and is suited for general purpose
     // allocations. Historically the game initialized the allocator but it's better if we allow the exe to use it for
@@ -72,12 +80,10 @@ struct game_memory {
         return result;
     }
 
-    // Our target FPS by default is 60 but if the PC we are running on doesn't manage to hit that and we need to reduce
-    // the FPS when the frame delta must change. So we shouldn't  hardcode 1000/60 ms per frame everywhere and instead
-    // use this variable managed by the exe.
+    // Our target FPS by default is 60. If the PC we are running on doesn't manage to hit that, we need to reduce
+    // it. Then the frame delta must change. So we shouldn't hardcode 1/60 spf (e.g. for physics calculations) everywhere
+    // and instead use this variable managed by the exe.
     f32 FrameDelta;
-
-    void *ImGuiContext = null;
 };
 
 // Makes get_state less error-prone and less verbose. The name used is just a string version of the variable name.
@@ -92,5 +98,3 @@ typedef GAME_MAIN_WINDOW_EVENT(game_main_window_event_func);
 
 inline game_memory *GameMemory = null;
 inline graphics *Graphics = null;
-
-inline catalog *AssetCatalog;

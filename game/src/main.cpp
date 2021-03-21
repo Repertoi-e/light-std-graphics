@@ -233,7 +233,7 @@ s32 main() {
 
     // We tell imgui to use our allocator (by default it uses raw malloc, not operator new)
     ImGui::SetAllocatorFunctions([](size_t size, void *) { return (void *) allocate_array<char>(size, {.Alloc = GameAlloc}); },
-                                 [](void *ptr, void *) { ::lstd::free(ptr); }); // Without the namespace this selects the CRT free for some bizarre reason...
+                                 [](void *ptr, void *) { ::lstd::free(ptr); });  // Without the namespace this selects the CRT free for some bizarre reason...
 
     setup_game_paths();
 
@@ -269,10 +269,7 @@ s32 main() {
             return *found;
         };
 
-        // @TODO: GameFPS currently does nothing, we rely on g.swap() and vsync to hit target monitor refresh
-        // rate
-        // but we should do that ourselves. I don't remember why we changed it (maybe simplicity?) but we should
-        // definitely allow the user to set the target fps.
+        // @TODO: GameFPS currently does nothing, we rely on g.swap() and vsync to hit target monitor refresh rate
 
         // This is affecting any physics time steps though
         gameMemory.FrameDelta = 1.0f / GameFPS;
@@ -287,6 +284,11 @@ s32 main() {
         init_imgui_for_our_windows(gameMemory.MainWindow);
         gameMemory.ImGuiContext = ImGui::GetCurrentContext();
         exit_schedule(destroy_imgui);
+
+        // This state also needs to be shared
+#if defined DEBUG_MEMORY
+        gameMemory.DEBUG_memory = DEBUG_memory;
+#endif
 
         imgui_renderer imguiRenderer;
         imguiRenderer.init(&g);
@@ -392,15 +394,8 @@ static void imgui_set_ime_pos(ImGuiViewport *viewport, ImVec2 pos) {
 #define HAS_WIN32_IME 0
 #endif
 
-// Hack
-namespace lstd {
-void win32_poll_monitors();
-}
-
 static void imgui_update_monitors() {
     ImGuiPlatformIO &platformIO = ImGui::GetPlatformIO();
-
-    lstd::win32_poll_monitors(); // @Hack ? Why do we need this? I thought the monitors would always get initialized.
 
     platformIO.Monitors.resize(0);
     For(os_get_monitors()) {
@@ -495,6 +490,8 @@ static void update_monitors(const monitor_event &e) {
 }
 
 static void init_imgui_for_our_windows(window *mainWindow) {
+    os_poll_monitors();
+
     ImGui::CreateContext();
 
     ImGuiIO &io = ImGui::GetIO();

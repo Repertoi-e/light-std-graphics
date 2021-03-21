@@ -77,8 +77,11 @@ constexpr u64 LEAK = 1ull << 62;
 using allocator_func_t = void *(*) (allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 *);
 
 struct allocator {
-    allocator_func_t Function = null;
-    void *Context = null;
+    allocator_func_t Function;
+    void *Context;
+
+    // Stub to avoid automatic initialization of DefaultAlloc
+    allocator(const char *) {}
 
     allocator(allocator_func_t function = null, void *context = null) : Function(function), Context(context) {}
 
@@ -207,41 +210,41 @@ inline u16 calculate_padding_for_pointer_with_header(void *ptr, s32 alignment, u
 
 // #if'd so programs don't compile when debug info shouldn't be used.
 #if defined DEBUG_MEMORY
-struct DEBUG_memory_info {
-    inline static s64 AllocationCount = 0;
+struct debug_memory {
+    s64 AllocationCount = 0;
 
     // We keep a linked list of all allocations. You can use this list to visualize them.
     // _Head_ is the last allocation done.
-    inline static allocation_header *Head = null;
+    allocation_header *Head = null;
 
     // Currently this mutex should be released in the OS implementations (e.g. windows_common.cpp).
     // We need to lock it before modifying the linked list for example.
     //
     // @TODO: @Speed: Lock-free linked list!
-    inline static thread::mutex Mutex;
+    thread::mutex Mutex;
 
     // After every allocation we check the heap for corruption.
     // The problem is that this involves iterating over a (possibly) large linked list of every allocation made.
     // We use the frequency variable below to specify how often we perform that expensive operation.
     // By default we check the heap every 255 allocations, but if a problem is found you may want to decrease
     // this to 1 so you catch the corruption at just the right time.
-    inline static u8 MemoryVerifyHeapFrequency = 255;
+    u8 MemoryVerifyHeapFrequency = 255;
 
     // Set this to true to print a list of unfreed memory blocks when the library uninitializes.
     // Yes, the OS claims back all the memory the program has allocated anyway, and we are not promoting C++ style RAII
     // which make EVEN program termination slow, we are just providing this information to the programmer because they might
     // want to debug crashes/bugs related to memory. (I had to debug a bug with loading/unloading DLLs during runtime).
-    inline static bool CheckForLeaksAtTermination = false;
+    bool CheckForLeaksAtTermination = false;
 
-    static void unlink_header(allocation_header *header);                                 // Removes a header from the list
-    static void add_header(allocation_header *header);                                    // This adds the header to the front - making it the new head
-    static void swap_header(allocation_header *oldHeader, allocation_header *newHeader);  // Replaces _oldHeader_ with _newHeader_ in the list
+    void unlink_header(allocation_header *header);                                 // Removes a header from the list
+    void add_header(allocation_header *header);                                    // This adds the header to the front - making it the new head
+    void swap_header(allocation_header *oldHeader, allocation_header *newHeader);  // Replaces _oldHeader_ with _newHeader_ in the list
 
     // Assuming that the heap is not corrupted, this reports any unfreed allocations.
     // Yes, the OS claims back all the memory the program has allocated anyway, and we are not promoting C++ style RAII
     // which make EVEN program termination slow, we are just providing this information to the programmer because they might
     // want to debug crashes/bugs related to memory. (I had to debug a bug with loading/unloading DLLs during runtime).
-    static void report_leaks();
+    void report_leaks();
 
     // Verifies the integrity of headers in all allocations (only if DEBUG_MEMORY is on).
     //
@@ -250,11 +253,13 @@ struct DEBUG_memory_info {
     // We use the frequency variable in the _Context_ to specify how often we perform that expensive operation.
     // By default we check the heap every 255 allocations, but if a problem is found you may want to decrease it to 1 so
     // your program runs way slower but you catch the corruption at just the right time.
-    static void maybe_verify_heap();
+    void maybe_verify_heap();
 
     // Verifies the integrity of a single header (only if DEBUG_MEMORY is on).
-    static void verify_header(allocation_header *header);
+    void verify_header(allocation_header *header);
 };
+
+inline debug_memory *DEBUG_memory;
 #endif
 
 void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options = 0, source_location loc = {});
@@ -278,7 +283,7 @@ void free_all(allocator alloc, u64 options = 0);
 
 // General purpose allocator.
 void *default_allocator(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 *);
-inline allocator DefaultAlloc = {default_allocator, null};
+inline allocator DefaultAlloc = {"don't_init"};
 
 //
 // Temporary allocator:

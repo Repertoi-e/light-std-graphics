@@ -1,12 +1,10 @@
 #include "state.h"
 
-import fmt;
-
 f32 graph_function(f32 x) {
     return Math_ArcTan_flt32(x);
 }
 
-void viewport_render() {
+void render_viewport() {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::Begin("Graph", null, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav);
     ImGui::PopStyleVar(1);
@@ -39,29 +37,7 @@ void viewport_render() {
 
         f32 thickness = 1;
 
-        // Scale the step size in order to fit around 10 squares
-        v2 step = v2(1, 1);  // (bottomRight - topLeft) / 10;
-
-        // Take just one scale (otherwise we might get rectangles in the guide lines)
-        // f32 s = min(step);
-        //
-        // // Round to the nearest fraction in the form n/5, e.g. 1/20, 1/15, 1/10, 1/5, 1, 5, 10, etc..
-        // bool flipped = false;
-        // if (s < 1) {
-        //     s = 1 / s;
-        //     flipped = true;
-        // }
-        //
-        // // This will be always positive,
-        // s = Math_RoundDown_flt32(s / 5);
-        // // so this will be always be > 5
-        // s = (s + 1) * 5;
-        //
-        // if (flipped) {
-        //     s = 1 / (s - 5);
-        // }
-        //
-        // step = v2(s);
+        v2 step = v2(1, 1);
 
         step *= GameState->Camera.Scale;  // Camera transform
 
@@ -70,8 +46,8 @@ void viewport_render() {
         v2 offset = topLeft - origin;
         offset.x = ImFmod(offset.x, step.x);  // @Cleanup
         offset.y = ImFmod(offset.y, step.y);  // @Cleanup
-        
-        v2 firstLine = topLeft - offset;  
+
+        v2 firstLine = topLeft - offset;
 
         // Draw lines
         v2 p = firstLine;  // Stores the position of the next line to draw
