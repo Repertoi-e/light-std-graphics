@@ -488,15 +488,15 @@ void free_all(allocator alloc, u64 options) {
         thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
 
         // Remove allocations made with the allocator from the the linked list so we don't corrupt the heap
-        WITH_ALLOC(DefaultAlloc) {
-            array<allocation_header *> allocations;
-
-            auto *h = DEBUG_memory->Head;
-            while (h) {
-                if (h->Alloc == alloc) append(allocations, h);
+        auto *h = DEBUG_memory->Head;
+        while (h) {
+            if (h->Alloc == alloc) {
+                auto *next = h->DEBUG_Next;
+                DEBUG_memory->unlink_header(h);
+                h = next;
+            } else {
                 h = h->DEBUG_Next;
             }
-            For(allocations) DEBUG_memory->unlink_header(it);
         }
     }
 #endif

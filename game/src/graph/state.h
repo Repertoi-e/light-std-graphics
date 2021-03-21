@@ -27,6 +27,11 @@ void camera_update(camera *cam);
 struct game_state {
     v4 ClearColor = {0.92f, 0.92f, 0.92f, 1.0f};
 
+    static constexpr s64 FORMULA_INPUT_BUFFER_SIZE = 100000;
+    char Formula[FORMULA_INPUT_BUFFER_SIZE]{};
+
+    string FormulaMessage;
+
     camera Camera;
 };
 

@@ -614,6 +614,8 @@ constexpr bool has(const string &s, const string &str) { return find_substring(s
 // This function doesn't allocate, but just returns a "view".
 // We can do this because we don't store strings with a zero terminator.
 constexpr string substring(const string &s, s64 begin, s64 end) {
+    if (begin == end) return "";
+
     s64 beginIndex = translate_index(begin, s.Length);
     s64 endIndex = translate_index(end, s.Length, true);
 

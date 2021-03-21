@@ -533,6 +533,7 @@ static void init_imgui_for_our_windows(window *mainWindow) {
         auto content = os_get_clipboard_content();
         reserve(buffer, content.Count + 1);
         copy_memory(buffer.Data, content.Data, content.Count);
+        buffer.Count = content.Count + 1;
         buffer[content.Count] = 0;
 
         return (const char *) buffer.Data;
