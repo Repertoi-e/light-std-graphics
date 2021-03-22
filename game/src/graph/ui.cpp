@@ -19,9 +19,22 @@ void ui_main() {
         if (ImGui::BeginMenu("Options")) {
             if (ImGui::MenuItem("VSync", "", GameMemory->MainWindow->Flags & window::VSYNC))
                 GameMemory->MainWindow->Flags ^= window::VSYNC;
+            if (ImGui::MenuItem("Display AST", "", GameState->DisplayAST))
+                GameState->DisplayAST = !GameState->DisplayAST;
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+                ImGui::TextUnformatted("Used for debugging problems with the expression parser.");
+                ImGui::TextUnformatted("");
+                ImGui::TextUnformatted("When enabled, displays the Abstract Syntax Tree below the expression input field.");
+                ImGui::PopTextWrapPos();
+                ImGui::EndTooltip();
+            }
+
             ImGui::EndMenu();
         }
-        ImGui::TextDisabled("Info");
+        ImGui::TextDisabled("(?)");
         if (ImGui::IsItemHovered()) {
             ImGui::BeginTooltip();
             ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
@@ -47,13 +60,6 @@ void ui_scene_properties() {
 
     ImGui::Begin("Scene", null);
     {
-        ImGui::Text("Frame information:");
-        ImGui::Text("  %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        ImGui::Text("Clear color:");
-        ImGui::ColorPicker3("", &GameState->ClearColor.x, ImGuiColorEditFlags_NoAlpha);
-        if (ImGui::Button("Reset color")) GameState->ClearColor = {0.0f, 0.017f, 0.099f, 1.0f};
-    }
-    {
         if (ImGui::Button("Reset camera")) camera_reinit(cam);
 
         ImGui::Text("Position: %.3f, %.3f", cam->Position.x, cam->Position.y);
@@ -65,6 +71,13 @@ void ui_scene_properties() {
         ImGui::InputFloat("Zoom speed", &cam->ZoomSpeed);
         ImGui::InputFloat2("Scale min/max", &cam->ScaleMin);
         if (ImGui::Button("Default camera constants")) camera_reset_constants(cam);
+    }
+    {
+        ImGui::Text("Frame information:");
+        ImGui::Text("  %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::Text("Clear color:");
+        ImGui::ColorPicker3("", &GameState->ClearColor.x, ImGuiColorEditFlags_NoAlpha);
+        if (ImGui::Button("Reset color")) GameState->ClearColor = {0.0f, 0.017f, 0.099f, 1.0f};
     }
     ImGui::End();
 }
@@ -102,6 +115,7 @@ void display_ast(ast *node) {
     if (!node) return;
 
     if (node->Type == ast::OP) {
+        // We use a unique node id because otherwise nodes with the same titles share properties (just the way ImGui works)
         auto *nodeTitle = mprint("OP {:c}##{}", ((ast_op *) node)->Op, node->ID);
 
         if (ImGui::TreeNode(nodeTitle)) {
@@ -122,7 +136,6 @@ void display_ast(ast *node) {
         }
 
         auto *nodeTitle = mprint("TERM {}##{}", w.Builder, node->ID);
-
         if (ImGui::TreeNode(nodeTitle)) {
             ImGui::TreePop();
         }
@@ -144,7 +157,7 @@ void ui_functions() {
 
         if (GameState->FormulaMessage) {
             ImGui::Text(temp_to_c_string(GameState->FormulaMessage));
-        } else {
+        } else if (GameState->DisplayAST) {
             display_ast(GameState->FormulaRoot);
         }
     }

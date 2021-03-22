@@ -42,6 +42,8 @@ struct game_state {
     v2 ViewportPos, ViewportSize;  // Set in viewport.cpp, needed to determine if mouse is in the viewport
     v2 LastMouse;                  // Gets calculated in camera.cpp @Cleanup Use events?
 
+    bool DisplayAST = false;
+
     camera Camera;
 };
 
