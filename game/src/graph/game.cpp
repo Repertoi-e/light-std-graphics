@@ -11,11 +11,14 @@ LE_GAME_API GAME_UPDATE_AND_RENDER(game_update_and_render, game_memory *memory, 
 
         reload_global_state();
 
-        auto *cam = &GameState->Camera;
+        auto *cam = &GraphState->Camera;
         camera_reinit(cam);
+
+        // Ensure at least one entry exists
+        if (!GraphState->Functions) append(GraphState->Functions);
     }
 
-    auto *cam = &GameState->Camera;
+    auto *cam = &GraphState->Camera;
     camera_update(cam);
 
     if (GameMemory->MainWindow->is_visible()) {
@@ -27,13 +30,13 @@ LE_GAME_API GAME_UPDATE_AND_RENDER(game_update_and_render, game_memory *memory, 
 }
 
 LE_GAME_API GAME_MAIN_WINDOW_EVENT(game_main_window_event, const event &e) {
-    if (!GameState) return false;
+    if (!GraphState) return false;
 
     assert(e.Window == GameMemory->MainWindow);
 
     if (e.Type == event::Mouse_Wheel_Scrolled) {
         if (mouse_in_viewport()) {
-            GameState->Camera.ScrollY += e.ScrollY;
+            GraphState->Camera.ScrollY += e.ScrollY;
             return true;  // We handled the event, don't propagate to other listeners
         }
     }

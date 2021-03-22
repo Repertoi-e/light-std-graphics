@@ -30,19 +30,32 @@ void camera_reinit(camera *cam);
 void camera_reset_constants(camera *cam);
 void camera_update(camera *cam);
 
-struct game_state {
-    v4 ClearColor = {0.92f, 0.92f, 0.92f, 1.0f};
-
-    static constexpr s64 FORMULA_INPUT_BUFFER_SIZE = 100000;
+//
+// We support graphing multiple functions at once.
+//
+struct function_entry {
+    static constexpr s64 FORMULA_INPUT_BUFFER_SIZE = 16_KiB;
     char Formula[FORMULA_INPUT_BUFFER_SIZE]{};
 
     string FormulaMessage;
     ast *FormulaRoot = null;
 
+    // ImGui needs this
+    u32 EntryID = 0;
+
+    inline static u32 NextID = 0;
+    function_entry() : EntryID(++NextID) {}
+};
+
+struct graph_state {
+    v4 ClearColor = {0.92f, 0.92f, 0.92f, 1.0f};
+
     v2 ViewportPos, ViewportSize;  // Set in viewport.cpp, needed to determine if mouse is in the viewport
     v2 LastMouse;                  // Gets calculated in camera.cpp @Cleanup Use events?
 
     bool DisplayAST = false;
+
+    array<function_entry> Functions;
 
     camera Camera;
 };
@@ -61,12 +74,12 @@ inline void render_ui() {
 
 void render_viewport();
 
-inline game_state *GameState = null;
+inline graph_state *GraphState = null;
 
 inline bool point_in_rect(v2 p, v2 min, v2 max) { return p.x > min.x && p.y > min.y && p.x < max.x && p.y < max.y; }
 
 inline bool mouse_in_viewport() {
-    v2 vpPos = GameState->ViewportPos - (v2) GameMemory->MainWindow->get_pos();
-    v2 vpSize = GameState->ViewportSize;
-    return point_in_rect(GameState->LastMouse, vpPos, vpPos + vpSize);
+    v2 vpPos = GraphState->ViewportPos - (v2) GameMemory->MainWindow->get_pos();
+    v2 vpSize = GraphState->ViewportSize;
+    return point_in_rect(GraphState->LastMouse, vpPos, vpPos + vpSize);
 }

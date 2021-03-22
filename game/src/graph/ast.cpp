@@ -34,7 +34,7 @@ extern "C" double strtod(const char *str, char **endptr);
             append(stream.Tokens, {token::VARIABLE, s(0, 1)});
             s = s(1, s.Length);
         } else {
-            error(stream, tsprint("Unexpected character when parsing", s.Data - stream.Expression.Data - 1));
+            error(stream, "Unexpected character when parsing", s.Data - stream.Expression.Data);
             return stream;
         }
     }

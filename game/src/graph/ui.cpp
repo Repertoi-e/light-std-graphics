@@ -19,8 +19,8 @@ void ui_main() {
         if (ImGui::BeginMenu("Options")) {
             if (ImGui::MenuItem("VSync", "", GameMemory->MainWindow->Flags & window::VSYNC))
                 GameMemory->MainWindow->Flags ^= window::VSYNC;
-            if (ImGui::MenuItem("Display AST", "", GameState->DisplayAST))
-                GameState->DisplayAST = !GameState->DisplayAST;
+            if (ImGui::MenuItem("Display AST", "", GraphState->DisplayAST))
+                GraphState->DisplayAST = !GraphState->DisplayAST;
 
             if (ImGui::IsItemHovered()) {
                 ImGui::BeginTooltip();
@@ -56,7 +56,7 @@ void ui_main() {
 }
 
 void ui_scene_properties() {
-    auto *cam = &GameState->Camera;
+    auto *cam = &GraphState->Camera;
 
     ImGui::Begin("Scene", null);
     {
@@ -76,19 +76,19 @@ void ui_scene_properties() {
         ImGui::Text("Frame information:");
         ImGui::Text("  %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::Text("Clear color:");
-        ImGui::ColorPicker3("", &GameState->ClearColor.x, ImGuiColorEditFlags_NoAlpha);
-        if (ImGui::Button("Reset color")) GameState->ClearColor = {0.0f, 0.017f, 0.099f, 1.0f};
+        ImGui::ColorPicker3("", &GraphState->ClearColor.x, ImGuiColorEditFlags_NoAlpha);
+        if (ImGui::Button("Reset color")) GraphState->ClearColor = {0.0f, 0.017f, 0.099f, 1.0f};
     }
     ImGui::End();
 }
 
-string validate_and_parse_formula() {
+string validate_and_parse_formula(function_entry *f) {
     // This function returns an error message (if there was one!).
 
     token_stream tokens;
 
     WITH_ALLOC(Context.Temp) {
-        tokens = tokenize(string(GameState->Formula));
+        tokens = tokenize(string(f->Formula));
         if (tokens.Error) {
             return tokens.Error;
         }
@@ -106,7 +106,7 @@ string validate_and_parse_formula() {
     assert(!tokens.Error);  // We should've caught that when validating, no?
 
     // Store the AST
-    GameState->FormulaRoot = root;
+    f->FormulaRoot = root;
 
     return "";
 }
@@ -145,20 +145,46 @@ void display_ast(ast *node) {
 void ui_functions() {
     ImGui::Begin("Functions", null);
     {
-        if (ImGui::InputText("", GameState->Formula, GameState->FORMULA_INPUT_BUFFER_SIZE)) {
-            if (GameState->FormulaRoot) {
-                free_ast(GameState->FormulaRoot);
-                GameState->FormulaRoot = null;
+        s64 indexToRemove = -1;
+
+        For_enumerate(GraphState->Functions) {
+            ImGui::PushID(it.EntryID);
+
+            if (ImGui::InputText("", it.Formula, function_entry::FORMULA_INPUT_BUFFER_SIZE)) {
+                if (it.FormulaRoot) {
+                    free_ast(it.FormulaRoot);
+                    it.FormulaRoot = null;
+                }
+
+                string error = validate_and_parse_formula(&it);
+                clone(&it.FormulaMessage, error);
+            }
+            
+            ImGui::SameLine();
+            if (ImGui::Button("X")) {
+                indexToRemove = it_index;
             }
 
-            string error = validate_and_parse_formula();
-            clone(&GameState->FormulaMessage, error);
+            if (it.FormulaMessage) {
+                ImGui::Text(temp_to_c_string(it.FormulaMessage));
+            } else if (GraphState->DisplayAST) {
+                display_ast(it.FormulaRoot);
+            }
+
+            ImGui::PopID();
         }
 
-        if (GameState->FormulaMessage) {
-            ImGui::Text(temp_to_c_string(GameState->FormulaMessage));
-        } else if (GameState->DisplayAST) {
-            display_ast(GameState->FormulaRoot);
+        if (indexToRemove != -1) {
+            auto it = GraphState->Functions[indexToRemove];
+
+            if (it.FormulaRoot) free_ast(it.FormulaRoot);
+            free(it.FormulaMessage);
+
+            remove_at_index(GraphState->Functions, indexToRemove);
+        }
+
+        if (ImGui::Button("Add entry")) {
+            append(GraphState->Functions);
         }
     }
     ImGui::End();

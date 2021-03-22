@@ -11,13 +11,13 @@ void render_viewport() {
 
     v2 viewportPos = ImGui::GetWindowPos();
     v2 viewportSize = ImGui::GetWindowSize();
-    GameState->ViewportPos = viewportPos;
-    GameState->ViewportSize = viewportSize;
+    GraphState->ViewportPos = viewportPos;
+    GraphState->ViewportSize = viewportSize;
     {
         auto *d = ImGui::GetWindowDrawList();
 
         // Add a colored rectangle which serves as a background
-        d->AddRectFilled(viewportPos, viewportPos + viewportSize, ImGui::ColorConvertFloat4ToU32(GameState->ClearColor));
+        d->AddRectFilled(viewportPos, viewportPos + viewportSize, ImGui::ColorConvertFloat4ToU32(GraphState->ClearColor));
 
         // Here we get the min max bounding box of the graph (which may be transformed by the camera).
         // We use this to prevent drawing anything outside the visible space.
@@ -32,7 +32,7 @@ void render_viewport() {
         // the problem of the origin moving when resizing the window, which doesn't look cosmetically pleasing).
         v2 viewportCenter = viewportPos + viewportSize / 2;
 
-        v2 origin = viewportCenter - GameState->Camera.Position;  // Camera transform
+        v2 origin = viewportCenter - GraphState->Camera.Position;  // Camera transform
 
         f32 xmin = topLeft.x, xmax = bottomRight.x;
         f32 ymin = topLeft.y, ymax = bottomRight.y;
@@ -41,7 +41,7 @@ void render_viewport() {
 
         v2 step = v2(1, 1);
 
-        step *= GameState->Camera.Scale;  // Camera transform
+        step *= GraphState->Camera.Scale;  // Camera transform
 
         v2 steps = (bottomRight - topLeft) / step;
 

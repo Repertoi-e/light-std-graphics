@@ -24,8 +24,8 @@ void camera_update(camera *cam) {
     auto *win = GameMemory->MainWindow;
 
     vec2<s32> mouse = win->get_cursor_pos();
-    v2 delta = {(f32) mouse.x - GameState->LastMouse.x, (f32) mouse.y - GameState->LastMouse.y};
-    GameState->LastMouse = mouse;
+    v2 delta = {(f32) mouse.x - GraphState->LastMouse.x, (f32) mouse.y - GraphState->LastMouse.y};
+    GraphState->LastMouse = mouse;
 
     // This gets set when we listen for the scroll event
     if (cam->ScrollY) {
