@@ -29,7 +29,7 @@ void *temporary_allocator(allocator_mode mode, void *context, s64 size, void *ol
                 assert(!p->Next);
                 p->Next = allocate<temporary_allocator_data::page>({.Alloc = DefaultAlloc});
 
-                s64 reserveTarget = p->Allocated * 2;
+                s64 reserveTarget = max((s64) 8_KiB, p->Allocated * 2);
                 while (reserveTarget < size) reserveTarget *= 2;
 
                 p->Next->Storage = allocate_array<byte>(reserveTarget, {.Alloc = DefaultAlloc});

@@ -392,7 +392,7 @@ bool remove(T &table, const key_t<T> &key) {
 // Returns true if the hash table has the given key.
 // We calculate the hash of the key using the global get_hash() specialized functions.
 template <any_hash_table T>
-bool has(const T &table, const key_t<T> &key) { return find(table, key) != null; }
+bool has(const T &table, const key_t<T> &key) { return find(table, key).Key != null; }
 
 // Returns true if the hash table has the given key.
 // In normal _hash_ we calculate the hash of the key using the global get_hash() specialized functions.
