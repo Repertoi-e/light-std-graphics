@@ -109,14 +109,19 @@ void display_formula_ast(ast *node) {
             ImGui::TreePop();
         }
     } else if (node->Type == ast::TERM) {
-        auto *nodeTitle = to_c_string(tsprint("TERM##{}", node->ID), Context.Temp);
+        auto *var = (ast_term *) node;
+
+        string_builder_writer w;
+        WITH_ALLOC(Context.Temp) {
+            fmt_to_writer(&w, "{:g} ", var->Coeff);
+            for (auto [k, v] : var->Letters) {
+                fmt_to_writer(&w, "{:c}^{} ", *k, *v);
+            }
+        }
+
+        auto *nodeTitle = to_c_string(tsprint("TERM {}##{}", w.Builder, node->ID), Context.Temp);
 
         if (ImGui::TreeNode(nodeTitle)) {
-            auto *var = (ast_term *) node;
-            ImGui::Text(to_c_string(tsprint("Coeff: {:g}", var->Coeff), Context.Temp));
-            for (auto [k, v] : var->Letters) {
-                ImGui::Text(to_c_string(tsprint("{:c}^{}", *k, *v), Context.Temp));
-            }
             ImGui::TreePop();
         }
     }
