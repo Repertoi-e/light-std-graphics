@@ -264,7 +264,7 @@ struct event {
     union {
         bool DoubleClicked;  // Only set on Mouse_Button_Pressed
         struct {
-            u32 ScrollX, ScrollY;  // Only set on Mouse_Wheel_Scrolled
+            s32 ScrollX, ScrollY;  // Only set on Mouse_Wheel_Scrolled
         };
 
         struct {
@@ -289,7 +289,7 @@ struct event {
         };
     };
 
-    // Gets temporarily allocated, the event doesn't own this
+    // Gets temporarily allocated in the window procedure, the event doesn't own this
     array<string> Paths;  // Only set on Window_Files_Dropped
 };
 

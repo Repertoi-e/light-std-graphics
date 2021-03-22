@@ -63,7 +63,7 @@ void ui_scene_properties() {
         ImGui::InputFloat("Pan speed", &cam->PanSpeed);
         ImGui::PushItemWidth(-140);
         ImGui::InputFloat("Zoom speed", &cam->ZoomSpeed);
-        ImGui::InputFloat2("Zoom min/max", &cam->ZoomMin);
+        ImGui::InputFloat2("Scale min/max", &cam->ScaleMin);
         if (ImGui::Button("Default camera constants")) camera_reset_constants(cam);
     }
     ImGui::End();
@@ -79,7 +79,7 @@ string validate_and_parse_formula() {
             return tokens.Error;
         }
 
-1        validate_expression(tokens);
+        validate_expression(tokens);
         if (tokens.Error) {
             return tokens.Error;
         }

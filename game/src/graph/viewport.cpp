@@ -11,6 +11,8 @@ void render_viewport() {
 
     v2 viewportPos = ImGui::GetWindowPos();
     v2 viewportSize = ImGui::GetWindowSize();
+    GameState->ViewportPos = viewportPos;
+    GameState->ViewportSize = viewportSize;
     {
         auto *d = ImGui::GetWindowDrawList();
 

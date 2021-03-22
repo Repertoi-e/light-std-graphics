@@ -19,7 +19,11 @@ struct camera {
     f32 PanSpeed;
     f32 ZoomSpeed;
 
-    f32 ZoomMin, ZoomMax;
+    f32 ScaleMin, ScaleMax;
+
+    bool Panning;
+
+    s32 ScrollY;  // This gets updated if the mouse is in the viewport, then we zoom the camera
 };
 
 void camera_reinit(camera *cam);
@@ -34,6 +38,9 @@ struct game_state {
 
     string FormulaMessage;
     ast *FormulaRoot = null;
+
+    v2 ViewportPos, ViewportSize;  // Set in viewport.cpp, needed to determine if mouse is in the viewport
+    v2 LastMouse;                  // Gets calculated in camera.cpp @Cleanup Use events?
 
     camera Camera;
 };
@@ -53,3 +60,11 @@ inline void render_ui() {
 void render_viewport();
 
 inline game_state *GameState = null;
+
+inline bool point_in_rect(v2 p, v2 min, v2 max) { return p.x > min.x && p.y > min.y && p.x < max.x && p.y < max.y; }
+
+inline bool mouse_in_viewport() {
+    v2 vpPos = GameState->ViewportPos - (v2) GameMemory->MainWindow->get_pos();
+    v2 vpSize = GameState->ViewportSize;
+    return point_in_rect(GameState->LastMouse, vpPos, vpPos + vpSize);
+}
