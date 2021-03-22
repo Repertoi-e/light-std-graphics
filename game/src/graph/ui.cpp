@@ -108,11 +108,11 @@ void display_formula_ast(ast *node) {
 
             ImGui::TreePop();
         }
-    } else if (node->Type == ast::VARIABLE) {
-        auto *nodeTitle = to_c_string(tsprint("VARIABLE##{}", node->ID), Context.Temp);
+    } else if (node->Type == ast::TERM) {
+        auto *nodeTitle = to_c_string(tsprint("TERM##{}", node->ID), Context.Temp);
 
         if (ImGui::TreeNode(nodeTitle)) {
-            auto *var = (ast_variable *) node;
+            auto *var = (ast_term *) node;
             ImGui::Text(to_c_string(tsprint("Coeff: {:g}", var->Coeff), Context.Temp));
             for (auto [k, v] : var->Letters) {
                 ImGui::Text(to_c_string(tsprint("{:c}^{}", *k, *v), Context.Temp));

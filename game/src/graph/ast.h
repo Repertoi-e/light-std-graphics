@@ -106,7 +106,7 @@ inline void error(token_stream &stream, string message, s64 errorPos = -1) {
 struct ast {
     enum type {
         NONE,
-        VARIABLE,
+        TERM,
         OP
     };
 
@@ -120,13 +120,13 @@ struct ast {
     ast(type t = NONE, ast *left = null, ast *right = null) : Type(t), Left(left), Right(right), ID(++NextID) {}
 };
 
-// A variable contains a bunch of letters (the variables which it depends on)
+// A term contains a bunch of letters (the variables which it depends on)
 // It may also contain 0 letters (in that case it's simply a literal)
-struct ast_variable : ast {
+struct ast_term : ast {
     f64 Coeff;
     hash_table<char32_t, s32> Letters;  // Key - letter, Value - power
 
-    ast_variable() : ast(VARIABLE, null, null) {}
+    ast_term() : ast(TERM, null, null) {}
 
     bool is_literal() { return Letters.Count == 0; }
 };
@@ -144,8 +144,8 @@ inline void free_ast(ast *node) {
     if (node->Type == ast::OP) {
         free_ast(node->Left);
         free_ast(node->Right);
-    } else if (node->Type == ast::VARIABLE) {
-        free(((ast_variable *) node)->Letters);
+    } else if (node->Type == ast::TERM) {
+        free(((ast_term *) node)->Letters);
     }
 
     free(node);

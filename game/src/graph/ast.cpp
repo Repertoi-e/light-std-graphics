@@ -107,7 +107,7 @@ void validate_e(token_stream &stream) {
     validate_p(stream);
 
     // :ImplicitTimes:
-    // "(" or a variable without operator beforehand means implicit *
+    // "(" or a term without operator beforehand means implicit *
     //
     // This means that we treat the following expressions as multiplications:
     //     xy      = x * y
@@ -147,14 +147,14 @@ def optimize_times(l, r):
     return l
        
 def collapse_unary(op, t0):
-    if t0.type == Ast_Type.VARIABLE:
+    if t0.type == Ast_Type.TERM:
         if op == "-unary":
             t0.coeff *= -1
             return t0
     return None
     
 def collapse_binary(op, t0, t1):
-    if t0.type == Ast_Type.VARIABLE and t1.type == Ast_Type.VARIABLE:
+    if t0.type == Ast_Type.TERM and t1.type == Ast_Type.TERM:
         if op == "+":
             optimized = optimize_plus(t0, t1)
             if optimized: return optimized
@@ -176,8 +176,8 @@ void pop_op(array<token> &ops, array<ast *> &operands) {
             // Do nothing
             toPush = t0;
         } else if (op == '-') {
-            if (t0->Type == ast::VARIABLE) {
-                auto *var = (ast_variable *) t0;
+            if (t0->Type == ast::TERM) {
+                auto *var = (ast_term *) t0;
                 var->Coeff *= -1;
 
                 toPush = t0;
@@ -207,9 +207,9 @@ void pop_op(array<token> &ops, array<ast *> &operands) {
 
         ast *toPush = null;
 
-        if (t0->Type == ast::VARIABLE && t1->Type == ast::VARIABLE) {
-            auto *l = (ast_variable *) t0;
-            auto *r = (ast_variable *) t1;
+        if (t0->Type == ast::TERM && t1->Type == ast::TERM) {
+            auto *l = (ast_term *) t0;
+            auto *r = (ast_term *) t1;
 
             if (op == '+') {
             } else if (op == '-') {
@@ -261,7 +261,7 @@ void parse_e(token_stream &stream, array<token> &ops, array<ast *> &operands);
 void parse_p(token_stream &stream, array<token> &ops, array<ast *> &operands) {
     auto next = peek(stream);
     if (is_v(next)) {
-        auto *v = allocate<ast_variable>();
+        auto *v = allocate<ast_term>();
         if (next.Type == token::VARIABLE) {
             v->Coeff = 1;
             add(v->Letters, next.Str[0], 1);
