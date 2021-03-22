@@ -79,7 +79,7 @@ string validate_and_parse_formula() {
             return tokens.Error;
         }
 
-        validate_expression(tokens);
+1        validate_expression(tokens);
         if (tokens.Error) {
             return tokens.Error;
         }
@@ -113,9 +113,9 @@ void display_formula_ast(ast *node) {
 
         if (ImGui::TreeNode(nodeTitle)) {
             auto *var = (ast_variable *) node;
-            ImGui::Text(to_c_string(tsprint("Coeff: {:g}\n", var->Coeff), Context.Temp));
+            ImGui::Text(to_c_string(tsprint("Coeff: {:g}", var->Coeff), Context.Temp));
             for (auto [k, v] : var->Letters) {
-                ImGui::Text(to_c_string(tsprint("{}: {:g}\n", *k, *v), Context.Temp));
+                ImGui::Text(to_c_string(tsprint("{:c}^{}", *k, *v), Context.Temp));
             }
             ImGui::TreePop();
         }

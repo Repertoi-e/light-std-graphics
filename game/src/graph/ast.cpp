@@ -47,7 +47,7 @@ extern "C" double strtod(const char *str, char **endptr);
                     append(stream.Tokens, {token::NUMBER, str, fltValue});
                 } else {
                     // There was no dot.
-                    auto str = s(0, -string(rest).Length);
+                    auto str = s(0, s.Length - string(rest).Length);
 
                     s = rest;
                     append(stream.Tokens, {token::NUMBER, str, (f64) value});
@@ -136,7 +136,7 @@ void validate_e(token_stream &stream) {
     validate_p(stream);
 
     // "(" without operator beforehand means implicit *
-    while (!stream.Error && (peek(stream).Type == token::OPERATOR || peek(stream).Str == "(")) {
+    while (!stream.Error && (peek(stream).Type == token::OPERATOR || is_v(peek(stream)) || peek(stream).Str == "(")) {
         // We consume the operator but not the "(" since that is part of "p"
         if (peek(stream).Type == token::OPERATOR) {
             consume(stream);
@@ -204,12 +204,12 @@ void parse_p(token_stream &stream, array<token> &ops, array<ast *> &operands) {
     } else if (next.Str == "(") {
         consume(stream);
 
-        append(ops, OP_SENTINEL);
+        append(ops, OP_SENTINEL);  // push sentinel
 
         parse_e(stream, ops, operands);
         expect(stream, token(token::PARENTHESIS, ")"));
 
-        remove_at_index(ops, -1);  // pop
+        remove_at_index(ops, -1);  // pop sentinel
     } else if (is_unary_op(next.Str[0])) {
         auto op = token(token::OPERATOR, next.Str);
         op.Unary = true;
@@ -228,9 +228,20 @@ void parse_p(token_stream &stream, array<token> &ops, array<ast *> &operands) {
 void parse_e(token_stream &stream, array<token> &ops, array<ast *> &operands) {
     parse_p(stream, ops, operands);
 
-    while (!stream.Error && peek(stream).Type == token::OPERATOR) {
-        push_op(token(token::OPERATOR, peek(stream).Str), ops, operands);
-        consume(stream);
+    // "(" without operator beforehand means implicit *
+    while (!stream.Error && (peek(stream).Type == token::OPERATOR || is_v(peek(stream)) || peek(stream).Str == "(")) {
+        token op;
+
+        // We consume the operator but not the "(" since that is part of "p"
+        if (peek(stream).Type == token::OPERATOR) {
+            op = token(token::OPERATOR, peek(stream).Str);
+            consume(stream);
+        } else {
+            op = token(token::OPERATOR, "*");  // Passing a string literal here is fine since we don't do error checking when parsing
+        }
+
+        push_op(op, ops, operands);
+
         parse_p(stream, ops, operands);
     }
 
