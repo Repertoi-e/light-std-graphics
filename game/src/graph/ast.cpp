@@ -171,6 +171,7 @@ void pop_op(array<token> &ops, array<ast *> &operands) {
         auto op = ops[-1].Str[0];
         remove_at_index(ops, -1);  // pop
 
+        // Now we try to "collapse" - avoid a new ast_op if the term is a variable and we can directly negate the coefficient
         ast *toPush = null;
         if (op == '+') {
             // Do nothing
@@ -186,6 +187,7 @@ void pop_op(array<token> &ops, array<ast *> &operands) {
             assert(false && "What?? Should be unary operator..");
         }
 
+        // We couldn't collapse... create a new ast node.
         if (!toPush) {
             auto *unop = allocate<ast_op>();
             unop->Left = t0;
@@ -207,35 +209,51 @@ void pop_op(array<token> &ops, array<ast *> &operands) {
 
         ast *toPush = null;
 
+        // Now we try to "collapse" - avoid a new ast_op if both of the terms are variables and we can do the operation directly
         if (t0->Type == ast::TERM && t1->Type == ast::TERM) {
             auto *l = (ast_term *) t0;
             auto *r = (ast_term *) t1;
 
             if (op == '+') {
+                // We can add the coefficients only if all letters match
+                if (l->Letters == r->Letters) {
+                    l->Coeff += r->Coeff;
+                    toPush = l;
+                }
             } else if (op == '-') {
+                // We can subtract the coefficients only if all letters match
+                if (l->Letters == r->Letters) {
+                    l->Coeff -= r->Coeff;
+                    toPush = l;
+                }
             } else if (op == '*') {
+                // We multiply the coefficients and add the powers of every letter
+
                 l->Coeff *= r->Coeff;
                 for (auto [k, v] : r->Letters) {
                     if (has(l->Letters, *k)) {
-                        (*l->Letters[*k]) += *v;
+                        (*l->Letters[*k]) += (*v);
                     } else {
-                        (*l->Letters[*k]) = *v;
+                        (*l->Letters[*k]) = (*v);
                     }
                 }
-                toPush = t0;
+                toPush = l;
             } else if (op == '/') {
+                // We divide the coefficients and subtract the powers of every letter
+
                 l->Coeff /= r->Coeff;
                 for (auto [k, v] : r->Letters) {
                     if (has(l->Letters, *k)) {
-                        (*l->Letters[*k]) += -(*v);
+                        (*l->Letters[*k]) -= (*v);
                     } else {
                         (*l->Letters[*k]) = -(*v);
                     }
                 }
-                toPush = t0;
+                toPush = l;
             }
         }
 
+        // We couldn't collapse... create a new ast node.
         if (!toPush) {
             auto *binop = allocate<ast_op>();
             binop->Left = t0;

@@ -400,6 +400,20 @@ bool has(const T &table, const key_t<T> &key) { return find(table, key).Key != n
 template <any_hash_table T>
 bool has_prehashed(const T &table, u64 hash, const key_t<T> &key) { return find_prehashed(table, hash, key) != null; }
 
+template <any_hash_table T>
+bool operator==(const T &t, const T &u) {
+    if (t.Count != u.Count) return false;
+
+    for (auto [k, v] : t) {
+        if (!has(u, *k)) return false;
+        if (*v != *find(u, *k).Value) return false;
+    }
+    return true;
+}
+
+template <any_hash_table T>
+bool operator!=(const T &t, const T &u) { return !(t == u); }
+
 #undef key_t
 #undef value_t
 
