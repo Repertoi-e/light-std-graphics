@@ -188,7 +188,11 @@ export {
 
     // Formats to a string. Uses the temporary allocator.
     template <typename... Args>
-    [[nodiscard("Leak")]] string tsprint(const string &fmtString, Args &&...arguments);
+    string tsprint(const string &fmtString, Args &&...arguments);
+
+    // Formats to a string then converts to null-terminated string. Uses the temporary allocator.
+    template <typename... Args>
+    utf8 *mprint(const string &fmtString, Args &&...arguments);
 
     // Calls fmt_to_writer on Context.Log - which is usually pointing to the console
     // but that can be changed to redirect the output!
@@ -446,6 +450,14 @@ export {
     string tsprint(const string &fmtString, Args &&...arguments) {
         WITH_ALLOC(Context.Temp) {
             return sprint(fmtString, ((Args &&) arguments)...);
+        }
+    }
+
+    // Formats to a string. Uses the temporary allocator.
+    template <typename... Args>
+    utf8 *mprint(const string &fmtString, Args &&...arguments) {
+        WITH_ALLOC(Context.Temp) {
+            return to_c_string(sprint(fmtString, ((Args &&) arguments)...));
         }
     }
 

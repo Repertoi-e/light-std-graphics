@@ -169,6 +169,10 @@ void free(string &s);
 // The caller is responsible for freeing.
 [[nodiscard("Leak")]] utf8 *to_c_string(const string &s, allocator alloc = {});
 
+// Allocates a buffer, copies the string's contents and also appends a zero terminator.
+// Uses the temporary allocator.
+utf8 *temp_to_c_string(const string &s);
+
 // Gets the _index_'th code point in the string.
 constexpr utf32 get(const string &s, s64 index) { return decode_cp(get_cp_at_index(s.Data, s.Length, index)); }
 

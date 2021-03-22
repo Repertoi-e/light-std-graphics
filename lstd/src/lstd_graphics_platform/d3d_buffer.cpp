@@ -114,7 +114,7 @@ void d3d_buffer_set_input_layout(buffer *b, const buffer_layout &layout) {
     auto *desc = allocate_array<D3D11_INPUT_ELEMENT_DESC>(layout.Elements.Count, {.Alloc = Context.Temp});
     auto *p = desc;
     For(layout.Elements) {
-        const char *name = to_c_string(it.Name, Context.Temp);
+        const char *name = temp_to_c_string(it.Name);
         *p++ = {name,
                 0,
                 gtype_and_count_to_dxgi_format(it.Type, it.Count, it.Normalized),

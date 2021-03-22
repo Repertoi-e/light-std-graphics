@@ -25,11 +25,11 @@ void ui_main() {
         if (ImGui::IsItemHovered()) {
             ImGui::BeginTooltip();
             ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-            ImGui::TextUnformatted("This is an awesome calculator.");
+            ImGui::TextUnformatted("This is an awesome calculator written entirely (expect ImGui) from scratch in order to battle-test my C++ standard library replacement.");
             ImGui::TextUnformatted("");
             ImGui::TextUnformatted("* Camera controls");
-            ImGui::TextUnformatted("      Ctrl + Left Mouse -> Pan");
-            ImGui::TextUnformatted("      Ctrl + Right Mouse -> Scale");
+            ImGui::TextUnformatted("      Left Mouse -> Pan");
+            ImGui::TextUnformatted("      Scroll -> Zoom");
             ImGui::TextUnformatted("");
             ImGui::TextUnformatted("This project is under the MIT license.");
             ImGui::TextUnformatted("Source code: github.com/Repertoi-e/light-std-graphics/");
@@ -69,8 +69,9 @@ void ui_scene_properties() {
     ImGui::End();
 }
 
-// Returns an error message
 string validate_and_parse_formula() {
+    // This function returns an error message (if there was one!).
+
     token_stream tokens;
 
     WITH_ALLOC(Context.Temp) {
@@ -91,20 +92,21 @@ string validate_and_parse_formula() {
     ast *root = parse_expression(tokens);
     assert(!tokens.Error);  // We should've caught that when validating, no?
 
+    // Store the AST
     GameState->FormulaRoot = root;
 
     return "";
 }
 
-void display_formula_ast(ast *node) {
+void display_ast(ast *node) {
     if (!node) return;
 
     if (node->Type == ast::OP) {
-        auto *nodeTitle = to_c_string(tsprint("OP {:c}##{}", ((ast_op *) node)->Op, node->ID), Context.Temp);
+        auto *nodeTitle = mprint("OP {:c}##{}", ((ast_op *) node)->Op, node->ID);
 
         if (ImGui::TreeNode(nodeTitle)) {
-            display_formula_ast(node->Left);
-            display_formula_ast(node->Right);
+            display_ast(node->Left);
+            display_ast(node->Right);
 
             ImGui::TreePop();
         }
@@ -119,7 +121,7 @@ void display_formula_ast(ast *node) {
             }
         }
 
-        auto *nodeTitle = to_c_string(tsprint("TERM {}##{}", w.Builder, node->ID), Context.Temp);
+        auto *nodeTitle = mprint("TERM {}##{}", w.Builder, node->ID);
 
         if (ImGui::TreeNode(nodeTitle)) {
             ImGui::TreePop();
@@ -130,7 +132,6 @@ void display_formula_ast(ast *node) {
 void ui_functions() {
     ImGui::Begin("Functions", null);
     {
-        ImGui::Text("Enter expression:");
         if (ImGui::InputText("", GameState->Formula, GameState->FORMULA_INPUT_BUFFER_SIZE)) {
             if (GameState->FormulaRoot) {
                 free_ast(GameState->FormulaRoot);
@@ -142,9 +143,9 @@ void ui_functions() {
         }
 
         if (GameState->FormulaMessage) {
-            ImGui::Text(to_c_string(GameState->FormulaMessage, Context.Temp));
+            ImGui::Text(temp_to_c_string(GameState->FormulaMessage));
         } else {
-            display_formula_ast(GameState->FormulaRoot);
+            display_ast(GameState->FormulaRoot);
         }
     }
     ImGui::End();
