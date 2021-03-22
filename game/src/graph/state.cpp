@@ -24,5 +24,5 @@ void copy_state_from_exe() {
 void reload_global_state() {
     copy_state_from_exe();
 
-    MANAGE_STATE(GameState);
+    MANAGE_GLOBAL_VARIABLE(GameState);
 }

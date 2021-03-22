@@ -11,6 +11,7 @@ void camera_reinit(camera *cam) {
 }
 
 void camera_reset_constants(camera *cam) {
+    // These are arbitrary, feel good though
     cam->PanSpeed = 0.05f;
     cam->ZoomSpeed = 3.0f;
     cam->ScaleMin = 5.0f;
@@ -26,6 +27,7 @@ void camera_update(camera *cam) {
     v2 delta = {(f32) mouse.x - GameState->LastMouse.x, (f32) mouse.y - GameState->LastMouse.y};
     GameState->LastMouse = mouse;
 
+    // This gets set when we listen for the scroll event
     if (cam->ScrollY) {
         // We map our scale range [ScaleMin, ScaleMax] to the range [1, ZoomSpeedup]
         // and then we speedup our scaling by a cubic factor.
@@ -45,6 +47,7 @@ void camera_update(camera *cam) {
         cam->ScrollY = 0;
     }
 
+    // Start panning if clicking inside the viewport, finish panning when the mouse is released
     if (win->MouseButtons[Mouse_Button_Left]) {
         if (mouse_in_viewport()) {
             cam->Panning = true;
