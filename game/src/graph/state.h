@@ -40,6 +40,13 @@ struct function_entry {
     string FormulaMessage;
     ast *FormulaRoot = null;
 
+    // @TODO:
+    // - Color
+    // - Domain
+    // - Determine parameters and display sliders and inputs for them
+    // 
+    // - ... actually graph them :D
+
     // ImGui needs this
     u32 EntryID = 0;
 

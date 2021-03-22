@@ -68,6 +68,8 @@ void render_viewport() {
         d->AddLine(v2(xmin, origin.y), v2(xmax, origin.y), 0xddebb609, thickness * 2);
 
         // Draw function graph
+        For(GraphState->Functions) {
+        }
     }
     ImGui::End();
 }
