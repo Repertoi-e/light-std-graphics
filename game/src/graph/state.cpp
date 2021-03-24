@@ -26,3 +26,8 @@ void reload_global_state() {
 
     MANAGE_GLOBAL_VARIABLE(GraphState);
 }
+
+// Defined here since they need to access GraphState
+function_entry::function_entry() : ImGuiID(++GraphState->NextImGuiID) {}
+ast::ast(type t, ast *left, ast *right) : Type(t), Left(left), Right(right), ImGuiID(++GraphState->NextImGuiID) {}
+

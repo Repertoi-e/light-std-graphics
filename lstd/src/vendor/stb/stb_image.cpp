@@ -10,7 +10,7 @@
 #define STBI_FREE(ptr) LSTD_NAMESPACE::free(ptr)
 
 #define STBI_WINDOWS_UTF8
-// #define STBI_NO_STDIO @DependencyCleanup
+// #define STBI_NO_STDIO 
 #define STBI_FAILURE_USERMSG
 
 // The next 4 defines were added by us (we modified stb_image.h)

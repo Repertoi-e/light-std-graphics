@@ -783,11 +783,11 @@ CODE
 #endif
 #include "imgui_internal.h"
 
-#define _wcsicmp(...) 1
-
 // System includes
-#include <ctype.h>      // toupper
-#include <stdio.h>      // vsnprintf, sscanf, printf
+// :WEMODIFIEDIMGUI: #include <ctype.h>      // toupper
+// :WEMODIFIEDIMGUI: #include <stdio.h>      // vsnprintf, sscanf, printf
+#define strncmp(s1, s2, n) LSTD_NAMESPACE::compare_lexicographically(LSTD_NAMESPACE::string(s1, n), LSTD_NAMESPACE::string(s2, n))
+
 #if defined(_MSC_VER) && _MSC_VER <= 1500 // MSVC 2008 or earlier
 #include <stddef.h>     // intptr_t
 #else

@@ -6,10 +6,30 @@
 
 #include "../types/type_info.h"
 #include "debug_break.h"
-#include "vendor/linasm/include/Array.h"
-#include "vendor/linasm/include/Math.h"
-#include "vendor/linasm/include/Numbers.h"
-#include "vendor/linasm/include/String.h"
+
+//
+// Provides replacements for the math functions found in virtually all standard libraries.
+// Also provides functions for extended precision arithmetic, statistical functions, physics, astronomy, etc.
+// https://www.netlib.org/cephes/
+// Note: We don't include everything, just cmath for now. 
+//       Statistics is a thing we will most definitely include as well in the future. 
+//       Everything else you can include on your own in your project (we don't want to be bloaty).
+// 
+// Note: Important difference,
+// atan2's return range is 0 to 2PI, and not -PI to PI (as per normal in the C standard library).
+//
+//
+// Parts of the source code that we modifed are marked with :WEMODIFIEDCEPHES: 
+//
+
+/*
+Cephes Math Library Release 2.8:  June, 2000
+Copyright 1984, 1995, 2000 by Stephen L. Moshier
+*/
+#include "vendor/cephes/maths_cephes.h"
+
+#define PI 3.1415926535897932384626433832795
+#define TAU 6.283185307179586476925286766559
 
 LSTD_BEGIN_NAMESPACE
 

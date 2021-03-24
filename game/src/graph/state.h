@@ -50,14 +50,13 @@ struct function_entry {
     //
     // - ... actually graph them :D
 
-    // ImGui needs this
-    u32 EntryID = 0;
+    // See note in graph_state.
+    u32 ImGuiID = 0;
 
-    inline static u32 NextID = 0;
-    function_entry() : EntryID(++NextID) {}
+    function_entry();
 };
 
-inline void free(function_entry& entry) {
+inline void free(function_entry &entry) {
     if (entry.FormulaRoot) free_ast(entry.FormulaRoot);
     free(entry.FormulaMessage);
 
@@ -66,6 +65,7 @@ inline void free(function_entry& entry) {
 
 struct graph_state {
     v4 ClearColor = {0.92f, 0.92f, 0.92f, 1.0f};
+    camera Camera;
 
     v2 ViewportPos, ViewportSize;  // Set in viewport.cpp, needed to determine if mouse is in the viewport
     v2 LastMouse;                  // Gets calculated in camera.cpp @Cleanup Use events?
@@ -74,7 +74,13 @@ struct graph_state {
 
     array<function_entry> Functions;
 
-    camera Camera;
+    // Used by stuff that gets drawn in ImGui.
+    // Each element must have a unique ID - usually that gets determined by the display string.
+    // However when we have elements with the same dispay string, state gets shared between the two.
+    // That's why the abstract syntax tree nodes and function entries get a unique id that is used when drawing.
+    //
+    // This is not thread-safe since for now we are running in a single thread. Otherwise use atomic_increment.
+    u32 NextImGuiID = 0;
 };
 
 void reload_global_state();

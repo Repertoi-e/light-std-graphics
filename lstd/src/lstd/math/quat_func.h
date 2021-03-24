@@ -159,7 +159,7 @@ vec<T, 3, Packed> to_euler_angles(const tquat<T, Packed> &q) {
     // Pitch/Y
     double sinp = 2 * (q.w * q.y - q.z * q.x);
     if (abs(sinp) >= 1) {
-        result.y = M_PI / 2 * sign_no_zero(sinp);  // Use 90 degrees if out of range
+        result.y = TAU / 4 * sign_no_zero(sinp);  // Use 90 degrees if out of range
     } else {
         result.y = (T) asin(sinp);
     }

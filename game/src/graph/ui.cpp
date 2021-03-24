@@ -116,7 +116,7 @@ void display_ast(ast *node) {
 
     if (node->Type == ast::OP) {
         // We use a unique node id because otherwise nodes with the same titles share properties (just the way ImGui works)
-        auto *nodeTitle = mprint("OP {:c}##{}", ((ast_op *) node)->Op, node->ID);
+        auto *nodeTitle = mprint("OP {:c}##{}", ((ast_op *) node)->Op, node->ImGuiID);
 
         if (ImGui::TreeNode(nodeTitle)) {
             display_ast(node->Left);
@@ -135,7 +135,7 @@ void display_ast(ast *node) {
             }
         }
 
-        auto *nodeTitle = mprint("TERM {}##{}", w.Builder, node->ID);
+        auto *nodeTitle = mprint("TERM {}##{}", w.Builder, node->ImGuiID);
         if (ImGui::TreeNode(nodeTitle)) {
             ImGui::TreePop();
         }
@@ -167,7 +167,7 @@ void ui_functions() {
         s64 indexToRemove = -1;
 
         For_enumerate(GraphState->Functions) {
-            ImGui::PushID(it.EntryID);
+            ImGui::PushID(it.ImGuiID);
 
             if (ImGui::InputText("", it.Formula, function_entry::FORMULA_INPUT_BUFFER_SIZE)) {
                 if (it.FormulaRoot) {

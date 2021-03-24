@@ -48,7 +48,7 @@ Index of this file:
 
 #include <stdio.h>      // FILE*, sscanf
 #include <stdlib.h>     // NULL, malloc, free, qsort, atoi, atof
-#include <math.h>       // sqrtf, fabsf, fmodf, powf, floorf, ceilf, cosf, sinf
+// :WEMODIFIEDIMGUI: #include <math.h>       // sqrtf, fabsf, fmodf, powf, floorf, ceilf, cosf, sinf
 #include <limits.h>     // INT_MIN, INT_MAX
 
 // Visual Studio warnings
@@ -367,22 +367,24 @@ IMGUI_API void*             ImFileLoadToMemory(const char* filename, const char*
 
 // Helpers: Maths
 // - Wrapper for standard libs functions. (Note that imgui_demo.cpp does _not_ use them to keep the code easy to copy)
+
 #ifndef IMGUI_DISABLE_DEFAULT_MATH_FUNCTIONS
-#define ImFabs(X)           fabsf(X)
-#define ImSqrt(X)           sqrtf(X)
-#define ImFmod(X, Y)        fmodf((X), (Y))
-#define ImCos(X)            cosf(X)
-#define ImSin(X)            sinf(X)
-#define ImAcos(X)           acosf(X)
-#define ImAtan2(Y, X)       atan2f((Y), (X))
+/*:WEMODIFIEDIMGUI: Removed the f suffixes from the functions, we get warnings when casting to f64, but whatever... */
+#define ImFabs(X)           ((f32) fabs(X))
+#define ImSqrt(X)           sqrt(X)
+#define ImFmod(X, Y)        fmod((X), (Y))
+#define ImCos(X)            cos(X)
+#define ImSin(X)            sin(X)
+#define ImAcos(X)           acos(X)
+#define ImAtan2(Y, X)       atan2((Y), (X))
 #define ImAtof(STR)         atof(STR)
-#define ImFloorStd(X)       floorf(X)           // We already uses our own ImFloor() { return (float)(int)v } internally so the standard one wrapper is named differently (it's used by e.g. stb_truetype)
-#define ImCeil(X)           ceilf(X)
-static inline float  ImPow(float x, float y)    { return powf(x, y); }          // DragBehaviorT/SliderBehaviorT uses ImPow with either float/double and need the precision
+#define ImFloorStd(X)       floor(X)           // We already uses our own ImFloor() { return (float)(int)v } internally so the standard one wrapper is named differently (it's used by e.g. stb_truetype)
+#define ImCeil(X)           ceil(X)
+static inline float  ImPow(float x, float y)    { return /*:WEMODIFIEDIMGUI: */ pow(x, y); }          // DragBehaviorT/SliderBehaviorT uses ImPow with either float/double and need the precision
 static inline double ImPow(double x, double y)  { return pow(x, y); }
-static inline float  ImLog(float x)             { return logf(x); }             // DragBehaviorT/SliderBehaviorT uses ImLog with either float/double and need the precision
+static inline float  ImLog(float x)             { return /*:WEMODIFIEDIMGUI: */ log(x); }             // DragBehaviorT/SliderBehaviorT uses ImLog with either float/double and need the precision
 static inline double ImLog(double x)            { return log(x); }
-static inline float  ImAbs(float x)             { return fabsf(x); }
+static inline float  ImAbs(float x)             { return /*:WEMODIFIEDIMGUI: */ fabs(x); }
 static inline double ImAbs(double x)            { return fabs(x); }
 static inline float  ImSign(float x)            { return (x < 0.0f) ? -1.0f : ((x > 0.0f) ? 1.0f : 0.0f); } // Sign operator - returns -1, 0 or 1 based on sign of argument
 static inline double ImSign(double x)           { return (x < 0.0) ? -1.0 : ((x > 0.0) ? 1.0 : 0.0); }

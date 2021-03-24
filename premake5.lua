@@ -83,8 +83,7 @@ project "lstd"
         "%{prj.name}/src/**.c",
         "%{prj.name}/src/**.cpp",
         "%{prj.name}/src/**.def",
-        "%{prj.name}/src/**.ixx",
-        "%{prj.name}/src/**.obj"
+        "%{prj.name}/src/**.ixx"
     }
 	
 	excludes {
@@ -96,8 +95,6 @@ project "lstd"
 		-- Exclude directx files on non-windows platforms 
         excludes  { "%{prj.name}/src/lstd_graphics_platform/d3d_*.cpp" }
 	filter {}
-	
-	includedirs { "%{prj.name}/src/vendor/linasm/include" }
     
     common_settings()
 
@@ -118,8 +115,7 @@ project "game"
         "%{prj.name}/src/graph/**.cpp"
     }
 	
-
-	includedirs { "lstd/src", "lstd/src/vendor/linasm/include" } -- @TODO
+	includedirs { "lstd/src" } 
     
     links { "lstd" }
 	
@@ -150,7 +146,7 @@ project "graph"
     defines { "LE_BUILDING_GAME" }
 
     links { "lstd" }
-    includedirs { "lstd/src", "game/src", "game/src/graph", "lstd/src/vendor/linasm/include" } -- @TODO
+    includedirs { "lstd/src", "game/src", "game/src/graph" } 
 
     pchheader "pch.h"
     pchsource "game/src/graph/pch.cpp"

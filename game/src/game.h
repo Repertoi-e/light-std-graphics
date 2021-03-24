@@ -8,8 +8,6 @@
 #include <lstd_graphics/graphics.h>
 #include <lstd_graphics/video.h>
 
-#include "catalog.h"
-
 using namespace lstd;  // The library is in it's own namespace for the sake of not being too invasive. I don't really want a namespace though!
 
 // LE_GAME_API is used to export functions from the game dll

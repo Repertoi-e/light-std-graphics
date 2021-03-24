@@ -20,6 +20,11 @@
 #include "lstd/memory/string.h"
 #include "lstd/memory/stack_array.h"
 
+//
+// Stuff we modified in the source code is marked with :WEMODIFIEDIMGUI:
+// Mainly removing standard library headers which cause compile errors...
+//
+
 //---- Define assertion handler. Defaults to calling assert().
 #define IM_ASSERT(_EXPR) assert(_EXPR)
 
@@ -48,7 +53,7 @@
 // #define IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS
 // [Win32] Don't implement default IME handler. Won't use and link with ImmGetContext/ImmSetCompositionWindow.
 //
-// #define IMGUI_DISABLE_WIN32_FUNCTIONS
+#define IMGUI_DISABLE_WIN32_FUNCTIONS
 // [Win32] Won't use and link with any Win32 function (clipboard, ime).
 //
 // #define IMGUI_ENABLE_OSX_DEFAULT_CLIPBOARD_FUNCTIONS
@@ -58,7 +63,7 @@
 // Don't implement ImFormatString/ImFormatStringV so you can implement them yourself if you don't want to link with
 // vsnprintf.
 //
-#define IMGUI_DISABLE_DEFAULT_MATH_FUNCTIONS
+// #define IMGUI_DISABLE_DEFAULT_MATH_FUNCTIONS
 // Don't implement ImFabs/ImSqrt/ImPow/ImFmod/ImCos/ImSin/ImAcos/ImAtan2 wrapper so you can implement them yourself.
 // Declare your prototypes in imconfig.h.
 //
@@ -66,8 +71,6 @@
 #define IMGUI_DISABLE_DEFAULT_ALLOCATORS
 // Don't implement default allocators calling malloc()/free() to avoid linking with them.
 // You will need to call ImGui::SetAllocatorFunctions().
-
-// #define IMGUI_USE_STB_SPRINTF
 
 //---- Include imgui_user.h at the end of imgui.h as a convenience
 //#define IMGUI_INCLUDE_IMGUI_USER_H
@@ -128,98 +131,6 @@ namespace ImGui {
 }  // namespace ImGui
 */
 
-#define ImAbs Math_Abs_flt32
-#define ImSqrt Math_Sqrt_flt32
-#define ImFabs Math_Abs_flt32
-#define ImPow Math_ExpB_flt32
-
-#define ImLog Math_Log_flt32
-
-// https://git.musl-libc.org/cgit/musl/tree/src/math/fmod.c
-inline double ImFmod(double x, double y) {
-    union {
-        double f;
-        u64 i;
-    } ux = {x}, uy = {y};
-    int ex = ux.i >> 52 & 0x7ff;
-    int ey = uy.i >> 52 & 0x7ff;
-    int sx = ux.i >> 63;
-    u64 i;
-
-    /* in the followings uxi should be ux.i, but then gcc wrongly adds */
-    /* float load/store to inner loops ruining performance and code size */
-    u64 uxi = ux.i;
-
-    if (uy.i << 1 == 0 || LSTD_NAMESPACE::is_nan(y) || ex == 0x7ff)
-        return (x * y) / (x * y);
-    if (uxi << 1 <= uy.i << 1) {
-        if (uxi << 1 == uy.i << 1)
-            return 0 * x;
-        return x;
-    }
-
-    /* normalize x and y */
-    if (!ex) {
-        for (i = uxi << 12; i >> 63 == 0; ex--, i <<= 1)
-            ;
-        uxi <<= -ex + 1;
-    } else {
-        uxi &= (u64)(-1) >> 12;
-        uxi |= 1ULL << 52;
-    }
-    if (!ey) {
-        for (i = uy.i << 12; i >> 63 == 0; ey--, i <<= 1)
-            ;
-        uy.i <<= -ey + 1;
-    } else {
-        uy.i &= (u64)(-1) >> 12;
-        uy.i |= 1ULL << 52;
-    }
-
-    /* x mod y */    
-    for (; ex > ey; ex--) {
-        i = uxi - uy.i;
-        if (i >> 63 == 0) {
-            if (i == 0)
-                return 0 * x;
-            uxi = i;
-        }
-        uxi <<= 1;
-    }
-    i = uxi - uy.i;
-    if (i >> 63 == 0) {
-        if (i == 0)
-            return 0 * x;
-        uxi = i;
-    }
-    for (; uxi >> 52 == 0; uxi <<= 1, ex--)
-        ;
-
-    /* scale result */
-    if (ex > 0) {
-        uxi -= 1ULL << 52;
-        uxi |= (u64) ex << 52;
-    } else {
-        uxi >>= -ex + 1;
-    }
-    uxi |= (u64) sx << 63;
-    ux.i = uxi;
-    return ux.f;
-}
-
-static inline float ImFmod(float x, float y) { return (float) ImFmod((double) x, (double) y); }
-
-#define ImCos Math_Cos_flt32
-#define ImSin Math_Sin_flt32
-#define ImAcos Math_ArcCos_flt32
-#define ImAtan2 Math_ArcTan2_flt32
-#define ImFloorStd Math_RoundDown_flt32
-#define ImCeil Math_RoundUp_flt32
-
-// We include the CRT ... sigh
-#define ImAtof atof
-
-
 /*
 NOTE:
 
@@ -245,71 +156,27 @@ We are relying on the CRT for the following functions:
 
 */
 
-#define memset LSTD_NAMESPACE::fill_memory
-#define memcpy LSTD_NAMESPACE::copy_memory
-#define memmove LSTD_NAMESPACE::copy_memory
+//
+// @DependencyHell
+//
+// These are defined in imconfig.cpp
+//
+extern "C" {
+void *memset(void *ptr, int value, size_t num);
+void *memcpy(void *dest, const void *src, size_t num);
+void *memmove(void *dest, const void *src, size_t num);
+u64 strlen(const char *str);
 
-inline int strcmp(const char *s1, const char *s2) {
-    while (*s1 && (*s1 == *s2)) s1++, s2++;
-    return *(const unsigned char *) s1 - *(const unsigned char *) s2;
+int strcmp(const char *str1, const char *str2);
+int memcmp(const void *ptr1, const void *ptr2, u64 num);
+
+const char *strstr(const char *str1, const char *str2);
+const char *strchr(const char *str, int character);
+char *strcpy(char *destination, const char *source);
+const void *memchr(const void *ptr, int value, size_t num);
+
+double fmod(double x, double y);
+
+int toupper(int c);
 }
 
-inline int memcmp(const void *css, const void *cts, u32 n) {
-    auto *s1 = (const char *) css;
-    auto *s2 = (const char *) cts;
-    while (n-- > 0) {
-        if (*s1++ != *s2++) return s1[-1] < s2[-1] ? -1 : 1;
-    }
-    return 0;
-}
-
-
-#define strlen LSTD_NAMESPACE::c_string_length
-
-inline int strncmp(const char *s1, const char *s2, u32 n) {
-    while (n && *s1 && (*s1 == *s2)) {
-        ++s1;
-        ++s2;
-        --n;
-    }
-    if (n == 0) {
-        return 0;
-    } else {
-        return (*(unsigned char *) s1 - *(unsigned char *) s2);
-    }
-}
-
-inline const char *strstr(const char *n, const char *h) {
-    auto s1 = LSTD_NAMESPACE::string(n);
-    auto s2 = LSTD_NAMESPACE::string(h);
-    auto r = LSTD_NAMESPACE::find_substring(s1, s2);
-    if (r == -1) return null;
-    return n + r;
-}
-
-inline const char *strchr(const char *str, char ch) {
-    auto s = LSTD_NAMESPACE::string(str);
-    auto r = LSTD_NAMESPACE::find_cp(s, ch);
-    if (r == -1) return null;
-    return str + r;
-}
-
-inline char *strcpy(char *destination, const char *source) {
-    if (!destination) return null;
-    char *ptr = destination;
-
-    while (*source != '\0') {
-        *destination = *source;
-        destination++;
-        source++;
-    }
-    *destination = '\0';
-    return ptr;
-}
-
-inline const char *memchr(const char *str, char ch, u64 textSize) {
-    auto s = LSTD_NAMESPACE::string(str, textSize);
-    auto r = LSTD_NAMESPACE::find_cp(s, ch);
-    if (r == -1) return null;
-    return str + r;
-}

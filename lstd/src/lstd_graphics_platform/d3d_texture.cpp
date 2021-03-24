@@ -7,9 +7,6 @@
 #include "lstd_graphics/graphics/texture.h"
 #include "lstd_graphics/memory/pixel_buffer.h"
 
-#define _wcsicmp(...) 1
-#define memcmp(...) 1
-#define memset(...) 1
 #include <d3d11.h>
 #include <d3dcompiler.h>
 

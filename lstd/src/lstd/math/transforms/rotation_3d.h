@@ -39,8 +39,8 @@ struct rotation_3d_axis_helper : non_copyable {
 
     template <typename U, s64 R, s64 C_, bool MPacked>
     void set_impl(mat<U, R, C_, MPacked> &m) const {
-        T C = (T) Math_Cos_flt32(Angle);
-        T S = (T) Math_Sin_flt32(Angle);
+        T C = (T) cos(Angle);
+        T S = (T) sin(Angle);
 
         assert(0 <= Axis && Axis < 3);
 

@@ -114,10 +114,10 @@ struct ast {
     ast *Left;
     ast *Right;
 
-    inline static u32 NextID = 0;
-    u32 ID; // Used when rendering the tree in ImGui
+    // See note in state.h
+    u32 ImGuiID;
 
-    ast(type t = NONE, ast *left = null, ast *right = null) : Type(t), Left(left), Right(right), ID(++NextID) {}
+    ast(type t = NONE, ast *left = null, ast *right = null);
 };
 
 // A term contains a bunch of letters (the variables which it depends on)

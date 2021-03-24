@@ -106,6 +106,8 @@ struct context {
     // Disable stylized text output (colors, background colors, and bold/italic/strikethrough/underline text).
     // This is useful when logging to files/strings and not the console. The ansi escape codes look like garbage in files/strings.
     bool FmtDisableAnsiCodes;
+
+    context() {} // Doesn't do anything. That's important.
 };
 
 // Immutable context available everywhere. Contains certain variables that are "global" to the program,

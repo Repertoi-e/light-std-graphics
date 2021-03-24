@@ -18,7 +18,7 @@ f64 evaluate_function_at(f64 x, function_entry *f, ast *node) {
             if (op->Op == '-') return evaluate_function_at(x, f, node->Left) - evaluate_function_at(x, f, node->Right);
             if (op->Op == '*') return evaluate_function_at(x, f, node->Left) * evaluate_function_at(x, f, node->Right);
             if (op->Op == '/') return evaluate_function_at(x, f, node->Left) / evaluate_function_at(x, f, node->Right);
-            if (op->Op == '^') return Math_ExpB_flt64(evaluate_function_at(x, f, node->Left), evaluate_function_at(x, f, node->Right));
+            if (op->Op == '^') return pow(evaluate_function_at(x, f, node->Left), evaluate_function_at(x, f, node->Right));
             assert(false && "Unknown operator");
             return 0.0;
         }
@@ -28,11 +28,11 @@ f64 evaluate_function_at(f64 x, function_entry *f, ast *node) {
         f64 result = t->Coeff;
         for (auto [k, exp] : t->Letters) {
             if (has(f->Parameters, *k)) {
-                result += Math_ExpB_flt64(*f->Parameters[*k], *exp);
+                result += pow(*f->Parameters[*k], *exp);
             } else {
                 // @TODO
                 if (*k == 'x') {
-                    result += Math_ExpB_flt64(x, *exp);
+                    result += powi(x, *exp);
                 } else {
                     assert(false && "Letter not found in parameter list");
                 }
@@ -87,8 +87,8 @@ void render_viewport() {
         v2 steps = (bottomRight - topLeft) / step;
 
         v2 offset = topLeft - origin;
-        offset.x = ImFmod(offset.x, step.x);  // @Cleanup
-        offset.y = ImFmod(offset.y, step.y);  // @Cleanup
+        offset.x = (f32) fmod(offset.x, step.x);
+        offset.y = (f32) fmod(offset.y, step.y);
 
         v2 firstLine = topLeft - offset;
 
@@ -112,12 +112,18 @@ void render_viewport() {
         For(GraphState->Functions) {
             if (!it.FormulaRoot) continue;
 
-            f64 x0 = origin.x - step.x;
-            f64 x1 = origin.x;
+            f64 x0 = firstLine.x - step.x;
+            f64 x1 = firstLine.x;
+
+            f64 ux0 = (x0 - origin.x) / GraphState->Camera.Scale.x;
+            f64 ux1 = (x1 - origin.x) / GraphState->Camera.Scale.x;
 
             while (x0 < xmax) {
-                f64 y0 = evaluate_function_at(x0, &it, it.FormulaRoot);
-                f64 y1 = evaluate_function_at(x1, &it, it.FormulaRoot);
+                f64 uy0 = evaluate_function_at(ux0, &it, it.FormulaRoot);
+                f64 uy1 = evaluate_function_at(ux1, &it, it.FormulaRoot);
+
+                f64 y0 = -uy0 * GraphState->Camera.Scale.y + origin.y;  // - means up
+                f64 y1 = -uy1 * GraphState->Camera.Scale.y + origin.y;  // - means up
 
                 d->AddLine(v2(x0, y0), v2(x1, y1), 0xffebb609, thickness * 2.5f);
 

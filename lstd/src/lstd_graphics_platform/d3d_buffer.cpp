@@ -7,9 +7,6 @@
 #include "lstd_graphics/graphics/buffer.h"
 #include "lstd_graphics/graphics/shader.h"
 
-#define _wcsicmp(...) 1
-#define memcmp(...) 1
-#define memset(...) 1
 #include <d3d11.h>
 
 LSTD_BEGIN_NAMESPACE
