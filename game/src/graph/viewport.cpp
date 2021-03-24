@@ -28,11 +28,11 @@ f64 evaluate_function_at(f64 x, function_entry *f, ast *node) {
         f64 result = t->Coeff;
         for (auto [k, exp] : t->Letters) {
             if (has(f->Parameters, *k)) {
-                result += pow(*f->Parameters[*k], *exp);
+                result *= pow(*f->Parameters[*k], *exp);
             } else {
                 // @TODO
                 if (*k == 'x') {
-                    result += powi(x, *exp);
+                    result *= powi(x, *exp);
                 } else {
                     assert(false && "Letter not found in parameter list");
                 }
@@ -114,21 +114,24 @@ void render_viewport() {
 
             f64 x0 = firstLine.x - step.x;
             f64 x1 = firstLine.x;
-
+            
             f64 ux0 = (x0 - origin.x) / GraphState->Camera.Scale.x;
-            f64 ux1 = (x1 - origin.x) / GraphState->Camera.Scale.x;
+            f64 uy0 = evaluate_function_at(ux0, &it, it.FormulaRoot);
+            f64 y0 = (-uy0) * GraphState->Camera.Scale.y + origin.y;  // negative y means up
 
             while (x0 < xmax) {
-                f64 uy0 = evaluate_function_at(ux0, &it, it.FormulaRoot);
+                f64 ux1 = (x1 - origin.x) / GraphState->Camera.Scale.x;
+
                 f64 uy1 = evaluate_function_at(ux1, &it, it.FormulaRoot);
+                f64 y1 = (-uy1) * GraphState->Camera.Scale.y + origin.y;  // negative y means up
 
-                f64 y0 = -uy0 * GraphState->Camera.Scale.y + origin.y;  // - means up
-                f64 y1 = -uy1 * GraphState->Camera.Scale.y + origin.y;  // - means up
-
-                d->AddLine(v2(x0, y0), v2(x1, y1), 0xffebb609, thickness * 2.5f);
+                d->AddLine(v2(x0, y0), v2(x1, y1), 0xffff0000, thickness * 2.5f);
 
                 x0 = x1;
-                x1 += step.x;
+                x1 += step.x * 0.1;
+
+                ux0 = ux1;
+                y0 = y1;
             }
         }
     }

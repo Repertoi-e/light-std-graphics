@@ -200,7 +200,7 @@ void ui_functions() {
             }
 
             for (auto [k, v] : it.Parameters) {
-                f64 min = -100, max = 100;
+                f64 min = -30, max = 30;
                 ImGui::SliderScalar(mprint("{:c}", *k), ImGuiDataType_Double, v, &min, &max, "%.7f", ImGuiSliderFlags_NoRoundToFormat);
             }
 
