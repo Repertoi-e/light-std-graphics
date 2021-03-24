@@ -4,7 +4,7 @@ extern "C" bool lstd_init_global() { return false; }
 
 void copy_state_from_exe() {
     auto *c = (context *) &Context;    // @Constcast
-    DefaultAlloc = GameMemory->Alloc;  // Switch our default allocator from malloc to the one the exe provides us with
+    DefaultAlloc = GameMemory->Alloc;  // Switch our default allocator to the one the exe provides us with
     c->Alloc = GameMemory->Alloc;
     c->AllocAlignment = 16;  // For SIMD
 

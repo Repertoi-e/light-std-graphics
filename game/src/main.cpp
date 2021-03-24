@@ -11,7 +11,7 @@ import fmt;
 import path;
 
 // These can be modified with command line arguments.
-s64 GameMemoryInMiB = 32;
+s64 GameMemoryInMiB = 64;
 u32 GameWidth = 800, GameHeight = 400, GameFPS = 60;
 string GameFileName = "graph.dll";
 
@@ -229,7 +229,7 @@ s32 main() {
     auto *allocData = allocate<free_list_allocator_data>({.Alloc = DefaultAlloc});
     allocData->init(GameMemoryInMiB * 1_MiB, free_list_allocator_data::Find_First);
     gameMemory.AllocData = allocData;
-    gameMemory.Alloc = GameAlloc = DefaultAlloc;  // = {free_list_allocator, allocData};
+    gameMemory.Alloc = GameAlloc = {free_list_allocator, allocData};
 
     // We tell imgui to use our allocator (by default it uses raw malloc, not operator new)
     ImGui::SetAllocatorFunctions([](size_t size, void *) { return (void *) allocate_array<char>(size, {.Alloc = GameAlloc}); },
