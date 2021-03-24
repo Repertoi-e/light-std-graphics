@@ -142,6 +142,25 @@ void display_ast(ast *node) {
     }
 }
 
+void determine_new_parameters(function_entry *f, hash_table<char32_t, f64> oldParams, ast *node) {
+    if (!node) return;
+
+    determine_new_parameters(f, oldParams, node->Left);
+    determine_new_parameters(f, oldParams, node->Right);
+
+    if (node->Type == ast::TERM) {
+        for (auto [k, _] : ((ast_term *) node)->Letters) {
+            if (*k != 'x') {  // @TODO
+                if (has(oldParams, *k)) {
+                    *(f->Parameters[*k]) = *oldParams[*k];
+                } else {
+                    *(f->Parameters[*k]) = 0.0;
+                }
+            }
+        }
+    }
+}
+
 void ui_functions() {
     ImGui::Begin("Functions", null);
     {
@@ -158,8 +177,17 @@ void ui_functions() {
 
                 string error = validate_and_parse_formula(&it);
                 clone(&it.FormulaMessage, error);
+
+                if (!it.FormulaMessage) {
+                    hash_table<char32_t, f64> oldParams;
+                    WITH_ALLOC(Context.Temp) {
+                        clone(&oldParams, it.Parameters);
+                    }
+                    free(it.Parameters);
+                    determine_new_parameters(&it, oldParams, it.FormulaRoot);
+                }
             }
-            
+
             ImGui::SameLine();
             if (ImGui::Button("X")) {
                 indexToRemove = it_index;
@@ -171,15 +199,16 @@ void ui_functions() {
                 display_ast(it.FormulaRoot);
             }
 
+            for (auto [k, v] : it.Parameters) {
+                f64 min = -100, max = 100;
+                ImGui::SliderScalar(mprint("{:c}", *k), ImGuiDataType_Double, v, &min, &max, "%.7f", ImGuiSliderFlags_NoRoundToFormat);
+            }
+
             ImGui::PopID();
         }
 
         if (indexToRemove != -1) {
-            auto it = GraphState->Functions[indexToRemove];
-
-            if (it.FormulaRoot) free_ast(it.FormulaRoot);
-            free(it.FormulaMessage);
-
+            free(GraphState->Functions[indexToRemove]);
             remove_at_index(GraphState->Functions, indexToRemove);
         }
 

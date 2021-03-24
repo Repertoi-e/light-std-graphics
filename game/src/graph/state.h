@@ -40,11 +40,14 @@ struct function_entry {
     string FormulaMessage;
     ast *FormulaRoot = null;
 
+    hash_table<char32_t, f64> Parameters;
+
     // @TODO:
     // - Color
     // - Domain
     // - Determine parameters and display sliders and inputs for them
-    // 
+    // - y= or x=
+    //
     // - ... actually graph them :D
 
     // ImGui needs this
@@ -53,6 +56,13 @@ struct function_entry {
     inline static u32 NextID = 0;
     function_entry() : EntryID(++NextID) {}
 };
+
+inline void free(function_entry& entry) {
+    if (entry.FormulaRoot) free_ast(entry.FormulaRoot);
+    free(entry.FormulaMessage);
+
+    free(entry.Parameters);
+}
 
 struct graph_state {
     v4 ClearColor = {0.92f, 0.92f, 0.92f, 1.0f};

@@ -8,6 +8,8 @@
 
 LSTD_BEGIN_NAMESPACE
 
+void win32_common_init_context_thread();
+
 namespace thread {
 
 // Block the calling thread until a lock on the mutex can
@@ -146,8 +148,10 @@ struct thread_start_info {
 u32 __stdcall thread::wrapper_function(void *data) {
     auto *ti = (thread_start_info *) data;
 
-    // Context was already (partially) initialized (see win32_common_init_context @Platform).
-    // Now we copy the context variables from the parent thread.
+    // Initialize the default context for a new thread
+    win32_common_init_context_thread();
+
+    // Now we copy the context variables from the parent thread
     s64 firstByte = FIELD_OFFSET(context, Temp) + sizeof(context::Temp);
     copy_memory((byte *) &Context + firstByte, (byte *) ti->ContextPtr + firstByte, sizeof(context) - firstByte);
 

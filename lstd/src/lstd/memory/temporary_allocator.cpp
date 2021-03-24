@@ -28,6 +28,7 @@ void *temporary_allocator(allocator_mode mode, void *context, s64 size, void *ol
             if (p->Used + size >= p->Allocated) {
                 assert(!p->Next);
                 p->Next = allocate<temporary_allocator_data::page>({.Alloc = DefaultAlloc});
+                p->Next->init();  // See note in allocator.h
 
                 s64 reserveTarget = max((s64) 8_KiB, p->Allocated * 2);
                 while (reserveTarget < size) reserveTarget *= 2;

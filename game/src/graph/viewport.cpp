@@ -1,7 +1,48 @@
 #include "state.h"
 
-f32 graph_function(f32 x) {
-    return Math_ArcTan_flt32(x);
+f64 evaluate_function_at(f64 x, function_entry *f, ast *node) {
+    assert(node && "We shouldn't get here?");
+
+    if (node->Type == ast::OP) {
+        auto *op = (ast_op *) node;
+        if (!node->Right) {  // If unary
+            if (op->Op == '-') {
+                return -evaluate_function_at(x, f, node->Left);
+            } else {
+                assert(op->Op == '+');
+                // We shouldn't even generate + unary operator, but for completeness.
+                return evaluate_function_at(x, f, node->Left);
+            }
+        } else {
+            if (op->Op == '+') return evaluate_function_at(x, f, node->Left) + evaluate_function_at(x, f, node->Right);
+            if (op->Op == '-') return evaluate_function_at(x, f, node->Left) - evaluate_function_at(x, f, node->Right);
+            if (op->Op == '*') return evaluate_function_at(x, f, node->Left) * evaluate_function_at(x, f, node->Right);
+            if (op->Op == '/') return evaluate_function_at(x, f, node->Left) / evaluate_function_at(x, f, node->Right);
+            if (op->Op == '^') return Math_ExpB_flt64(evaluate_function_at(x, f, node->Left), evaluate_function_at(x, f, node->Right));
+            assert(false && "Unknown operator");
+            return 0.0;
+        }
+    } else if (node->Type == ast::TERM) {
+        auto *t = (ast_term *) node;
+
+        f64 result = t->Coeff;
+        for (auto [k, exp] : t->Letters) {
+            if (has(f->Parameters, *k)) {
+                result += Math_ExpB_flt64(*f->Parameters[*k], *exp);
+            } else {
+                // @TODO
+                if (*k == 'x') {
+                    result += Math_ExpB_flt64(x, *exp);
+                } else {
+                    assert(false && "Letter not found in parameter list");
+                }
+            }
+        }
+        return result;
+    } else {
+        assert(false && "Unknown AST node");
+        return 0.0;
+    }
 }
 
 void render_viewport() {
@@ -69,6 +110,20 @@ void render_viewport() {
 
         // Draw function graph
         For(GraphState->Functions) {
+            if (!it.FormulaRoot) continue;
+
+            f64 x0 = origin.x - step.x;
+            f64 x1 = origin.x;
+
+            while (x0 < xmax) {
+                f64 y0 = evaluate_function_at(x0, &it, it.FormulaRoot);
+                f64 y1 = evaluate_function_at(x1, &it, it.FormulaRoot);
+
+                d->AddLine(v2(x0, y0), v2(x1, y1), 0xffebb609, thickness * 2.5f);
+
+                x0 = x1;
+                x1 += step.x;
+            }
         }
     }
     ImGui::End();

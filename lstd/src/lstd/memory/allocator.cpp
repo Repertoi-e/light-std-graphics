@@ -512,21 +512,14 @@ LSTD_END_NAMESPACE
 using LSTD_NAMESPACE::general_allocate;
 using LSTD_NAMESPACE::general_free;
 using LSTD_NAMESPACE::source_location;
+
 #define C LSTD_NAMESPACE::Context
 
-// #if defined LSTD_DONT_DEFINE_STD
-// #define L
-// #define loc LSTD_NAMESPACE::source_location()
-// #else
-// #define L , LSTD_NAMESPACE::source_location loc
-// #endif
+[[nodiscard]] void *operator new(size_t size) { return general_allocate(C.Alloc, size, 0, 0); }
+[[nodiscard]] void *operator new[](size_t size) { return general_allocate(C.Alloc, size, 0, 0); }
 
-#define L , LSTD_NAMESPACE::source_location loc
-[[nodiscard]] void *operator new(size_t size L) { return general_allocate(C.Alloc, size, 0, 0, loc); }
-[[nodiscard]] void *operator new[](size_t size L) { return general_allocate(C.Alloc, size, 0, 0, loc); }
-
-[[nodiscard]] void *operator new(size_t size, align_val_t alignment L) { return general_allocate(C.Alloc, size, (u32) alignment, 0, loc); }
-[[nodiscard]] void *operator new[](size_t size, align_val_t alignment L) { return general_allocate(C.Alloc, size, (u32) alignment, 0, loc); }
+[[nodiscard]] void *operator new(size_t size, align_val_t alignment) { return general_allocate(C.Alloc, size, (u32) alignment, 0); }
+[[nodiscard]] void *operator new[](size_t size, align_val_t alignment) { return general_allocate(C.Alloc, size, (u32) alignment, 0); }
 
 void operator delete(void *ptr) noexcept { general_free(ptr); }
 void operator delete[](void *ptr) noexcept { general_free(ptr); }

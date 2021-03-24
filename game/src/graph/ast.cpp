@@ -232,9 +232,9 @@ void pop_op(array<token> &ops, array<ast *> &operands) {
                 l->Coeff *= r->Coeff;
                 for (auto [k, v] : r->Letters) {
                     if (has(l->Letters, *k)) {
-                        (*l->Letters[*k]) += (*v);
+                        *(l->Letters[*k]) += (*v);
                     } else {
-                        (*l->Letters[*k]) = (*v);
+                        *(l->Letters[*k]) = (*v);
                     }
                 }
                 toPush = l;
@@ -244,9 +244,9 @@ void pop_op(array<token> &ops, array<ast *> &operands) {
                 l->Coeff /= r->Coeff;
                 for (auto [k, v] : r->Letters) {
                     if (has(l->Letters, *k)) {
-                        (*l->Letters[*k]) -= (*v);
+                        *(l->Letters[*k]) -= (*v);
                     } else {
-                        (*l->Letters[*k]) = -(*v);
+                        *(l->Letters[*k]) = -(*v);
                     }
                 }
                 toPush = l;

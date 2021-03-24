@@ -37,7 +37,7 @@ enum class allocator_mode { ALLOCATE = 0,
                             FREE_ALL };
 
 // This is an option when allocating.
-// Allocations marked explicitly as leaks don't get reported with DEBUG_memory_info::report_leaks().
+// Allocations marked explicitly as leaks don't get reported with DEBUG_memory->report_leaks().
 // This is handled internally when passed, so allocator implementations needn't pay attention to it.
 constexpr u64 LEAK = 1ull << 62;
 
@@ -291,15 +291,26 @@ inline allocator DefaultAlloc = {"don't_init"};
 
 struct temporary_allocator_data {
     struct page {
-        byte *Storage = null;
-        s64 Allocated = 0;
-        s64 Used = 0;
+        byte *Storage;
+        s64 Allocated;
+        s64 Used;
 
-        page *Next = null;
+        page *Next;
+
+        // We make a function to do this instead of just using = directly in the members above,
+        // because this is stored in the Context. And we must initialize the Context explicitly.
+        // The Context mustn't have a default constructor, otherwise it gets called by the C++
+        // global constructor table and overrides the initializion we have done before that.
+        // We initialize the Context (and the temporary allocator) before initializes for global variables run!
+        void init() {
+            Storage = null;
+            Allocated = Used = 0;
+            Next = null;
+        }
     };
 
     page Base;
-    s64 TotalUsed = 0;
+    s64 TotalUsed;
 };
 
 // :TemporaryAllocator:

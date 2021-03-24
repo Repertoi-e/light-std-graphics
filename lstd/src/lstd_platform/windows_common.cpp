@@ -113,11 +113,45 @@ void init_global_vars() {
 #endif
 }
 
+// Called when a new thread is started, doesn't touch DefaultAlloc, just the Context
+void win32_common_init_context_thread() {
+    context *c = (context *) &Context;  // @Constcast
+
+    c->ThreadID = thread::id((u64) GetCurrentThreadId());
+
+    // This must be initialized by the thread routine (either to the parent thread allocator or whatever else is the use case).
+    // We set it to null so we crash if is left undecided.
+    c->Alloc = {};
+
+    c->TempAllocData.Base.init();  // See note in allocator.h
+    c->TempAllocData.TotalUsed = 0;
+
+    auto startingSize = 8_KiB;
+    c->TempAllocData.Base.Storage = (byte *) os_allocate_block(startingSize);  // @XXX @TODO: Allocate this with malloc (the general purpose allocator)!
+    c->TempAllocData.Base.Allocated = startingSize;
+
+    c->Temp = {temporary_allocator, &c->TempAllocData};
+
+    c->AllocAlignment = POINTER_SIZE;
+    c->AllocOptions = 0;
+
+    c->LogAllAllocations = false;
+    c->LoggingAnAllocation = false;
+
+    c->PanicHandler = default_panic_handler;
+    c->HandlingPanic = false;
+
+    c->Log = &cout;
+
+    c->FmtParseErrorHandler = fmt_default_parse_error_handler;
+    c->FmtDisableAnsiCodes = false;
+}
+
 // When our program runs, but also needs to happen when a new thread starts!
 void win32_common_init_context() {
     context *c = (context *) &Context;  // @Constcast
 
-    c->ThreadID = thread::id((u64) GetCurrentThreadId());
+    win32_common_init_context_thread();
 
     if (lstd_init_global()) {
         DefaultAlloc = {default_allocator, null};
@@ -127,12 +161,6 @@ void win32_common_init_context() {
         DefaultAlloc = {};
         c->Alloc = {};
     }
-
-    auto startingSize = 8_KiB;
-    c->TempAllocData.Base.Storage = (byte *) os_allocate_block(startingSize);  // @XXX @TODO: Allocate this with malloc (the general purpose allocator)!
-    c->TempAllocData.Base.Allocated = startingSize;
-
-    c->Temp = {temporary_allocator, &c->TempAllocData};
 }
 
 void exit_schedule(const delegate<void()> &function) {
@@ -210,17 +238,17 @@ s32 c_init() {
 
 // We need to reinit the context after the TLS initalizer fires and resets our state.. sigh.
 // We can't just do it once because global variables might still use the context and TLS fires a bit later.
-s32 tls_init() {
-    win32_common_init_context();
-    return 0;
-}
+// s32 tls_init() {
+//     // win32_common_init_context();
+//     return 0;
+// }
 
 s32 pre_termination() {
     exit_call_scheduled_functions();
-    
+
     win32_window_uninit();
     win32_monitor_uninit();
-    
+
     uninit_win32_state();
     return 0;
 }
@@ -233,9 +261,9 @@ typedef s32 cb(void);
 __declspec(allocate(".CRT$XIU")) cb *g_CInit = c_init;
 #pragma const_seg()
 
-#pragma const_seg(".CRT$XDU")
-__declspec(allocate(".CRT$XDU")) cb *g_TLSInit = tls_init;
-#pragma const_seg()
+// #pragma const_seg(".CRT$XDU")
+// __declspec(allocate(".CRT$XDU")) cb *g_TLSInit = tls_init;
+// #pragma const_seg()
 
 // #pragma const_seg(".CRT$XCU")
 // __declspec(allocate(".CRT$XCU")) cb *g_CPPInit = cpp_init;
