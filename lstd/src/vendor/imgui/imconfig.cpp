@@ -59,157 +59,75 @@ const void *memchr(const void *ptr, int value, u64 n) {
     return NULL;
 }
 
-//
-// fmod source code taken from glibc
-//
-
-typedef union {
-    double value;
-    struct
-    {
-        u32 msw;
-        u32 lsw;
-    } parts;
-    u64 word;
-} ieee_double_shape_type;
-
-/* Get two 32 bit ints from a double.  */
-#define EXTRACT_WORDS(ix0, ix1, d)   \
-    do {                             \
-        ieee_double_shape_type ew_u; \
-        ew_u.value = (d);            \
-        (ix0) = ew_u.parts.msw;      \
-        (ix1) = ew_u.parts.lsw;      \
-    } while (0)
-
-/* Set a double from two 32 bit ints.  */
-#define INSERT_WORDS(d, ix0, ix1)    \
-    do {                             \
-        ieee_double_shape_type iw_u; \
-        iw_u.parts.msw = (ix0);      \
-        iw_u.parts.lsw = (ix1);      \
-        (d) = iw_u.value;            \
-    } while (0)
-
-static const double one = 1.0, Zero[] = {0.0, -0.0};
-
 double fmod(double x, double y) {
-    s32 n, hx, hy, hz, ix, iy, sx, i;
-    u32 lx, ly, lz;
+    union {
+        double f;
+        u64 i;
+    } ux = {x}, uy = {y};
+    int ex = ux.i >> 52 & 0x7ff;
+    int ey = uy.i >> 52 & 0x7ff;
+    int sx = ux.i >> 63;
+    u64 i;
 
-    EXTRACT_WORDS(hx, lx, x);
-    EXTRACT_WORDS(hy, ly, y);
-    sx = hx & 0x80000000; /* sign of x */
-    hx ^= sx;             /* |x| */
-    hy &= 0x7fffffff;     /* |y| */
+    /* in the followings uxi should be ux.i, but then gcc wrongly adds */
+    /* float load/store to inner loops ruining performance and code size */
+    u64 uxi = ux.i;
 
-    /* purge off exception values */
-    if ((hy | ly) == 0 || (hx >= 0x7ff00000) ||   /* y=0,or x not finite */
-        ((hy | ((ly | -ly) >> 31)) > 0x7ff00000)) /* or y is NaN */
+    if (uy.i << 1 == 0 || LSTD_NAMESPACE::is_nan(y) || ex == 0x7ff)
         return (x * y) / (x * y);
-    if (hx <= hy) {
-        if ((hx < hy) || (lx < ly)) return x; /* |x|<|y| return x */
-        if (lx == ly)
-            return Zero[(u32) sx >> 31]; /* |x|=|y| return x*0*/
+    if (uxi << 1 <= uy.i << 1) {
+        if (uxi << 1 == uy.i << 1)
+            return 0 * x;
+        return x;
     }
 
-    /* determine ix = ilogb(x) */
-    if (hx < 0x00100000) { /* subnormal x */
-        if (hx == 0) {
-            for (ix = -1043, i = lx; i > 0; i <<= 1) ix -= 1;
-        } else {
-            for (ix = -1022, i = (hx << 11); i > 0; i <<= 1) ix -= 1;
-        }
-    } else
-        ix = (hx >> 20) - 1023;
-
-    /* determine iy = ilogb(y) */
-    if (hy < 0x00100000) { /* subnormal y */
-        if (hy == 0) {
-            for (iy = -1043, i = ly; i > 0; i <<= 1) iy -= 1;
-        } else {
-            for (iy = -1022, i = (hy << 11); i > 0; i <<= 1) iy -= 1;
-        }
-    } else
-        iy = (hy >> 20) - 1023;
-
-    /* set up {hx,lx}, {hy,ly} and align y to x */
-    if (ix >= -1022)
-        hx = 0x00100000 | (0x000fffff & hx);
-    else { /* subnormal x, shift x to normal */
-        n = -1022 - ix;
-        if (n <= 31) {
-            hx = (hx << n) | (lx >> (32 - n));
-            lx <<= n;
-        } else {
-            hx = lx << (n - 32);
-            lx = 0;
-        }
+    /* normalize x and y */
+    if (!ex) {
+        for (i = uxi << 12; i >> 63 == 0; ex--, i <<= 1)
+            ;
+        uxi <<= -ex + 1;
+    } else {
+        uxi &= (u64)(-1) >> 12;
+        uxi |= 1ULL << 52;
     }
-    if (iy >= -1022)
-        hy = 0x00100000 | (0x000fffff & hy);
-    else { /* subnormal y, shift y to normal */
-        n = -1022 - iy;
-        if (n <= 31) {
-            hy = (hy << n) | (ly >> (32 - n));
-            ly <<= n;
-        } else {
-            hy = ly << (n - 32);
-            ly = 0;
-        }
+    if (!ey) {
+        for (i = uy.i << 12; i >> 63 == 0; ey--, i <<= 1)
+            ;
+        uy.i <<= -ey + 1;
+    } else {
+        uy.i &= (u64)(-1) >> 12;
+        uy.i |= 1ULL << 52;
     }
 
-    /* fix point fmod */
-    n = ix - iy;
-    while (n--) {
-        hz = hx - hy;
-        lz = lx - ly;
-        if (lx < ly) hz -= 1;
-        if (hz < 0) {
-            hx = hx + hx + (lx >> 31);
-            lx = lx + lx;
-        } else {
-            if ((hz | lz) == 0) /* return sign(x)*0 */
-                return Zero[(u32) sx >> 31];
-            hx = hz + hz + (lz >> 31);
-            lx = lz + lz;
+    /* x mod y */
+    for (; ex > ey; ex--) {
+        i = uxi - uy.i;
+        if (i >> 63 == 0) {
+            if (i == 0)
+                return 0 * x;
+            uxi = i;
         }
+        uxi <<= 1;
     }
-    hz = hx - hy;
-    lz = lx - ly;
-    if (lx < ly) hz -= 1;
-    if (hz >= 0) {
-        hx = hz;
-        lx = lz;
+    i = uxi - uy.i;
+    if (i >> 63 == 0) {
+        if (i == 0)
+            return 0 * x;
+        uxi = i;
     }
+    for (; uxi >> 52 == 0; uxi <<= 1, ex--)
+        ;
 
-    /* convert back to floating value and restore the sign */
-    if ((hx | lx) == 0) /* return sign(x)*0 */
-        return Zero[(u32) sx >> 31];
-    while (hx < 0x00100000) { /* normalize x */
-        hx = hx + hx + (lx >> 31);
-        lx = lx + lx;
-        iy -= 1;
+    /* scale result */
+    if (ex > 0) {
+        uxi -= 1ULL << 52;
+        uxi |= (u64) ex << 52;
+    } else {
+        uxi >>= -ex + 1;
     }
-    if (iy >= -1022) { /* normalize output */
-        hx = ((hx - 0x00100000) | ((iy + 1023) << 20));
-        INSERT_WORDS(x, hx | sx, lx);
-    } else { /* subnormal output */
-        n = -1022 - iy;
-        if (n <= 20) {
-            lx = (lx >> n) | ((u32) hx << (32 - n));
-            hx >>= n;
-        } else if (n <= 31) {
-            lx = (hx << (32 - n)) | (lx >> n);
-            hx = sx;
-        } else {
-            lx = hx >> (n - 32);
-            hx = sx;
-        }
-        INSERT_WORDS(x, hx | sx, lx);
-        x *= one; /* create necessary signal */
-    }
-    return x; /* exact output */
+    uxi |= (u64) sx << 63;
+    ux.i = uxi;
+    return ux.f;
 }
 
 int toupper(int c) { return LSTD_NAMESPACE::to_upper(c); }
