@@ -169,6 +169,9 @@ void ui_functions() {
         For_enumerate(GraphState->Functions) {
             ImGui::PushID(it.ImGuiID);
 
+            ImGui::ColorEdit3("", &it.Color.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoAlpha);
+
+            ImGui::SameLine();
             if (ImGui::InputText("", it.Formula, function_entry::FORMULA_INPUT_BUFFER_SIZE)) {
                 if (it.FormulaRoot) {
                     free_ast(it.FormulaRoot);

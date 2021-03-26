@@ -114,7 +114,7 @@ void render_viewport() {
 
             f64 x0 = firstLine.x - step.x;
             f64 x1 = firstLine.x;
-            
+
             f64 ux0 = (x0 - origin.x) / GraphState->Camera.Scale.x;
             f64 uy0 = evaluate_function_at(ux0, &it, it.FormulaRoot);
             f64 y0 = (-uy0) * GraphState->Camera.Scale.y + origin.y;  // negative y means up
@@ -125,13 +125,13 @@ void render_viewport() {
                 f64 uy1 = evaluate_function_at(ux1, &it, it.FormulaRoot);
                 f64 y1 = (-uy1) * GraphState->Camera.Scale.y + origin.y;  // negative y means up
 
-                d->AddLine(v2(x0, y0), v2(x1, y1), 0xffff0000, thickness * 2.5f);
-
-                x0 = x1;
-                x1 += step.x * 0.1;
+                d->AddLine(v2(x0, y0), v2(x1, y1), ImColor(it.Color), thickness * 2.5f);
 
                 ux0 = ux1;
                 y0 = y1;
+
+                x0 = x1;
+                x1 += step.x * 0.1;
             }
         }
     }

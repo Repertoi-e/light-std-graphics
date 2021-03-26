@@ -11,15 +11,15 @@
 // Provides replacements for the math functions found in virtually all standard libraries.
 // Also provides functions for extended precision arithmetic, statistical functions, physics, astronomy, etc.
 // https://www.netlib.org/cephes/
-// Note: We don't include everything, just cmath for now. 
-//       Statistics is a thing we will most definitely include as well in the future. 
+// Note: We don't include everything, just cmath for now.
+//       Statistics is a thing we will most definitely include as well in the future.
 //       Everything else you can include on your own in your project (we don't want to be bloaty).
-// 
+//
 // Note: Important difference,
 // atan2's return range is 0 to 2PI, and not -PI to PI (as per normal in the C standard library).
 //
 //
-// Parts of the source code that we modifed are marked with :WEMODIFIEDCEPHES: 
+// Parts of the source code that we modifed are marked with :WEMODIFIEDCEPHES:
 //
 
 /*
@@ -391,8 +391,21 @@ constexpr void *const_copy_memory(void *dst, const void *src, u64 size) {
 
 extern void *(*fill_memory)(void *dst, char value, u64 size);
 constexpr void *const_fill_memory(void *dst, char value, u64 size) {
-    auto d = (char *) dst;
-    while (size-- > 0) *d++ = value;
+    u64 uValue = (u64) value;
+    u64 largeValue = uValue << 56 | uValue << 48 | uValue << 40 | uValue << 32 | uValue << 24 | uValue << 16 | uValue << 8 | uValue;
+
+    u64 offset = ((u64) dst) % sizeof(u64);
+    byte *b = (byte *) dst;
+    while (--offset) *b = value;
+
+    u64 *dstBig = (u64 *) b;
+    u64 bigNum = (size & (~sizeof(u64) + 1)) / sizeof(u64);
+    while (bigNum--) *dstBig++ = largeValue;
+
+    size &= (sizeof(u64) - 1);
+
+    b = (byte *) dstBig;
+    while (size--) *b++ = value;
     return dst;
 }
 
@@ -401,8 +414,8 @@ constexpr void *const_zero_memory(void *dst, u64 size) { return const_fill_memor
 
 // compare_memory returns the index of the first byte that is different
 // e.g: calling with
-//		*ptr1 = 00000011
-//		*ptr1 = 00100001
+//		*ptr1 = 0000001234
+//		*ptr1 = 0010000234
 //	returns 2
 // If the memory regions are equal, the returned value is -1
 extern s64 (*compare_memory)(const void *ptr1, const void *ptr2, u64 size);

@@ -42,13 +42,11 @@ struct function_entry {
 
     hash_table<char32_t, f64> Parameters;
 
+    v4 Color = {1.0, 0.2f, 0.3f, 0.8f};
+
     // @TODO:
-    // - Color
     // - Domain
-    // - Determine parameters and display sliders and inputs for them
-    // - y= or x=
-    //
-    // - ... actually graph them :D
+    // - Parse y= or x=
 
     // See note in graph_state.
     u32 ImGuiID = 0;

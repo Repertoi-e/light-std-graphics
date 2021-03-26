@@ -1,213 +1,108 @@
 #include "free_list_allocator.h"
 
-#include "../types/numeric_info.h"
-#include "array.h"
-
 LSTD_BEGIN_NAMESPACE
 
-using node = free_list_allocator_data::node;
+void free_list_allocator_data::init(const void *base, s64 size, s16 maxBlocks, s16 splitThresh) {
+    Heap = (heap *) base;
+    Heap->Limit = (byte *) base + size;
+    Heap->SplitThresh = splitThresh;
+    Heap->MaxBlocks = maxBlocks;
 
-file_scope void coalescence(node *previousNode, node *freeNode) {
-    if (freeNode->Next && (s64) freeNode + freeNode->BlockSize == (s64) freeNode->Next) {
-        freeNode->BlockSize += freeNode->Next->BlockSize;
-        freeNode->Next = freeNode->Next->Next;
+    Heap->Free = null;
+    Heap->Used = null;
+    Heap->Fresh = (block *) Heap + 1;
+    Heap->Top = (s64)(Heap->Fresh + maxBlocks);
+
+    block *b = Heap->Fresh;
+    For(range(maxBlocks)) {
+        b->Next = b + 1;
+        ++b;
     }
-
-    if (previousNode && (s64) previousNode + previousNode->BlockSize == (s64) freeNode) {
-        previousNode->BlockSize += freeNode->BlockSize;
-        previousNode->Next = freeNode->Next;
-    }
+    b->Next = null;
 }
 
-u16 free_list_allocator_data::find_first(s64 size, node **previousNode, node **foundNode) {
-    u16 padding = 0;
-
-    node *it = FreeListHead, *itPrev = null;
-    while (it) {
-        padding = calculate_padding_for_pointer_with_header(it, 16, sizeof(block_header));
-
-        s64 requiredSpace = size + padding;
-        if (it->BlockSize >= requiredSpace) break;
-        itPrev = it;
-        it = it->Next;
-    }
-    *previousNode = itPrev;
-    *foundNode = it;
-
-    return padding;
-}
-
-u16 free_list_allocator_data::find_best(s64 size, node **previousNode, node **foundNode) {
-    u16 padding = 0;
-
-    // Iterate the whole list while keeping a pointer to the best fit
-    s64 smallestDiff = numeric_info<s64>::max();
-
-    node *it = FreeListHead, *itPrev = null, *bestBlock = null;
-    while (it) {
-        padding = calculate_padding_for_pointer_with_header(it, 16, sizeof(block_header));
-        s64 requiredSpace = size + padding;
-        s64 diff = it->BlockSize - requiredSpace;
-        if (it->BlockSize >= requiredSpace && (diff < smallestDiff)) {
-            bestBlock = it;
-            smallestDiff = diff;
-        }
-
-        itPrev = it;
-        it = it->Next;
-    }
-    *previousNode = itPrev;
-    *foundNode = bestBlock;
-
-    return padding;
-}
-
-void free_list_allocator_data::init(s64 totalSize, u8 policy) {
-    Storage = allocate_array<byte>(totalSize, {.Alloc = DefaultAlloc});
-    Allocated = totalSize;
-    PlacementPolicy = policy;
-    free_all(allocator{free_list_allocator, this});  // Initializes the linked list
-}
-
-void free_list_allocator_data::release() {
-    free(Storage);
-    Allocated = 0;
-    FreeListHead = null;
-    Storage = null;
-}
+void insert_block(free_list_allocator_data::block **free, free_list_allocator_data::block *b);
+void compact(free_list_allocator_data::block **fresh, free_list_allocator_data::block *free);
 
 void *free_list_allocator_data::allocate_block(s64 size) {
-    auto userSize = size;
+    block *ptr = Heap->Free;
+    block *prev = null;
 
-    assert(userSize >= sizeof(node) && "Allocation size must be bigger");
-
-    // Search through the free list for a free block that has enough space to allocate our Data
-    node *previousNode, *foundNode;
-    u16 padding = PlacementPolicy == free_list_allocator_data::Find_First
-                      ? find_first(userSize, &previousNode, &foundNode)
-                      : find_best(userSize, &previousNode, &foundNode);
-    if (!foundNode) return null;
-
-    u16 alignmentPadding = padding - sizeof(block_header);
-    s64 required = userSize + padding;
-
-    s64 rest = foundNode->BlockSize - required;
-    if (rest > 0) {
-        // We have to split the block into the Data block and a free block of size _rest_
-        auto *newFreeNode = (node *) ((char *) foundNode + required);
-        newFreeNode->BlockSize = rest;
-        newFreeNode->Next = foundNode->Next;
-        foundNode->Next = newFreeNode;
-    }
-    if (previousNode) {
-        previousNode->Next = foundNode->Next;
-    } else {
-        FreeListHead = foundNode->Next;
-    }
-
-#if defined DEBUG_MEMORY
-    sanity();
-#endif
-
-    Used += required;
-    PeakUsed = max(Used, PeakUsed);
-
-    auto *header = (block_header *) ((char *) foundNode + alignmentPadding);
-    header->Size = userSize;
-    header->AlignmentPadding = alignmentPadding;
-
-    return (void *) (header + 1);
-}
-
-/*
-void *free_list_allocator_data::resize_block(void *block, s64 newSize) {
-    auto *header = (block_header *) block - 1;
-
-#if defined DEBUG_MEMORY
-    auto *p = (u32 *) ((char *) header - header->AlignmentPadding);
-    assert(*p == USED_BLOCK_FLAG);  // Sanity
-#endif
-
-    s64 diff = (s64) newSize - (s64) header->Size;
-
-    auto *nextBlock = (char *) block + header->Size;
-    auto *flag = (u32 *) nextBlock;
-
-    // There is a guarantee to be no padding if the block is a free block, so the flag must be at that location.
-    if (*flag == FREE_BLOCK_FLAG) {
-        auto *freeNode = (node *) nextBlock;
-
-        if (diff > 0) {
-            if ((s64) freeNode->BlockSize >= diff) {
-                freeNode->BlockSize -= (s64) diff;
+    u64 top = Heap->Top;
+    while (ptr) {
+        bool isTop = ((u64) ptr->Address + ptr->Size >= top) && ((u64) ptr->Address + size <= (u64) Heap->Limit);
+        if (isTop || ptr->Size >= size) {
+            if (prev) {
+                prev->Next = ptr->Next;
             } else {
-                return null;  // Not enough space in next free node
+                Heap->Free = ptr->Next;
             }
-        } else {
-            freeNode->BlockSize += (s64) -diff;  // If we are shrinking, tell the free node it has more space now.
+
+            ptr->Next = Heap->Used;
+            Heap->Used = ptr;
+            if (isTop) {
+                // print_s("resize top block");
+                ptr->Size = size;
+                Heap->Top = (size_t) ptr->Address + size;
+            } else if (Heap->Fresh) {
+                size_t excess = ptr->Size - size;
+                if (excess >= Heap->SplitThresh) {
+                    ptr->Size = size;
+
+                    block *split = Heap->Fresh;
+                    Heap->Fresh = split->Next;
+                    split->Address = (void *) ((u64) ptr->Address + size);
+                    // print_s("split");
+                    // print_i((size_t) split->addr);
+                    split->Size = excess;
+                    insert_block(&Heap->Free, split);
+                    compact(&Heap->Fresh, Heap->Free);
+                }
+            }
+            return ptr->Address;
         }
-
-        auto *moved = (char *) freeNode + diff;
-        copy_memory(moved, freeNode, sizeof(node));
-
-        // Find the previous free node
-        node *it = FreeListHead, *itPrev = null;
-        while (it) {
-            if (it == freeNode) break;
-            itPrev = it;
-            it = it->Next;
-        }
-        itPrev->Next = (node *) moved;
-
-        return block;
-    } else {
-        return null;  // We can't resize it, next node is not free
+        prev = ptr;
+        ptr = ptr->Next;
     }
+
+    // No matching free blocks, see if any other blocks available
+    size_t newTop = top + size;
+    if (Heap->Free != null && newTop <= (u64) Heap->Limit) {
+        ptr = Heap->Fresh;
+        Heap->Fresh = ptr->Next;
+        ptr->Address = (void *) top;
+        ptr->Next = Heap->Used;
+        ptr->Size = size;
+        Heap->Used = ptr;
+        Heap->Top = newTop;
+        return ptr->Address;
+    }
+
+    return null;
 }
-*/
 
-void free_list_allocator_data::free_block(void *block) {
-    auto *header = (block_header *) block - 1;
-
-    s64 alignmentPadding = header->AlignmentPadding;
-
-    auto *freeNode = (node *) ((char *) header - alignmentPadding);
-    freeNode->BlockSize = header->Size + header->AlignmentPadding + sizeof(block_header);
-    freeNode->Next = null;
-
-    node *it = FreeListHead, *itPrev = null;
-    while (it) {
-        if (block < (void *) it) {
-            if (!itPrev) {
-                freeNode->Next = FreeListHead;
-                FreeListHead = freeNode;
+void free_list_allocator_data::free_block(void *ptr) {
+    block *b = Heap->Used;
+    block *prev = NULL;
+    while (b) {
+        if (ptr == b->Address) {
+            if (prev) {
+                prev->Next = b->Next;
             } else {
-                freeNode->Next = itPrev->Next;
-                itPrev->Next = freeNode;
+                Heap->Used = b->Next;
             }
-            break;
+            insert_block(&Heap->Free, b);
+            compact(&Heap->Fresh, Heap->Free);
+            return;
         }
-        itPrev = it;
-        it = it->Next;
+        prev = b;
+        b = b->Next;
     }
-    Used -= freeNode->BlockSize;
-
-    // Merge contiguous nodes
-    coalescence(itPrev, freeNode);
 
 #if defined DEBUG_MEMORY
-    sanity();
+    // Sanity
+    assert(count_free() + count_used() + count_fresh() == Heap->MaxBlocks);
 #endif
-}
-
-void free_list_allocator_data::sanity() {
-    node *it = FreeListHead;
-    while (it) {
-        if (it->Next) {
-            assert((s64) it + it->BlockSize <= (s64) it->Next);
-        }
-        it = it->Next;
-    }
 }
 
 void *free_list_allocator(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 *) {
@@ -218,27 +113,100 @@ void *free_list_allocator(allocator_mode mode, void *context, s64 size, void *ol
             return data->allocate_block(size);
         }
         case allocator_mode::RESIZE: {
+            // return data->resize_block(oldMemory, size);
             return null;
-            // return data->resize(oldMemory, size);
         }
         case allocator_mode::FREE: {
             data->free_block(oldMemory);
             return null;
         }
         case allocator_mode::FREE_ALL: {
-            data->Used = data->PeakUsed = 0;
-
-            auto *firstNode = (node *) data->Storage;
-            firstNode->BlockSize = data->Allocated;
-            firstNode->Next = null;
-            data->FreeListHead = firstNode;
-
+            data->init(data->Heap, (s64) ((byte *) data->Heap->Limit - (byte *) data->Heap), data->Heap->MaxBlocks, data->Heap->SplitThresh);
             return null;
         }
         default:
             assert(false);
     }
     return null;
+}
+
+using block = free_list_allocator_data::block;
+
+file_scope s64 count_blocks(block *ptr) {
+    s64 num = 0;
+    while (ptr != NULL) {
+        num++;
+        ptr = ptr->Next;
+    }
+    return num;
+}
+
+s64 free_list_allocator_data::count_free() { return count_blocks(Heap->Free); }
+s64 free_list_allocator_data::count_used() { return count_blocks(Heap->Used); }
+s64 free_list_allocator_data::count_fresh() { return count_blocks(Heap->Fresh); }
+
+file_scope void insert_block(block **free, block *b) {
+    block *ptr = *free;
+    block *prev = null;
+    while (ptr) {
+        if ((u64) b->Address <= (u64) ptr->Address) break;
+        prev = ptr;
+        ptr = ptr->Next;
+    }
+
+    if (prev) {
+        prev->Next = b;
+    } else {
+        (*free) = b;
+    }
+
+    b->Next = ptr;
+}
+
+file_scope void release_blocks(block **fresh, block *scan, block *to) {
+    block *next;
+    while (scan != to) {
+        // print_s("release");
+        // print_i((size_t) scan);
+        next = scan->Next;
+        scan->Next = (*fresh);
+        *fresh = scan;
+        scan->Address = 0;
+        scan->Size = 0;
+        scan = next;
+    }
+}
+
+file_scope void compact(block **fresh, block *free) {
+    block *prev;
+    block *scan;
+
+    block *ptr = free;
+    while (ptr) {
+        prev = ptr;
+        scan = ptr->Next;
+        while (scan && (u64) prev->Address + prev->Size == (s64) scan->Address) {
+            // print_s("merge");
+            // print_i((size_t) scan);
+            prev = scan;
+            scan = scan->Next;
+        }
+
+        if (prev) {
+            size_t new_size = (u64) prev->Address - (u64) ptr->Address + prev->Size;
+            // print_s("new size");
+            // print_i(new_size);
+            ptr->Size = new_size;
+            block *next = prev->Next;
+
+            // Make merged blocks available
+            release_blocks(fresh, ptr->Next, prev->Next);
+
+            // Relink
+            ptr->Next = next;
+        }
+        ptr = ptr->Next;
+    }
 }
 
 LSTD_END_NAMESPACE
