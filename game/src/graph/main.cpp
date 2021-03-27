@@ -4,24 +4,26 @@
 
 #include "state.h"
 
-LE_GAME_API GAME_UPDATE_AND_RENDER(game_update_and_render, game_memory *memory, graphics *g) {
-    if (memory->ReloadedThisFrame) {
-        GameMemory = memory;
+LE_GAME_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
+    if (m->ReloadedThisFrame) {
+        Memory = m;
         Graphics = g;
 
         reload_global_state();
 
+        // Reinit the camera
+        // Should we?
         auto *cam = &GraphState->Camera;
         camera_reinit(cam);
 
-        // Ensure at least one entry exists
+        // Ensure at least one function entry exists
         if (!GraphState->Functions) append(GraphState->Functions);
     }
 
     auto *cam = &GraphState->Camera;
     camera_update(cam);
 
-    if (GameMemory->MainWindow->is_visible()) {
+    if (Memory->MainWindow->is_visible()) {
         render_ui();
         render_viewport();
     }
@@ -29,10 +31,10 @@ LE_GAME_API GAME_UPDATE_AND_RENDER(game_update_and_render, game_memory *memory, 
     free_all(Context.Temp);
 }
 
-LE_GAME_API GAME_MAIN_WINDOW_EVENT(game_main_window_event, const event &e) {
+LE_GAME_API MAIN_WINDOW_EVENT(main_window_event, const event &e) {
     if (!GraphState) return false;
 
-    assert(e.Window == GameMemory->MainWindow);
+    assert(e.Window == Memory->MainWindow);
 
     if (e.Type == event::Mouse_Wheel_Scrolled) {
         if (mouse_in_viewport()) {

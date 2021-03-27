@@ -18,17 +18,17 @@ import fmt;
 // which means that allocations done in different modules are incompatible. If you provide a symbol lstd_dont_initialize_global_state_stub
 // with the value "true" we don't initialize that global state (instead we leave it as null). That means that YOU MUST initialize it yourself!
 // You must initialize the following global variables by passing the values from the "host" to the "guest" module:
-//  - DefaultAlloc     (a global variable)
-//  - Context.Alloc    (member of the context, by default we initialize it to DefaultAlloc)
-//  - DEBUG_memory     (a global pointer, by default we allocates)
+//  - DEBUG_memory     (a global pointer, by default we allocate it)
 //
 // @Volatile: As we add more global state.
 //
 // Why do we do this?
 // In another project (light-std-graphics) I have an exe which serves as the engine, and loads dlls (the game). We do this to support hot-loading
-// so we can change the game code without closing the window. The game (dll) allocates memory and needs to do that from the engine's allocator,
+// so we can change the game code without closing the window. The game (dll) allocates memory and needs to do that from the engine's allocator and debug memory,
 // otherwise problems occur when hot-loading a new dll.
 //
+// @Cleanup @Cleanup @Cleanup @Cleanup @Cleanup @Cleanup @Cleanup @Cleanup  There should be a better way and we should get rid of this.
+//                                                                          I haven't thought much about it yet.
 extern "C" bool lstd_init_global();
 
 // If the user didn't provide a definition for lstd_init_global, the linker shouldn't complain,
@@ -41,7 +41,14 @@ LSTD_BEGIN_NAMESPACE
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 #define MODULE_HANDLE ((HMODULE) &__ImageBase)
 
-struct win32_common_state {
+struct win64_common_state {
+    allocator PersistentAlloc;  // Used to store global state, tlsf
+    thread::mutex PersistentAllocMutex;
+
+    allocator TempAlloc;  // Used for temporary storage (e.g. converting strings from utf8 to utf16 for windows calls).
+                          // Memory returned is valid until the next TempAlloc call.
+    thread::mutex TempAllocMutex;
+
     static constexpr s64 CONSOLE_BUFFER_SIZE = 1_KiB;
 
     byte CinBuffer[CONSOLE_BUFFER_SIZE];
@@ -71,13 +78,17 @@ struct win32_common_state {
 // rely on e.g. the Context being initialized). This is analogous to the stuff CRT runs before main is called.
 // Except that we don't link against the CRT (that's why we even have to "call" the constructors ourselves,
 // using linker magic - take a look at the exe_main.cpp in no_crt).
-file_scope byte State[sizeof(win32_common_state)];
+file_scope byte State[sizeof(win64_common_state)];
 
 // Short-hand macro for sanity
-#define S ((win32_common_state *) &State[0])
+#define S ((win64_common_state *) &State[0])
+
+// These functions are used by other windows platform files.
+allocator win64_get_persistent_allocator() { return S->PersistentAlloc; }
+allocator win64_get_temporary_allocator() { return S->TempAlloc; }
 
 // This is used before the Context is initted.
-void report_warning_no_allocations(string message) {
+file_scope void report_warning_no_allocations(string message) {
     DWORD ignored;
 
     string preMessage = ">>> Warning (in windows_common.cpp): ";
@@ -89,15 +100,103 @@ void report_warning_no_allocations(string message) {
     WriteFile(S->CerrHandle, postMessage.Data, (DWORD) postMessage.Count, &ignored, null);
 }
 
-void report_error(string message, source_location loc = source_location::current()) {
+file_scope void report_error(string message, source_location loc = source_location::current()) {
     print(">>> {!RED}Platform error{!} {}:{} (in function: {}): {}.\n", loc.File, loc.Line, loc.Function, message);
 }
 
+// @TODO: Make these macros so the user (programmer) can modify them easily.
+constexpr s64 TEMPORARY_STORAGE_STARTING_POOL_SIZE = 16_KiB;
+constexpr s64 PERSISTENT_STORAGE_STARTING_POOL_SIZE = 1_MiB;
+
+// Some global state about our temporary allocator.
+// We don't use the one bundled with the Context because we don't want to mess with the user's memory.
+file_scope void *TempStorageBlock;
+file_scope s64 TempStorageSize;
+
+void create_temp_storage_block(s64);
+void create_persistent_alloc_block(s64);
+
+// An extension to the arena allocator. Calls free_all when not enough space. Because we are not running a game
+// there is no clear point at which to free_all the temporary allocator, that's why we assume that no allocation
+// made with TempAlloc should persist beyond the next allocation.
+void *win64_temp_alloc(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
+    auto *data = (arena_allocator_data *) context;
+
+    thread::scoped_lock _(&S->TempAllocMutex);
+
+    auto *result = arena_allocator(mode, context, size, oldMemory, oldSize, options);
+    if (mode == allocator_mode::ALLOCATE) {
+        if (size > TempStorageSize) {
+            // If we try to allocate a block with size bigger than the temporary storage block, we make a new, larger temporary storage block
+
+            report_warning_no_allocations("Tried to allocate a temporary block with size which was bigger than what we could handle. Increasing the starting pool size.");
+
+            allocator_remove_pool(S->TempAlloc, TempStorageBlock);
+            os_free_block(TempStorageBlock);
+
+            create_temp_storage_block(size * 2);
+        } else if (!result) {
+            // If we couldn't allocate but the temporary storage block has enough space, we just call free_all
+            free_all(S->TempAlloc);
+        }
+        result = arena_allocator(allocator_mode::ALLOCATE, context, size, null, 0, options);
+    }
+
+    return result;
+}
+
+file_scope void create_temp_storage_block(s64 size) {
+    // We allocate the arena allocator data and the starting pool in one big block in order to reduce fragmentation.
+    TempStorageBlock = os_allocate_block(sizeof(arena_allocator_data) + size);
+    TempStorageSize = size;
+
+    auto *data = (arena_allocator_data *) TempStorageBlock;
+    zero_memory(data, sizeof(arena_allocator_data));
+    S->TempAlloc = {win64_temp_alloc, data};
+
+    allocator_add_pool(S->TempAlloc, data + 1, size);
+}
+
+void *win64_persistent_alloc(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
+    auto *data = (tlsf_allocator_data *) context;
+
+    thread::scoped_lock _(&S->PersistentAllocMutex);
+
+    auto *result = tlsf_allocator(mode, context, size, oldMemory, oldSize, options);
+    if (mode == allocator_mode::ALLOCATE) {
+        if (!result) {
+            report_warning_no_allocations("Not enough memory in the persistent allocator. Adding a new pool.");
+
+            create_persistent_alloc_block(size * 3);
+        }
+        result = tlsf_allocator(allocator_mode::ALLOCATE, context, size, null, 0, options);
+    }
+    return result;
+}
+
+file_scope void create_persistent_alloc_block(s64 size) {
+    // We allocate the tlsf allocator data and the starting pool in one big block in order to reduce fragmentation.
+    void *block = os_allocate_block(sizeof(tlsf_allocator_data) + size);
+
+    auto *data = (tlsf_allocator_data *) block;
+    zero_memory(data, sizeof(tlsf_allocator_data));
+    S->PersistentAlloc = {win64_persistent_alloc, data};
+
+    allocator_add_pool(S->PersistentAlloc, data + 1, size);
+}
+
+file_scope void init_allocators() {
+    create_temp_storage_block(TEMPORARY_STORAGE_STARTING_POOL_SIZE);
+    create_persistent_alloc_block(PERSISTENT_STORAGE_STARTING_POOL_SIZE);
+}
+
 // This zeroes out the global variables (stored in State) and initializes the mutexes
-void init_global_vars() {
-    zero_memory(&State, sizeof(win32_common_state));
+file_scope void init_global_vars() {
+    zero_memory(&State, sizeof(win64_common_state));
 
     // Init mutexes
+    S->PersistentAllocMutex.init();
+    S->TempAllocMutex.init();
     S->CinMutex.init();
     S->CoutMutex.init();
     S->ExitScheduleMutex.init();
@@ -111,56 +210,16 @@ void init_global_vars() {
         DEBUG_memory = null;
     }
 #endif
-}
 
-// Called when a new thread is started, doesn't touch DefaultAlloc, just the Context
-void win32_common_init_context_thread() {
-    context *c = (context *) &Context;  // @Constcast
-
-    c->ThreadID = thread::id((u64) GetCurrentThreadId());
-
-    // This must be initialized by the thread routine (either to the parent thread allocator or whatever else is the use case).
-    // We set it to null so we crash if is left undecided.
-    c->Alloc = {};
-
-    c->TempAllocData.Base.init();  // See note in allocator.h
-    c->TempAllocData.TotalUsed = 0;
-
-    auto startingSize = 8_KiB;
-    c->TempAllocData.Base.Storage = (byte *) os_allocate_block(startingSize);  // @XXX @TODO: Allocate this with malloc (the general purpose allocator)!
-    c->TempAllocData.Base.Allocated = startingSize;
-
-    c->Temp = {temporary_allocator, &c->TempAllocData};
-
-    c->AllocAlignment = POINTER_SIZE;
-    c->AllocOptions = 0;
-
-    c->LogAllAllocations = false;
-    c->LoggingAnAllocation = false;
-
-    c->PanicHandler = default_panic_handler;
-    c->HandlingPanic = false;
-
-    c->Log = &cout;
-
-    c->FmtParseErrorHandler = fmt_default_parse_error_handler;
-    c->FmtDisableAnsiCodes = false;
+    init_allocators();
 }
 
 // When our program runs, but also needs to happen when a new thread starts!
-void win32_common_init_context() {
+void win64_common_init_context() {
     context *c = (context *) &Context;  // @Constcast
 
-    win32_common_init_context_thread();
-
-    if (lstd_init_global()) {
-        DefaultAlloc = {default_allocator, null};
-        c->Alloc = DefaultAlloc;
-    } else {
-        // Set to null so we catch if the programmer forgot to initialize it himself
-        DefaultAlloc = {};
-        c->Alloc = {};
-    }
+    *c = {};  // Constructor gets called later again (cpp global constructors for thread local variables), but doesn't reinit the thread id.
+    c->ThreadID = thread::id((u64) GetCurrentThreadId());
 }
 
 void exit_schedule(const delegate<void()> &function) {
@@ -183,7 +242,7 @@ array<delegate<void()>> *exit_get_scheduled_functions() {
     return &S->ExitFunctions;
 }
 
-void uninit_win32_state() {
+file_scope void uninit_state() {
 #if defined DEBUG_MEMORY
     if (lstd_init_global()) {
     } else {
@@ -210,14 +269,14 @@ void uninit_win32_state() {
 #endif
 }
 
-void win32_common_init_context();
-void win32_common_init_global_state();
+void win64_common_init_context();
+void win64_common_init_global_state();
 
-void win32_monitor_init();
-void win32_monitor_uninit();
+void win64_monitor_init();
+void win64_monitor_uninit();
 
-void win32_window_init();
-void win32_window_uninit();
+void win64_window_init();
+void win64_window_uninit();
 
 // We use to do this on MSVC but since then we no longer link the CRT and do all of this ourselves. (take a look at no_crt/exe_main.cpp)
 //
@@ -226,30 +285,29 @@ void win32_window_uninit();
 // How it works is described in this awesome article:
 // https://www.codeguru.com/cpp/misc/misc/applicationcontrol/article.php/c6945/Running-Code-Before-and-After-Main.htm#page-2
 #if COMPILER == MSVC
-s32 c_init() {
-    win32_common_init_context();
-    win32_common_init_global_state();
+file_scope s32 c_init() {
+    win64_common_init_context();
 
-    win32_monitor_init();
-    win32_window_init();
+    win64_common_init_global_state();
+
+    win64_window_init();
+    win64_monitor_init();
 
     return 0;
 }
 
-// We need to reinit the context after the TLS initalizer fires and resets our state.. sigh.
-// We can't just do it once because global variables might still use the context and TLS fires a bit later.
-// s32 tls_init() {
-//     // win32_common_init_context();
-//     return 0;
-// }
+file_scope s32 tls_init() {
+    win64_common_init_context();
+    return 0;
+}
 
-s32 pre_termination() {
+file_scope s32 pre_termination() {
     exit_call_scheduled_functions();
 
-    win32_window_uninit();
-    win32_monitor_uninit();
+    win64_window_uninit();
+    win64_monitor_uninit();
 
-    uninit_win32_state();
+    uninit_state();
     return 0;
 }
 
@@ -261,20 +319,12 @@ typedef s32 cb(void);
 __declspec(allocate(".CRT$XIU")) cb *g_CInit = c_init;
 #pragma const_seg()
 
-// #pragma const_seg(".CRT$XDU")
-// __declspec(allocate(".CRT$XDU")) cb *g_TLSInit = tls_init;
-// #pragma const_seg()
-
-// #pragma const_seg(".CRT$XCU")
-// __declspec(allocate(".CRT$XCU")) cb *g_CPPInit = cpp_init;
-// #pragma const_seg()
+#pragma const_seg(".CRT$XDU")
+__declspec(allocate(".CRT$XDU")) cb *g_TLSInit = tls_init;
+#pragma const_seg()
 
 #pragma const_seg(".CRT$XPU")
 __declspec(allocate(".CRT$XPU")) cb *g_PreTermination = pre_termination;
-#pragma const_seg()
-
-#pragma const_seg(".CRT$XTU")
-__declspec(allocate(".CRT$XTU")) cb *g_Termination = NULL;
 #pragma const_seg()
 
 #pragma pop_macro("allocate")
@@ -283,21 +333,25 @@ __declspec(allocate(".CRT$XTU")) cb *g_Termination = NULL;
 #error @TODO: See how this works on other compilers!
 #endif
 
-// Utf16.. Sigh...
-utf16 *utf8_to_utf16_temp(const string &str) {
+// Windows uses utf16.. Sigh...
+file_scope utf16 *utf8_to_utf16_temp(const string &str) {
     if (!str.Length) return null;
 
-    // src.Length * 2 because one unicode character might take 2 wide chars.
-    // This is just an approximation, not all space will be used!
-    auto *result = allocate_array<utf16>(str.Length * 2 + 1, {.Alloc = Context.Temp});
+    utf16 *result;
+    WITH_ALLOC(S->TempAlloc) {
+        // src.Length * 2 because one unicode character might take 2 wide chars.
+        // This is just an approximation, not all space will be used!
+        result = allocate_array<utf16>(str.Length * 2 + 1);
+    }
+
     utf8_to_utf16(str.Data, str.Length, result);
     return result;
 }
 
-string utf16_to_utf8_temp(const utf16 *str) {
+file_scope string utf16_to_utf8_temp(const utf16 *str) {
     string result;
 
-    WITH_ALLOC(Context.Temp) {
+    WITH_ALLOC(S->TempAlloc) {
         // String length * 4 because one unicode character might take 4 bytes in utf8.
         // This is just an approximation, not all space will be used!
         reserve(result, c_string_length(str) * 4);
@@ -309,25 +363,10 @@ string utf16_to_utf8_temp(const utf16 *str) {
     return result;
 }
 
-bool dynamic_library::load(const string &name) {
-    Handle = (void *) LoadLibraryW(utf8_to_utf16_temp(name));
-    return Handle;
-}
-
-void *dynamic_library::get_symbol(const string &name) {
-    auto *cString = to_c_string(name);
-    defer(free(cString));
-    return (void *) GetProcAddress((HMODULE) Handle, (LPCSTR) cString);
-}
-
-void dynamic_library::close() {
-    if (Handle) {
-        FreeLibrary((HMODULE) Handle);
-        Handle = null;
-    }
-}
-
-void win32_common_init_global_state() {
+//
+// Initializes the state we need to function.
+//
+void win64_common_init_global_state() {
     init_global_vars();
 
     if (!AttachConsole(ATTACH_PARENT_PROCESS)) {
@@ -360,7 +399,7 @@ void win32_common_init_global_state() {
     QueryPerformanceFrequency(&S->PerformanceFrequency);
 
     // Get the module name
-    utf16 *buffer = allocate_array<utf16>(MAX_PATH, {.Alloc = Context.Temp});
+    utf16 *buffer = allocate_array<utf16>(MAX_PATH, {.Alloc = S->TempAlloc});
     s64 reserved = MAX_PATH;
 
     while (true) {
@@ -368,7 +407,7 @@ void win32_common_init_global_state() {
         if (written == reserved) {
             if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
                 reserved *= 2;
-                buffer = allocate_array<utf16>(reserved, {.Alloc = Context.Temp});
+                buffer = allocate_array<utf16>(reserved, {.Alloc = S->TempAlloc});
                 continue;
             }
         }
@@ -376,7 +415,7 @@ void win32_common_init_global_state() {
     }
 
     string moduleName = utf16_to_utf8_temp(buffer);
-    WITH_ALLOC(Context.Temp) {
+    WITH_ALLOC(S->PersistentAlloc) {
         S->ModuleName = path_normalize(moduleName);
     }
 
@@ -390,7 +429,7 @@ void win32_common_init_global_state() {
     if (argv == null) {
         report_warning_no_allocations("Couldn't parse command line arguments, os_get_command_line_arguments() will return an empty array in all cases");
     } else {
-        WITH_ALLOC(Context.Temp) {
+        WITH_ALLOC(S->TempAlloc) {
             reserve(S->Argv, argc - 1);
         }
 
@@ -399,6 +438,10 @@ void win32_common_init_global_state() {
         LocalFree(argv);
     }
 }
+
+//
+// Implementation of os.h and cout (console_writer.h).
+//
 
 bytes os_read_from_console() {
     DWORD read;
@@ -443,11 +486,6 @@ void console_writer::flush() {
 
     Current = Buffer;
     Available = S->CONSOLE_BUFFER_SIZE;
-}
-
-// This workaround is needed in order to prevent circular inclusion of context.h
-namespace internal {
-writer *g_ConsoleLog = &cout;
 }
 
 void *os_allocate_block(s64 size) {
@@ -555,7 +593,7 @@ void os_free_block(void *ptr) {
 
 void os_exit(s32 exitCode) {
     exit_call_scheduled_functions();
-    uninit_win32_state();
+    uninit_state();
     ExitProcess(exitCode);
 }
 
@@ -606,8 +644,11 @@ void os_set_working_dir(const string &dir) {
     S->WorkingDir = dir;
 }
 
+//
+// Cache environment variables when running the program in order to avoid allocating
+// and possibly running out of memory every time we call this function.
+//
 os_get_env_result os_get_env(const string &name, bool silent) {
-    // @Bug name.Length is not enough (2 wide chars for one char)
     auto *name16 = utf8_to_utf16_temp(name);
 
     DWORD bufferSize = 65535;  // Limit according to http://msdn.microsoft.com/en-us/library/ms683188.aspx
@@ -703,6 +744,10 @@ array<string> os_get_command_line_arguments() { return S->Argv; }
 
 u32 os_get_pid() { return (u32) GetCurrentProcessId(); }
 
+//
+// Implementation of guid.h
+//
+
 guid guid_new() {
     GUID g;
     CoCreateGuid(&g);
@@ -717,6 +762,27 @@ guid guid_new() {
                                (byte) g.Data4[0], (byte) g.Data4[1], (byte) g.Data4[2], (byte) g.Data4[3],
                                (byte) g.Data4[4], (byte) g.Data4[5], (byte) g.Data4[6], (byte) g.Data4[7]);
     return guid(data);
+}
+
+//
+// Implementation of dynamic_library.h
+//
+bool dynamic_library::load(const string &name) {
+    Handle = (void *) LoadLibraryW(utf8_to_utf16_temp(name));
+    return Handle;
+}
+
+void *dynamic_library::get_symbol(const string &name) {
+    auto *cString = to_c_string(name);
+    defer(free(cString));
+    return (void *) GetProcAddress((HMODULE) Handle, (LPCSTR) cString);
+}
+
+void dynamic_library::close() {
+    if (Handle) {
+        FreeLibrary((HMODULE) Handle);
+        Handle = null;
+    }
 }
 
 LSTD_END_NAMESPACE

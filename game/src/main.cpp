@@ -11,60 +11,60 @@ import fmt;
 import path;
 
 // These can be modified with command line arguments.
-s64 GameMemoryInMiB = 64;
-u32 GameWidth = 800, GameHeight = 400, GameFPS = 60;
-string GameFileName = "graph.dll";
+s64 MemoryInMiB = 64;
+u32 WindowWidth = 800, WindowHeight = 400, TargetFPS = 60;
+string DLLFileName = "graph.dll";
 
-allocator GameAlloc;  // Imgui uses this, it needs to be global
+allocator PersistentAlloc;  // Imgui uses this, it needs to be global
 
-dynamic_library GameLibrary;
-game_update_and_render_func *GameUpdateAndRender = null;
-game_main_window_event_func *GameMainWindowEvent = null;
+dynamic_library DLL;
+update_and_render_func *UpdateAndRender = null;
+main_window_event_func *MainWindowEvent = null;
 
 string DLLFile, BuildLockFile;
 
-static void setup_game_paths() {
-    assert(GameFileName != "");
+static void setup_paths() {
+    assert(DLLFileName != "");
 
     // This may be different from the working directory
     string exeDir = path_directory(os_get_current_module());
 
-    DLLFile = path_join(exeDir, GameFileName);
+    DLLFile = path_join(exeDir, DLLFileName);
     BuildLockFile = path_join(exeDir, "buildlock");
 }
 
 // @TODO: This fails in Dist configuration for some reason
-static bool reload_game_code() {
-    GameUpdateAndRender = null;
-    GameMainWindowEvent = null;
-    if (GameLibrary.Handle) GameLibrary.close();
+static bool reload_code() {
+    UpdateAndRender = null;
+    MainWindowEvent = null;
+    if (DLL.Handle) DLL.close();
 
-    string copyPath = path_join(path_directory(DLLFile), "loaded_game_code.dll");
+    string copyPath = path_join(path_directory(DLLFile), "loaded_code.dll");
     if (!path_copy(DLLFile, copyPath, true)) {
-        print("Error: Couldn't write to {!YELLOW}\"{}\"{!}. Game already running?\n", copyPath);
+        print("Error: Couldn't write to {!YELLOW}\"{}\"{!}. App already running?\n", copyPath);
         return false;
     }
 
-    if (!GameLibrary.load(copyPath)) {
-        print("Error: Couldn't load {!YELLOW}\"{}\"{!} (copied from {!GRAY}\"{}\"{}) as the game code for the engine.\n", copyPath, DLLFile);
+    if (!DLL.load(copyPath)) {
+        print("Error: Couldn't load {!YELLOW}\"{}\"{!} (copied from {!GRAY}\"{}\"{}) as the code for the engine.\n", copyPath, DLLFile);
         return false;
     }
 
-    GameUpdateAndRender = (game_update_and_render_func *) GameLibrary.get_symbol("game_update_and_render");
-    if (!GameUpdateAndRender) {
-        print("Error: Couldn't load game_update_and_render\n");
+    UpdateAndRender = (update_and_render_func *) DLL.get_symbol("update_and_render");
+    if (!UpdateAndRender) {
+        print("Error: Couldn't load update_and_render\n");
         return false;
     }
 
-    GameMainWindowEvent = (game_main_window_event_func *) GameLibrary.get_symbol("game_main_window_event");
-    if (!GameMainWindowEvent) {
-        print("Error: Couldn't load game_main_window_event\n");
+    MainWindowEvent = (main_window_event_func *) DLL.get_symbol("main_window_event");
+    if (!MainWindowEvent) {
+        print("Error: Couldn't load main_window_event\n");
         return false;
     }
     return true;
 }
 
-// Returns true if the game was reloaded
+// Returns true if the code was reloaded
 static bool check_for_dll_change() {
     static time_t checkTimer = 0, lastTime = 0;
 
@@ -72,7 +72,7 @@ static bool check_for_dll_change() {
         auto writeTime = path_last_modification_time(DLLFile);
         if (writeTime != lastTime) {
             lastTime = writeTime;
-            return reload_game_code();
+            return reload_code();
         }
     }
     ++checkTimer;
@@ -90,14 +90,14 @@ static void parse_arguments() {
                   "Specifies which dll to hot load in the engine. By default it searches for cars.dll{!}\n\n"));
     append(usage,
            string("    {!YELLOW}-memory <amount>{!GRAY}    "
-                  "Specifies the amount of memory (in MiB) which gets reserved for the game (default is 128 MiB)."
+                  "Specifies the amount of memory (in MiB) which gets reserved for the app (default is 128 MiB)."
                   "Usage must never cross this.{!}\n\n"));
     append(usage,
            string("    {!YELLOW}-width <value>{!GRAY}    "
-                  "Specifies the width of the game window (default is 1200).{!}\n\n"));
+                  "Specifies the width of the app window (default is 1200).{!}\n\n"));
     append(usage,
            string("    {!YELLOW}-heigth <value>{!GRAY}    "
-                  "Specifies the height of the game window (default is 600).\n\n"));
+                  "Specifies the height of the app window (default is 600).\n\n"));
     append(usage,
            string("    {!YELLOW}-fps <value>{!GRAY}    "
                   "Specifies the target fps (default is 60).\n\n"));
@@ -108,7 +108,7 @@ static void parse_arguments() {
     auto args = os_get_command_line_arguments();
     For(args) {
         if (seekFileName) {
-            GameFileName = it;
+            DLLFileName = it;
             seekFileName = false;
             continue;
         }
@@ -122,7 +122,7 @@ static void parse_arguments() {
             } else if (status == PARSE_EXHAUSTED) {
                 print(">>> {!RED}Couldn't parse memory value. The argument was: \"{}\"\n", it);
             } else {
-                GameMemoryInMiB = (s64) value;
+                MemoryInMiB = (s64) value;
             }
             seekMemory = false;
             continue;
@@ -137,7 +137,7 @@ static void parse_arguments() {
             } else if (status == PARSE_EXHAUSTED) {
                 print(">>> {!RED}Couldn't parse memory value. The argument was: \"{}\"\n", it);
             } else {
-                GameWidth = value;
+                WindowWidth = value;
             }
             seekWidth = false;
             continue;
@@ -152,7 +152,7 @@ static void parse_arguments() {
             } else if (status == PARSE_EXHAUSTED) {
                 print(">>> {!RED}Couldn't parse memory value. The argument was: \"{}\"\n", it);
             } else {
-                GameHeight = value;
+                WindowHeight = value;
             }
             seekHeight = false;
             continue;
@@ -167,7 +167,7 @@ static void parse_arguments() {
             } else if (status == PARSE_EXHAUSTED) {
                 print(">>> {!RED}Couldn't parse memory value. The argument was: \"{}\"\n", it);
             } else {
-                GameFPS = value;
+                TargetFPS = value;
             }
             seekFPS = false;
             continue;
@@ -211,7 +211,7 @@ static void parse_arguments() {
 }
 
 static bool main_window_event(const event &e) {
-    if (GameMainWindowEvent) return GameMainWindowEvent(e);
+    if (MainWindowEvent) return MainWindowEvent(e);
     return false;
 }
 
@@ -220,47 +220,44 @@ static void destroy_imgui() {
     ImGui::DestroyContext();
 }
 
-s32 main() {
+s32 main_logic() {
     parse_arguments();
 
-    game_memory gameMemory;
-    GameMemory = &gameMemory;
+    memory m;
+    Memory = &m;
 
-    auto *allocData = allocate<free_list_allocator_data>({.Alloc = DefaultAlloc});
-    allocData->init(GameMemoryInMiB * 1_MiB, free_list_allocator_data::Find_First);
-    gameMemory.AllocData = allocData;
-    gameMemory.Alloc = GameAlloc = {free_list_allocator, allocData};
+    m.Alloc = PersistentAlloc;
 
     // We tell imgui to use our allocator (by default it uses raw malloc, not operator new)
-    ImGui::SetAllocatorFunctions([](size_t size, void *) { return (void *) allocate_array<char>(size, {.Alloc = GameAlloc}); },
+    ImGui::SetAllocatorFunctions([](size_t size, void *) { return (void *) allocate_array<char>(size, {.Alloc = PersistentAlloc}); },
                                  [](void *ptr, void *) { ::lstd::free(ptr); });  // Without the namespace this selects the CRT free for some bizarre reason...
 
-    setup_game_paths();
+    setup_paths();
 
-    WITH_ALLOC(GameAlloc) {
-        // string windowTitle = sprint("Graphics Engine | {}", GameFileName);
+    WITH_ALLOC(PersistentAlloc) {
+        // string windowTitle = sprint("Graphics Engine | {}", DLLFileName);
         string windowTitle = "Calculator";
 
         auto windowFlags = window::SHOWN | window::RESIZABLE | window::VSYNC | window::FOCUS_ON_SHOW | window::CLOSE_ON_ALT_F4;
-        gameMemory.MainWindow = allocate<window>()->init(windowTitle, window::DONT_CARE, window::DONT_CARE, GameWidth, GameHeight, windowFlags);
+        m.MainWindow = allocate<window>()->init(windowTitle, window::DONT_CARE, window::DONT_CARE, WindowWidth, WindowHeight, windowFlags);
 
         auto icon = pixel_buffer("data/calc.png", false, pixel_format::RGBA);
         array<pixel_buffer> icons;
         append(icons, icon);
-        gameMemory.MainWindow->set_icon(icons);
+        m.MainWindow->set_icon(icons);
         free(icons);
 
-        gameMemory.MainWindow->Event.connect(main_window_event);
+        m.MainWindow->Event.connect(main_window_event);
 
-        gameMemory.GetStateImpl = [](const string &name, s64 size, bool *created) {
+        m.GetStateImpl = [](const string &name, s64 size, bool *created) {
             string identifier = name;
             append_string(identifier, "Ident");
 
-            auto **found = find(GameMemory->States, identifier).Value;
+            auto **found = find(Memory->States, identifier).Value;
             if (!found) {
-                // We allocate with alignment 16 because the game uses SIMD in structs (game_state is one struct which we handle with this function).
+                // We allocate with alignment 16 because we use SIMD types
                 void *result = allocate_array<char>(size, {.Alignment = 16});
-                add(GameMemory->States, identifier, result);
+                add(Memory->States, identifier, result);
                 *created = true;
                 return result;
             }
@@ -269,10 +266,10 @@ s32 main() {
             return *found;
         };
 
-        // @TODO: GameFPS currently does nothing, we rely on g.swap() and vsync to hit target monitor refresh rate
+        // @TODO: TargetFPS currently does nothing, we rely on g.swap() and vsync to hit target monitor refresh rate
 
         // This is affecting any physics time steps though
-        gameMemory.FrameDelta = 1.0f / GameFPS;
+        m.FrameDelta = 1.0f / TargetFPS;
 
         graphics g;
         Graphics = &g;
@@ -281,13 +278,13 @@ s32 main() {
         g.set_blend(true);
         g.set_depth_testing(false);
 
-        init_imgui_for_our_windows(gameMemory.MainWindow);
-        gameMemory.ImGuiContext = ImGui::GetCurrentContext();
+        init_imgui_for_our_windows(m.MainWindow);
+        m.ImGuiContext = ImGui::GetCurrentContext();
         exit_schedule(destroy_imgui);
 
         // This state also needs to be shared
 #if defined DEBUG_MEMORY
-        gameMemory.DEBUG_memory = DEBUG_memory;
+        m.DEBUG_memory = DEBUG_memory;
 #endif
 
         imgui_renderer imguiRenderer;
@@ -295,22 +292,22 @@ s32 main() {
         defer(imguiRenderer.release());
 
         while (true) {
-            gameMemory.ReloadedThisFrame = check_for_dll_change();
-            if (gameMemory.RequestReloadNextFrame) {
-                gameMemory.ReloadedThisFrame = reload_game_code();
-                gameMemory.RequestReloadNextFrame = false;
+            m.ReloadedThisFrame = check_for_dll_change();
+            if (m.RequestReloadNextFrame) {
+                m.ReloadedThisFrame = reload_code();
+                m.RequestReloadNextFrame = false;
             }
 
             window::update();
-            if (gameMemory.MainWindow->IsDestroying) break;
+            if (m.MainWindow->IsDestroying) break;
 
-            imgui_for_our_windows_new_frame(gameMemory.MainWindow);
+            imgui_for_our_windows_new_frame(m.MainWindow);
             ImGui::NewFrame();
-            if (GameUpdateAndRender) GameUpdateAndRender(&gameMemory, &g);
+            if (UpdateAndRender) UpdateAndRender(&m, &g);
             ImGui::Render();
 
-            if (gameMemory.MainWindow->is_visible()) {
-                g.set_target_window(gameMemory.MainWindow);
+            if (m.MainWindow->is_visible()) {
+                g.set_target_window(m.MainWindow);
                 g.set_cull_mode(cull::None);
                 imguiRenderer.draw(ImGui::GetDrawData());
                 g.swap();
@@ -320,6 +317,32 @@ s32 main() {
                 ImGui::UpdatePlatformWindows();
                 ImGui::RenderPlatformWindowsDefault(null, &imguiRenderer);
             }
+        }
+    }
+}
+
+template <typename T>
+T *os_allocate_block_and_prepend_data(s64 size) {
+    void *block = os_allocate_block(sizeof(T) + size);
+
+    auto *t = (T *) block;
+    *t = {};
+    return t;
+}
+
+s32 main() {
+    auto persistentMemorySize = MemoryInMiB * 1_MiB;
+
+    // We allocate the allocator data struct together with the pool to reduce fragmentation.
+    auto *persistentData = os_allocate_block_and_prepend_data<tlsf_allocator_data>(persistentMemorySize);
+    PersistentAlloc = {tlsf_allocator, persistentData};
+    
+    allocator_add_pool(PersistentAlloc, persistentData + 1, persistentMemorySize);
+
+    // We need to set up a valid Context allocator before calling the logic in main().
+    WITH_ALLOC(PersistentAlloc) {
+        WITH_CONTEXT_VAR(Log, &cout) {
+            return main_logic();
         }
     }
 }

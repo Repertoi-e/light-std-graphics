@@ -21,7 +21,7 @@ void camera_reset_constants(camera *cam) {
 void camera_update(camera *cam) {
     // The viewport window may not be in an additional imgui window since
     // we don't allow moving it, so assuming this is is fine.
-    auto *win = GameMemory->MainWindow;
+    auto *win = Memory->MainWindow;
 
     vec2<s32> mouse = win->get_cursor_pos();
     v2 delta = {(f32) mouse.x - GraphState->LastMouse.x, (f32) mouse.y - GraphState->LastMouse.y};

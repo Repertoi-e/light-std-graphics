@@ -76,9 +76,9 @@ BOOL is_windows_10_build_or_greater(WORD build) {
 file_scope array<monitor *> Monitors;
 file_scope DWORD ForegroundLockTimeout;
 
-void win32_poll_monitors();
+void win64_poll_monitors();
 
-void win32_monitor_uninit() {
+void win64_monitor_uninit() {
     g_MonitorEvent.release();
 
     For(Monitors) free(it);
@@ -90,7 +90,7 @@ void win32_monitor_uninit() {
     if (ntdll.hInstance) FreeLibrary(ntdll.hInstance);
 }
 
-void win32_monitor_init() {
+void win64_monitor_init() {
     // To make SetForegroundWindow work as we want, we need to fiddle
     // with the FOREGROUNDLOCKTIMEOUT system setting (we do this as early
     // as possible in the hope of still being the foreground process)
@@ -356,7 +356,7 @@ file_scope void get_display_modes(array<display_mode> &modes, monitor *mon) {
 }
 
 // Poll for changes in the set of connected monitors
-void win32_poll_monitors() {
+void win64_poll_monitors() {
     array<monitor *> disconnected;
     clone(&disconnected, Monitors);
     defer(free(disconnected));
@@ -423,7 +423,7 @@ void win32_poll_monitors() {
     }
 }
 
-void os_poll_monitors() { win32_poll_monitors(); }
+void os_poll_monitors() { win64_poll_monitors(); }
 
 array<monitor *> os_get_monitors() { return Monitors; }
 

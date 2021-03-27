@@ -17,8 +17,8 @@ void ui_main() {
 
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("Options")) {
-            if (ImGui::MenuItem("VSync", "", GameMemory->MainWindow->Flags & window::VSYNC))
-                GameMemory->MainWindow->Flags ^= window::VSYNC;
+            if (ImGui::MenuItem("VSync", "", Memory->MainWindow->Flags & window::VSYNC))
+                Memory->MainWindow->Flags ^= window::VSYNC;
             if (ImGui::MenuItem("Display AST", "", GraphState->DisplayAST))
                 GraphState->DisplayAST = !GraphState->DisplayAST;
 

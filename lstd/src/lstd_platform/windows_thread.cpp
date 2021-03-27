@@ -8,8 +8,6 @@
 
 LSTD_BEGIN_NAMESPACE
 
-void win32_common_init_context_thread();
-
 namespace thread {
 
 // Block the calling thread until a lock on the mutex can
@@ -149,10 +147,12 @@ u32 __stdcall thread::wrapper_function(void *data) {
     auto *ti = (thread_start_info *) data;
 
     // Initialize the default context for a new thread
-    win32_common_init_context_thread();
+    // win64_common_init_context();
+    // The context has been initialized already (see tls_init in windows_common.cpp).
 
+    // @TODO: Make this optional:
     // Now we copy the context variables from the parent thread
-    s64 firstByte = FIELD_OFFSET(context, Temp) + sizeof(context::Temp);
+    s64 firstByte = offset_of(context, Temp) + sizeof(context::Temp);
     copy_memory((byte *) &Context + firstByte, (byte *) ti->ContextPtr + firstByte, sizeof(context) - firstByte);
 
     // If the parent thread was using the temporary allocator, set the new thread to also use the temporary allocator,
@@ -165,8 +165,6 @@ u32 __stdcall thread::wrapper_function(void *data) {
 
     // Do we need this?
     // CloseHandle(ti->ThreadPtr->Handle);
-
-    release_temporary_allocator();
 
     free(ti);
 

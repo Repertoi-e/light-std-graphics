@@ -45,6 +45,8 @@ struct initializer_list {
 #define va_copy(destination, source) ((destination) = (source))
 #endif
 
+#define offset_of(s, field) ((u64) & ((s *) (0))->field)
+
 // Personal preference
 // I prefer to type null over nullptr but they are exactly the same
 constexpr auto null = nullptr;

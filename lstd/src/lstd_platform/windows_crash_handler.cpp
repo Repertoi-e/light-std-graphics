@@ -96,7 +96,7 @@ void release_code_descs() {
     free(CodeDescs);
 }
 
-void win32_crash_handler_init() {
+void win64_crash_handler_init() {
     auto [processor, success] = os_get_env("PROCESSOR_ARCHITECTURE");
     if (success) {
         defer(free(processor));

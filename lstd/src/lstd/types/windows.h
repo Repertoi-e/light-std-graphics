@@ -1,7 +1,5 @@
 #pragma once
 
-#include <stdarg.h>
-
 #include "types.h"
 
 //
@@ -2189,9 +2187,7 @@ typedef struct _IMAGE_SECTION_HEADER {
     DWORD Characteristics;
 } IMAGE_SECTION_HEADER, *PIMAGE_SECTION_HEADER;
 
-#define FIELD_OFFSET(s, field) ((u64) & ((s *) (0))->field)
-
-#define IMAGE_FIRST_SECTION(ntheader) ((PIMAGE_SECTION_HEADER)((ULONG_PTR) ntheader + FIELD_OFFSET(IMAGE_NT_HEADERS64, OptionalHeader) + ((PIMAGE_NT_HEADERS64)(ntheader))->FileHeader.SizeOfOptionalHeader))
+#define IMAGE_FIRST_SECTION(ntheader) ((PIMAGE_SECTION_HEADER)((ULONG_PTR) ntheader + offset_of(IMAGE_NT_HEADERS64, OptionalHeader) + ((PIMAGE_NT_HEADERS64)(ntheader))->FileHeader.SizeOfOptionalHeader))
 #define IMAGE_SCN_MEM_WRITE 0x80000000
 
 struct _RTL_CRITICAL_SECTION;

@@ -464,6 +464,7 @@ export {
     // Calls fmt_to_writer on Context.Log - which is usually pointing to the console
     template <typename... Args>
     void print(const string &fmtString, Args &&...arguments) {
+        assert(Context.Log && "Context log was null. The programmer should set that (e.g. to cout).");
         fmt_to_writer(Context.Log, fmtString, ((Args &&) arguments)...);
     }
 }

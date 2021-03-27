@@ -21,22 +21,22 @@ void fmt_default_parse_error_handler(const string &message, const string &format
 
 //
 // Thread local global variable to control certain behaviours of the program.
-// A way to store options that are valid in a certain scope or for certain threads.
+// A way to store options that change the behaviour of the code without passing a bunch of parameters to routines.
 //
 // Gets initialized when the program runs for the main thread and tls_init (take a look at windows_common.cpp) initializes allocators.
 // Options get copied to new threads (take a look at thread_wrapper in windows_thread.cpp).
 //
 struct context {
-    thread::id ThreadID;  // The current thread's ID
+    thread::id ThreadID;  // The current thread's ID (Context is thread-local)
 
     // :TemporaryAllocator: Take a look at the docs of this allocator in "allocator.h"
     // (or the allocator module if you are living in the future).
     //
     // This gets initialized the first time it gets used in a thread.
     // Each thread gets a unique temporary allocator to prevent data races and to remain fast.
-    // Default size is 8 KiB but you can increase that by allocating a large block and then calling free_all.
-    temporary_allocator_data TempAllocData;  // Initialized the first time it is used
-    allocator Temp = {"no_init"};            // The "allocator object" for the temporary allocator with which allocations are made.
+    // Default size is 8 KiB but you can increase that by adding a pool with allocator_add_pool().
+    arena_allocator_data TempAllocData;  // Initialized the first time it is used
+    allocator Temp;                      // The "allocator object" for the temporary allocator with which allocations are made.
 
     ///////////////////////////////////////////////////////////////////////////////////////
     //
@@ -73,26 +73,26 @@ struct context {
     // the function can just allocate normally, without knowing that the caller has changed the allocator.
     //
     // When allocating you should use the context's allocator (allocate<> and allocate_array<> does
-    // that by default - unless overriden explicitly, we also override operator new and delete).
+    // that by default - unless overriden explicitly, we also override operator new and delete @TODO malloc).
     //
     // The idea for this comes from the implicit context in Jai.
-    allocator Alloc;  // = DefaultAlloc by default. Initialized in windows_common.cpp. @Platform
 
-    u16 AllocAlignment;  // By default == POINTER_SIZE (8)
+    allocator Alloc;  // = null by default. The user should provide an allocator at the start of the program.
+                      // We encourage using several different allocators depending on the memory requirements and the specific use case.
+                      // See :BigPhilosophyTime: in allocator.h for the reasoning behind this.
+
+    u16 AllocAlignment = POINTER_SIZE;
 
     // Any options that get OR'd with the options in any allocation (options are implemented as flags).
-    // e.g. using the LEAK flag, you can mark the allocation as a leak (doesn't get reported when calling DEBUG_memory->report_leaks()).
-    u64 AllocOptions;
+    // e.g. using the LEAK flag, you can mark the allocations done in a whole scope as leaks (don't get reported when calling DEBUG_memory->report_leaks()).
+    u64 AllocOptions = 0;
 
-    // Used for debugging. Every time an allocation is made, logs info about it.
-    bool LogAllAllocations;
-    bool LoggingAnAllocation;  // Don't set. Used to avoid infinite looping when the above bool is true.
+    bool LogAllAllocations = false;  // Used for debugging. Every time an allocation is made, logs info about it.
 
     // Gets called when the program encounters an unhandled expection.
     // This can be used to view the stack trace before the program terminates.
     // The default handler prints the crash message and stack trace to _Log_.
-    panic_handler_t PanicHandler;
-    bool HandlingPanic;  // Don't set. Used to avoid infinite looping when handling panics. Don't touch!
+    panic_handler_t PanicHandler = default_panic_handler;
 
     // When printing you should use this variable.
     // This makes it so users can redirect logging output.
@@ -101,13 +101,14 @@ struct context {
 
     // By default when we encounter an invalid format string we panic the program.
     // One might want to silence such errors and just continue executing, or redirect the error - like we do in the tests.
-    fmt_parse_error_handler_t FmtParseErrorHandler;
+    fmt_parse_error_handler_t FmtParseErrorHandler = fmt_default_parse_error_handler;
 
     // Disable stylized text output (colors, background colors, and bold/italic/strikethrough/underline text).
     // This is useful when logging to files/strings and not the console. The ansi escape codes look like garbage in files/strings.
-    bool FmtDisableAnsiCodes;
+    bool FmtDisableAnsiCodes = false;
 
-    context() {} // Doesn't do anything. That's important.
+    bool _HandlingPanic = false;        // Don't set. Used to avoid infinite looping when handling panics. Don't touch!
+    bool _LoggingAnAllocation = false;  // Don't set. Used to avoid infinite looping when the above bool is true. Don't touch!
 };
 
 // Immutable context available everywhere. Contains certain variables that are "global" to the program,
@@ -163,7 +164,7 @@ inline const thread_local context Context;
 //
 // These were moved from allocator.h where they made sense to be, but we need to access Context.Alloc here.
 // In the future we hopefully find a way to structure the library so these problems are avoided.
-// We can't make them non-templates because we need the type info...
+// We can't make them non-templates because we need the type info of T...
 //
 
 template <typename T>
@@ -175,6 +176,7 @@ LSTD_END_NAMESPACE
 using size_t = u64;
 #else
 using size_t = u32;
+#error We don't support 32 bits, do we?
 #endif
 using align_val_t = size_t;
 
@@ -205,6 +207,8 @@ T *lstd_allocate_impl(s64 count, allocator alloc, u32 alignment, u64 options, so
     s64 size = count * sizeof(T);
 
     if (!alloc) alloc = Context.Alloc;
+    assert(alloc && "Context allocator was null. The programmer should set it before calling allocate functions.");
+
     auto *result = (T *) general_allocate(alloc, size, alignment, options, loc);
 
     if constexpr (!types::is_scalar<T>) {
@@ -261,7 +265,7 @@ requires(!types::is_const<T>) T *lstd_reallocate_array_impl(T *block, s64 newCou
 }
 
 //
-// More philosophy on this library...
+// :BigPhilosophyTime: Some more stuff..
 //
 // We don't use new and delete.
 // 1) The syntax is ugly in my opinion.
@@ -270,10 +274,10 @@ requires(!types::is_const<T>) T *lstd_reallocate_array_impl(T *block, s64 newCou
 // 4) Modern C++ people say not to use new/delete as well, so ..
 //
 // Now seriously, there are two ways to allocate memory in C++: malloc and new.
-// Both are far from optimal, so let's introduce another way!
+// Both are far from optimal, so let's introduce another way (haha)!
 // Note: We override the default operator new/delete to call our version.
 //       When we don't link with the CRT, malloc is undefined, we provide a replacement.
-//       When we link with the CRT, we do it dynamically, so we can redirect calls to malloc to our replacement.
+//       When we link with the CRT, we do it dynamically, so we can redirect calls to malloc to our replacement. @TODO: We don't do that yet..
 //
 // The following functions are defined:
 //  allocate,
@@ -285,15 +289,17 @@ requires(!types::is_const<T>) T *lstd_reallocate_array_impl(T *block, s64 newCou
 //
 // Note: allocate and allocate_array call constructors on non-scalar values, free calls destructors (make sure you pass the right pointer type to free!)
 //
-// We allocate a bit of space (28 bytes without debugging info) before the block to store a header with information (the size of the allocation, the alignment,
+// We allocate a bit of space before the block to store a header with information (the size of the allocation, the alignment,
 // the allocator with which it was allocated, and debugging info if DEBUG_MEMORY is defined - see comments in allocator.h).
+//              (* this overhead should become smaller, right now we haven't bothered yet! @TODO)
 //
 // There are some assumptions we make:
 //   Your types are "trivially copyable" which means that they can be copied byte by byte to another place and still work.
 //   That means that we don't call copy/move constructors when reallocating.
 //
-// In general our array<> type also expects type to be simple data. If you need extra logic when copying memory, implement that explicitly (not with a copy constructor).
-// We do that to avoid C++ complicated shit that drives sane people insane.
+// We are following a data oriented design with this library.
+// Our array<> type also expects type to be simple data. If you need extra logic when copying memory, implement that explicitly 
+// (not with a copy constructor). We do that to avoid C++ complicated shit that drives sane people insane.
 // Here we don't do C++ style exceptions, we don't do copy/move constructors, we don't do destructors, we don't do any of that.
 //
 // Note: I said we don't do destructors but we still call them. That's because sometimes they are useful and can really simplify the code.
@@ -303,22 +309,22 @@ requires(!types::is_const<T>) T *lstd_reallocate_array_impl(T *block, s64 newCou
 //
 // e.g
 //   string a;
-//   free(a); // Not free(&a)!
+//   free(a);       // Not free(&a)!
 //
 //
-// The functions also allow certain options to be specified. Using C++20 syntax, here are a few examples on call that looks:
+// The functions also allow certain options to be specified. Using C++20 syntax, here are a few examples on how calls look:
 //
-// auto *node = allocate<ast_binop>();
-// auto *node = allocate<ast_binop>({.Alloc = Context.Temp});
-// auto *node = allocate<ast_binop>({.Options = LEAK});
+//     auto *node = allocate<ast_binop>();
+//     auto *node = allocate<ast_binop>({.Alloc = AstNodeAllocator});
+//     auto *node = allocate<ast_binop>({.Options = LEAK});
+//     
+//     auto *simdType = allocate<f32v4>({.Alignment = 16});
+//     
+//     auto *memory = allocate_array<byte>(200);
+//     auto *memory = allocate_array<byte>(200, {.Alloc = Context.Temp, .Alignment = 64, .Options = LEAK});
 //
-// auto *simdType = allocate<f32v4>({.Alignment = 16});
 //
-// auto *memory = allocate_array<byte>(200);
-// auto *memory = allocate_array<byte>(200, {.Alloc = Context.Temp, .Alignment = 64, .Options = LEAK});
-//
-//
-// The functions take source_location as a final parameter. That is set automatically to current() which means the caller site.
+// The functions take source_location as a final parameter. This is set to current() automatically which means the caller's site.
 // This info is saved to the header when DEBUG_MEMORY is defined.
 //
 

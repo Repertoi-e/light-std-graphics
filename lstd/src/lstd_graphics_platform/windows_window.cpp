@@ -16,6 +16,15 @@ extern BOOL is_windows_10_build_or_greater(WORD build);
 #define IS_WINDOWS_10_ANNIVERSARY_UPDATE_OR_GREATER() is_windows_10_build_or_greater(14393)
 #define IS_WINDOWS_10_CREATORS_UPDATE_OR_GREATER() is_windows_10_build_or_greater(15063)
 
+// Defined in windows_common.cpp
+allocator win64_get_persistent_allocator();
+allocator win64_get_temporary_allocator();
+
+//
+// @ThreadSafety.
+// Right now, functions dealing with windows must be called from the main thread only.
+//
+
 file_scope utf16 *WindowClassName;
 
 file_scope s32 AcquiredMonitorCount = 0;
@@ -42,7 +51,7 @@ file_scope auto MonitorCallback = [](const monitor_event &e) {
 
 file_scope bool MonitorCallbackAdded = false;
 
-void win32_window_uninit() {
+void win64_window_uninit() {
     auto *win = WindowsList;
     while (win) {
         win->release();
@@ -307,8 +316,6 @@ void window::update() {
         vec2<s32> size = win->get_size();
         if (win->PlatformData.Win32.LastCursorPos != size / 2) win->set_cursor_pos(size / 2);
     }
-
-    free_all(Context.Temp);
 }
 
 file_scope void acquire_monitor(window *win) {
@@ -373,24 +380,26 @@ void window::release() {
 }
 
 string window::get_title() {
-    constexpr s64 tempLength = 30;
+    s32 length = GetWindowTextLengthW(PlatformData.Win32.hWnd) + 1;
 
-    auto *titleUtf16 = allocate_array<utf16>(tempLength, {.Alloc = Context.Temp});
-    s32 length = GetWindowTextW(PlatformData.Win32.hWnd, titleUtf16, tempLength);
-    if (length >= tempLength - 1) {
-        titleUtf16 = allocate_array<utf16>(length + 1, {.Alloc = Context.Temp});
-        GetWindowTextW(PlatformData.Win32.hWnd, titleUtf16, tempLength);
+    auto *titleUtf16 = allocate_array<utf16>(length, {.Alloc = win64_get_temporary_allocator()});
+    defer(free(titleUtf16));
+
+    GetWindowTextW(PlatformData.Win32.hWnd, titleUtf16, length);
+
+    WITH_ALLOC(win64_get_persistent_allocator()) {
+        string result;
+        reserve(result, length * 2);
+        utf16_to_utf8(titleUtf16, (utf8 *) result.Data, &result.Count);  // @Constcast
+        result.Length = utf8_length(result.Data, result.Count);
+        return result;
     }
-
-    string result;  // @Bug length * 2 is not enough
-    reserve(result, length * 2);
-    utf16_to_utf8(titleUtf16, const_cast<utf8 *>(result.Data), &result.Count);
-    result.Length = utf8_length(result.Data, result.Count);
-    return result;
 }
 
 void window::set_title(const string &title) {
-    auto *titleUtf16 = allocate_array<utf16>(title.Length + 1, {.Alloc = Context.Temp});  // @Bug title.Length is not enough
+    // title.Length * 2 because one unicode character might take 2 wide chars.
+    // This is just an approximation, not all space will be used!
+    auto *titleUtf16 = allocate_array<utf16>(title.Length * 2 + 1, {.Alloc = win64_get_temporary_allocator()});
     utf8_to_utf16(title.Data, title.Length, titleUtf16);
 
     SetWindowTextW(PlatformData.Win32.hWnd, titleUtf16);
@@ -930,7 +939,7 @@ void window::focus() {
 
 void window::request_attention() { FlashWindow(PlatformData.Win32.hWnd, true); }
 
-void win32_poll_monitors();
+void win64_poll_monitors();
 
 file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPARAM lParam) {
     window *win = (window *) GetPropW(hWnd, L"LSTD");
@@ -942,7 +951,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 if (IS_WINDOWS_10_ANNIVERSARY_UPDATE_OR_GREATER()) EnableNonClientDpiScaling(hWnd);
                 break;
             case WM_DISPLAYCHANGE:
-                win32_poll_monitors();
+                win64_poll_monitors();
                 break;
         }
         return DefWindowProcW(hWnd, message, wParam, lParam);
@@ -1177,7 +1186,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             u32 size = 0;
             GetRawInputData(ri, RID_INPUT, null, &size, sizeof(RAWINPUTHEADER));
 
-            auto *rawInput = allocate_array<RAWINPUT>(size / sizeof(RAWINPUT), {.Alloc = Context.Temp});
+            auto *rawInput = allocate_array<RAWINPUT>(size / sizeof(RAWINPUT), {.Alloc = win64_get_temporary_allocator()});
             if (GetRawInputData(ri, RID_INPUT, rawInput, &size, sizeof(RAWINPUTHEADER)) == (u32) -1) {
                 print(">>> {}:{} Failed to retrieve raw input data.\n", __FILE__, __LINE__);
                 break;
@@ -1407,7 +1416,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
         case WM_SETTINGCHANGE:
         case WM_DWMCOMPOSITIONCHANGED:
             // @TODO: Handle font size change here!
-            
+
             InvalidateRect(hWnd, null, true);
 
             if (message == WM_DWMCOMPOSITIONCHANGED) {
@@ -1434,15 +1443,17 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             For(range(count)) {
                 u32 length = DragQueryFileW(drop, (u32) it, null, 0);
                 // @Bug ?
-                utf16 *buffer = allocate_array<utf16>(length + 1, {.Alloc = Context.Temp});
+                utf16 *buffer = allocate_array<utf16>(length + 1, {.Alloc = win64_get_temporary_allocator()});
                 DragQueryFileW(drop, (u32) it, buffer, length + 1);
 
-                string file;
-                reserve(file, length * 2);  // @Bug length * 2 is not enough
-                utf16_to_utf8(buffer, const_cast<utf8 *>(file.Data), &file.Count);
-                file.Length = utf8_length(file.Data, file.Count);
+                WITH_ALLOC(win64_get_persistent_allocator()) {
+                    string file;
+                    reserve(file, length * 2);  // @Bug length * 2 is not enough
+                    utf16_to_utf8(buffer, const_cast<utf8 *>(file.Data), &file.Count);
+                    file.Length = utf8_length(file.Data, file.Count);
 
-                append(paths, file);
+                    append(paths, file);
+                }
             }
 
             event e;
@@ -1461,7 +1472,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
     return DefWindowProcW(hWnd, message, wParam, lParam);
 }
 
-void win32_window_init() {
+void win64_window_init() {
     GUID guid;
     WIN32_CHECKHR(CoCreateGuid(&guid));
     WIN32_CHECKHR(StringFromCLSID(guid, &WindowClassName));

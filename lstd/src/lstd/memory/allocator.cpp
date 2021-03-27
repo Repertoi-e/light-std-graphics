@@ -311,8 +311,8 @@ void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options
     }
 #endif
 
-    if (Context.LogAllAllocations && !Context.LoggingAnAllocation) {
-        WITH_CONTEXT_VAR(LoggingAnAllocation, true) {
+    if (Context.LogAllAllocations && !Context._LoggingAnAllocation) {
+        WITH_CONTEXT_VAR(_LoggingAnAllocation, true) {
             write(Context.Log, ">>> Allocation made at: ");
             log_file_and_line(loc);
             write(Context.Log, "\n");
@@ -327,7 +327,7 @@ void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options
     required += NO_MANS_LAND_SIZE;  // This is for the bytes after the requested block
 #endif
 
-    void *block = alloc.Function(allocator_mode::ALLOCATE, alloc.Context, required, null, 0, &options);
+    void *block = alloc.Function(allocator_mode::ALLOCATE, alloc.Context, required, null, 0, options);
     auto *result = encode_header(block, userSize, alignment, alloc, options);
 
 #if defined DEBUG_MEMORY
@@ -361,8 +361,8 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
     auto id = header->ID;
 #endif
 
-    if (Context.LogAllAllocations && !Context.LoggingAnAllocation) {
-        WITH_CONTEXT_VAR(LoggingAnAllocation, true) {
+    if (Context.LogAllAllocations && !Context._LoggingAnAllocation) {
+        WITH_CONTEXT_VAR(_LoggingAnAllocation, true) {
             write(Context.Log, ">>> Reallocation made at: ");
             log_file_and_line(loc);
             write(Context.Log, "\n");
@@ -389,10 +389,10 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
     void *p;
 
     // Try to resize the block, this returns null if the block can't be resized and we need to move it.
-    void *newBlock = alloc.Function(allocator_mode::RESIZE, alloc.Context, newSize, block, oldSize, &options);
+    void *newBlock = alloc.Function(allocator_mode::RESIZE, alloc.Context, newSize, block, oldSize, options);
     if (!newBlock) {
         // Memory needs to be moved
-        void *newBlock = alloc.Function(allocator_mode::ALLOCATE, alloc.Context, newSize, null, 0, &options);
+        void *newBlock = alloc.Function(allocator_mode::ALLOCATE, alloc.Context, newSize, null, 0, options);
         auto *newPointer = encode_header(newBlock, newUserSize, header->Alignment, alloc, options);
 
         auto *newHeader = (allocation_header *) newPointer - 1;
@@ -414,7 +414,7 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
 
         newHeader->MarkedAsLeak = header->MarkedAsLeak;
 #endif
-        alloc.Function(allocator_mode::FREE, alloc.Context, 0, block, oldSize, &options);
+        alloc.Function(allocator_mode::FREE, alloc.Context, 0, block, oldSize, options);
 
         p = (void *) (newHeader + 1);
     } else {
@@ -479,7 +479,7 @@ void general_free(void *ptr, u64 options) {
     fill_memory(block, DEAD_LAND_FILL, size);
 #endif
 
-    alloc.Function(allocator_mode::FREE, alloc.Context, 0, block, size, &options);
+    alloc.Function(allocator_mode::FREE, alloc.Context, 0, block, size, options);
 }
 
 void free_all(allocator alloc, u64 options) {
@@ -503,7 +503,7 @@ void free_all(allocator alloc, u64 options) {
 
     options |= Context.AllocOptions;
 
-    auto result = alloc.Function(allocator_mode::FREE_ALL, alloc.Context, 0, 0, 0, &options);
+    auto result = alloc.Function(allocator_mode::FREE_ALL, alloc.Context, 0, 0, 0, options);
     assert((result != (void *) -1) && "Allocator doesn't support FREE_ALL");
 }
 

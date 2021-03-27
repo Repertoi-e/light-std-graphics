@@ -8,6 +8,11 @@
 
 LSTD_BEGIN_NAMESPACE
 
+//
+// @ThreadSafety.
+// Right now, functions dealing with windows must be called from the main thread only.
+//
+
 struct window {
     union platform_data {
         struct {
@@ -134,8 +139,7 @@ struct window {
 
     signal<bool(const event &), collector_while0<bool>> Event;
 
-    // The caller is responsible for freeing
-    string get_title();
+    [[nodiscard("Leak")]] string get_title(); // The caller is responsible for freeing
     void set_title(const string &title);
 
     void set_fullscreen(monitor *mon, s32 width, s32 height, s32 refreshRate = DONT_CARE);
