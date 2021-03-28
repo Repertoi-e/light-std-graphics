@@ -56,6 +56,15 @@ struct source_location {
     }
 };
 
+// Loop that gets unrolled at compile-time
+template <s64 First, s64 Last, typename Lambda>
+void static_for(Lambda &&f) {
+    if constexpr (First < Last) {
+        f(types::integral_constant<s64, First>{});
+        static_for<First + 1, Last>(f);
+    }
+}
+
 // Convenience storage literal operators, allows for specifying sizes like this:
 //  s64 a = 10_MiB;
 

@@ -154,6 +154,8 @@ int isnan(), isfinite();
 #endif
 extern double LOGE2, SQRT2, INFINITY, NAN;
 
+#if INTRINSIC
+
 double log10(x)
 double x;
 {
@@ -248,3 +250,5 @@ z += e * L102A;
 
 return( z );
 }
+
+#endif  // INTRINSIC

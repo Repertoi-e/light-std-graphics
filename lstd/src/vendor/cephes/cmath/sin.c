@@ -213,6 +213,7 @@ extern double NAN;
 extern double INFINITY;
 #endif
 
+#if INTRINSIC
 
 double sin(x)
 double x;
@@ -365,6 +366,7 @@ if(sign < 0)
 return(y);
 }
 
+#endif  // INTRINSIC
 
 
 
@@ -385,3 +387,4 @@ double d,m,s;
 
 return( ((d*60.0 + m)*60.0 + s)*P64800 );
 }
+

@@ -363,6 +363,8 @@ extern double NAN;
 extern double NEGZERO;
 #endif
 
+#if INTRINSIC
+
 double pow( x, y )
 double x, y;
 {
@@ -754,3 +756,5 @@ t = floor( t );
 t = ldexp( t, -4 );
 return(t);
 }
+
+#endif  // INTRINSIC

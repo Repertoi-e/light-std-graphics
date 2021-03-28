@@ -21,6 +21,56 @@ struct array;
 // Allocates memory by calling OS functions
 [[nodiscard("Leak")]] void *os_allocate_block(s64 size);
 
+// Allocates one giant block determined from the size of types passed in.
+// Returns pointers in the block spaced out accordingly.
+// After that this calls constructors on non-scalar values.
+//
+// Also reserves space for blocks whose size is determined at runtime.
+// These get passed in as parameters to the function.
+//
+// Note: @Robustness This doesn't call constructors on arrays, e.g. my_data_t[n].
+//       We can implement this but the code is going to get much more complicated.
+//
+// This is a utility which aids in reducing fragmentation when you can allocate program state in one place in the code.
+template <typename... Types>
+[[nodiscard("Leak")]] auto os_allocate_packed(array_view<s64> runtimeSizes) {
+    constexpr s64 TYPE_SIZE[] = {sizeof(Types)...};
+    constexpr s64 TOTAL_TYPE_SIZE = (sizeof(Types) + ...);
+
+    // We decay, remove pointers and add a pointer in order to handle arrays
+    // e.g.  byte[10] -> decays to -> byte *, but here if we add a pointer again, we would get byte **
+    // The reason we return pointers is because we return the address in the block each element begins.
+    using result_t = tuple<types::add_pointer_t<types::remove_pointer_t<types::decay_t<Types>>>..., void *>;
+    result_t result;
+
+    s64 size = TOTAL_TYPE_SIZE;
+    For(runtimeSizes) size += it;
+
+    void *block = os_allocate_block(size);
+
+    s64 offset = 0;
+    static_for<0, sizeof...(Types)>([&](auto i) {
+        using element_t = tuple_get_t<i, result_t>;
+
+        auto *p = (element_t)((byte *) block + offset);
+        tuple_get<i>(result) = p;
+
+        using element_t_no_pointer = types::remove_pointer_t<element_t>;
+
+        // Call constructor on values that are not scalars
+        // @Robustness This doesn't call constructors on arrays, e.g. my_data_t[n]
+        if constexpr (!types::is_scalar<element_t_no_pointer>) {
+            new (p) element_t_no_pointer;
+        }
+
+        offset += TYPE_SIZE[i];
+    });
+
+    tuple_get<sizeof...(Types)>(result) = (byte *) block + offset;
+
+    return result;
+}
+
 // Expands/shrinks a memory block allocated by _os_alloc()_.
 // This is NOT realloc. When this fails it returns null instead of allocating a new block and copying the contents of the old one.
 // That's why it's not called realloc.

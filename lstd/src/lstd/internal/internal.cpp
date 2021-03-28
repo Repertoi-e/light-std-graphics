@@ -1000,7 +1000,9 @@ void *(*copy_memory)(void *dst, const void *src, u64 size) = apex::dispatcher;
 //
 
 file_scope void fill_single_byte(void *dst, char c, u64 size) {
-    byte *b = (byte *) dst;
+    // This needs to be marked volatile to avoid compiler optimizing with memset intrinsic
+    // and thus causing a stack overflow in optimized_fill_memory.
+    auto *b = (volatile byte *) dst; 
     while (size--) *b++ = c;
 }
 

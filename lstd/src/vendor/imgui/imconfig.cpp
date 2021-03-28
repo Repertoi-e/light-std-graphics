@@ -2,16 +2,22 @@
 
 extern "C" {
 
+#pragma function(memset)
 void *memset(void *ptr, int value, size_t n) { return LSTD_NAMESPACE::fill_memory(ptr, value, n); }
+#pragma function(memcpy)
 void *memcpy(void *dest, const void *src, size_t n) { return LSTD_NAMESPACE::copy_memory(dest, src, n); }
+#pragma function(memmove)
 void *memmove(void *dest, const void *src, size_t n) { return LSTD_NAMESPACE::copy_memory(dest, src, n); }
+#pragma function(strlen)
 u64 strlen(const char *str) { return LSTD_NAMESPACE::c_string_length(str); }
 
+#pragma function(strcmp)
 int strcmp(const char *s1, const char *s2) {
     while (*s1 && (*s1 == *s2)) s1++, s2++;
     return *(const unsigned char *) s1 - *(const unsigned char *) s2;
 }
 
+#pragma function(memcmp)
 int memcmp(const void *ptr1, const void *ptr2, u64 n) {
     auto *s1 = (const char *) ptr1;
     auto *s2 = (const char *) ptr2;
@@ -36,6 +42,7 @@ const char *strchr(const char *str, int character) {
     return str + r;
 }
 
+#pragma function(strcpy)
 char *strcpy(char *destination, const char *source) {
     if (!destination) return null;
     char *ptr = destination;
@@ -49,6 +56,7 @@ char *strcpy(char *destination, const char *source) {
     return ptr;
 }
 
+#pragma function(memchr)
 const void *memchr(const void *ptr, int value, u64 n) {
     const unsigned char *src = (const unsigned char *) ptr;
     while (n-- > 0) {
@@ -59,6 +67,7 @@ const void *memchr(const void *ptr, int value, u64 n) {
     return NULL;
 }
 
+#if 0
 double fmod(double x, double y) {
     union {
         double f;
@@ -129,6 +138,7 @@ double fmod(double x, double y) {
     ux.i = uxi;
     return ux.f;
 }
+#endif
 
 int toupper(int c) { return LSTD_NAMESPACE::to_upper(c); }
 }

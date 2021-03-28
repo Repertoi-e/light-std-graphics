@@ -151,6 +151,8 @@ extern double LOGE2, LOG2E, MAXLOG, MINLOG, MAXNUM;
 extern double INFINITY;
 #endif
 
+#if INTRINSIC
+
 double exp(x)
 double x;
 {
@@ -201,3 +203,5 @@ x = 1.0 + 2.0 * x;
 x = ldexp( x, n );
 return(x);
 }
+
+#endif  // INTRINSIC

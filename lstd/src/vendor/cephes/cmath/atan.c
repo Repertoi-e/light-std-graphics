@@ -188,6 +188,7 @@ extern double PI, PIO2, PIO4, INFINITY, NEGZERO, MAXNUM;
 #endif
 
 
+#if INTRINSIC
 double atan(x)
 double x;
 {
@@ -391,3 +392,5 @@ if( z == 0.0 && y < 0 )
 #endif
 return( z );
 }
+
+#endif  // INTRINSIC

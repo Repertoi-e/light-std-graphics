@@ -252,6 +252,7 @@ double asin();
 #endif
 extern double PIO2, PIO4, NAN;
 
+#if INTRINSIC
 double asin(x)
 double x;
 {
@@ -322,3 +323,5 @@ z = z + MOREBITS;
 z = z + PIO4;
 return( z );
 }
+
+#endif // INTRINSIC

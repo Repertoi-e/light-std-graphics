@@ -196,6 +196,8 @@ extern double PIO4;
 extern double INFINITY;
 extern double NAN;
 
+#if INTRINSIC
+
 double tan(x)
 double x;
 {
@@ -302,3 +304,5 @@ if( sign < 0 )
 
 return( y );
 }
+
+#endif  // INTRINSIC

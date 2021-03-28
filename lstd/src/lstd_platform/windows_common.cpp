@@ -153,14 +153,13 @@ void *win64_temp_alloc(allocator_mode mode, void *context, s64 size, void *oldMe
 
 file_scope void create_temp_storage_block(s64 size) {
     // We allocate the arena allocator data and the starting pool in one big block in order to reduce fragmentation.
-    TempStorageBlock = os_allocate_block(sizeof(arena_allocator_data) + size);
-    TempStorageSize = size;
-
-    auto *data = (arena_allocator_data *) TempStorageBlock;
-    zero_memory(data, sizeof(arena_allocator_data));
+    auto pools = to_stack_array(size);
+    auto [data, pool] = os_allocate_packed<arena_allocator_data>(pools);
     S->TempAlloc = {win64_temp_alloc, data};
+    allocator_add_pool(S->TempAlloc, pool, size);
 
-    allocator_add_pool(S->TempAlloc, data + 1, size);
+    TempStorageBlock = data;
+    TempStorageSize = sizeof(arena_allocator_data) + size; 
 }
 
 void *win64_persistent_alloc(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {

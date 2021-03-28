@@ -54,6 +54,8 @@ double frexp(), ldexp();
 #endif
 extern double SQRT2;  /*  SQRT2 = 1.41421356237309504880 */
 
+#if INTRINSIC
+
 double sqrt(x)
 double x;
 {
@@ -176,3 +178,5 @@ x += w/x;
 
 return(x);
 }
+
+#endif  // INTRINSIC

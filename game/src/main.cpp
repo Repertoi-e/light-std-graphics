@@ -11,7 +11,7 @@ import fmt;
 import path;
 
 // These can be modified with command line arguments.
-s64 MemoryInMiB = 64;
+s64 MemoryInBytes = 64_MiB;
 u32 WindowWidth = 800, WindowHeight = 400, TargetFPS = 60;
 string DLLFileName = "graph.dll";
 
@@ -23,7 +23,7 @@ main_window_event_func *MainWindowEvent = null;
 
 string DLLFile, BuildLockFile;
 
-static void setup_paths() {
+file_scope void setup_paths() {
     assert(DLLFileName != "");
 
     // This may be different from the working directory
@@ -34,7 +34,7 @@ static void setup_paths() {
 }
 
 // @TODO: This fails in Dist configuration for some reason
-static bool reload_code() {
+file_scope bool reload_code() {
     UpdateAndRender = null;
     MainWindowEvent = null;
     if (DLL.Handle) DLL.close();
@@ -65,7 +65,7 @@ static bool reload_code() {
 }
 
 // Returns true if the code was reloaded
-static bool check_for_dll_change() {
+file_scope bool check_for_dll_change() {
     static time_t checkTimer = 0, lastTime = 0;
 
     if (!path_exists(BuildLockFile) && (checkTimer % 20 == 0)) {
@@ -83,7 +83,7 @@ void init_imgui_for_our_windows(window *mainWindow);
 void imgui_for_our_windows_new_frame(window *mainWindow);
 
 // @TODO: Provide a library construct for parsing arguments automatically
-static void parse_arguments() {
+file_scope void parse_arguments() {
     array<string> usage;
     append(usage, string("Usage:\n"));
     append(usage,
@@ -123,7 +123,7 @@ static void parse_arguments() {
             } else if (status == PARSE_EXHAUSTED) {
                 print(">>> {!RED}Couldn't parse memory value. The argument was: \"{}\"\n", it);
             } else {
-                MemoryInMiB = (s64) value;
+                MemoryInBytes = (s64) value * 1_MiB;
             }
             seekMemory = false;
             continue;
@@ -211,135 +211,119 @@ static void parse_arguments() {
     }
 }
 
-static bool main_window_event(const event &e) {
-    if (MainWindowEvent) return MainWindowEvent(e);
-    return false;
-}
-
-static void destroy_imgui() {
-    ImGui::DestroyPlatformWindows();
-    ImGui::DestroyContext();
-}
-
-
-template <typename T>
-T *os_allocate_block_and_prepend_data(s64 size) {
-    void *block = os_allocate_block(sizeof(T) + size);
-
-    auto *t = (T *) block;
-    *t = {};
-    return t;
-}
-
 s32 main() {
-    auto persistentMemorySize = MemoryInMiB * 1_MiB;
+    // We allocate all the state we need next to each other in order to reduce fragmentation.
 
-    // We allocate the allocator data struct together with the pool to reduce fragmentation.
-    auto *persistentData = os_allocate_block_and_prepend_data<tlsf_allocator_data>(persistentMemorySize);
-    PersistentAlloc = {tlsf_allocator, persistentData};
+    auto pools = to_stack_array(MemoryInBytes);
+    auto [data, m, g, pool] = os_allocate_packed<tlsf_allocator_data, memory, graphics>(pools);
+    PersistentAlloc = {tlsf_allocator, data};
 
-    allocator_add_pool(PersistentAlloc, persistentData + 1, persistentMemorySize);
+    s64 offset = 0;
+    For(pools) {
+        allocator_add_pool(PersistentAlloc, (byte *) pool + offset, it);
+        offset += it;
+    }
+
+    Memory = m;
+    Graphics = g;
 
     auto newContext = Context;
     newContext.Log = &cout;
     newContext.Alloc = PersistentAlloc;
     OVERRIDE_CONTEXT(newContext);
 
+    m->Alloc = PersistentAlloc;
+
     parse_arguments();
+    setup_paths();
 
-    memory m;
-    Memory = &m;
+    // string windowTitle = sprint("Graphics Engine | {}", DLLFileName);
+    string windowTitle = "Calculator";
 
-    m.Alloc = PersistentAlloc;
+    auto windowFlags = window::SHOWN | window::RESIZABLE | window::VSYNC | window::FOCUS_ON_SHOW | window::CLOSE_ON_ALT_F4;
+    m->MainWindow = allocate<window>()->init(windowTitle, window::DONT_CARE, window::DONT_CARE, WindowWidth, WindowHeight, windowFlags);
+
+    auto icon = pixel_buffer("data/calc.png", false, pixel_format::RGBA);
+    array<pixel_buffer> icons;
+    append(icons, icon);
+    m->MainWindow->set_icon(icons);
+    free(icons);
+
+    m->MainWindow->Event.connect(delegate<bool(const event &e)>([](auto e) {
+        if (MainWindowEvent) return MainWindowEvent(e);
+        return false;
+    }));
+
+    m->GetStateImpl = [](const string &name, s64 size, bool *created) {
+        string identifier = name;
+        append_string(identifier, "Ident");
+
+        auto **found = find(Memory->States, identifier).Value;
+        if (!found) {
+            // We allocate with alignment 16 because we use SIMD types
+            void *result = allocate_array<char>(size, {.Alignment = 16});
+            add(Memory->States, identifier, result);
+            *created = true;
+            return result;
+        }
+
+        free(identifier);
+        return *found;
+    };
+
+    // @TODO: TargetFPS currently does nothing, we rely on g.swap() and vsync to hit target monitor refresh rate
+
+    // This is affecting any physics time steps though
+    m->FrameDelta = 1.0f / TargetFPS;
+
+    g->init(graphics_api::Direct3D);
+    g->set_blend(true);
+    g->set_depth_testing(false);
 
     ImGui::SetAllocatorFunctions([](size_t size, void *) { return (void *) allocate_array<char>(size, {.Alloc = PersistentAlloc}); },
                                  [](void *ptr, void *) { ::lstd::free(ptr); });  // Without the namespace this selects the CRT free for some bizarre reason...
 
-    setup_paths();
+    init_imgui_for_our_windows(m->MainWindow);
+    m->ImGuiContext = ImGui::GetCurrentContext();
+    exit_schedule(delegate<void(void)>([]() {
+        ImGui::DestroyPlatformWindows();
+        ImGui::DestroyContext();
+    }));
 
-    PUSH_ALLOC(PersistentAlloc) {
-        // string windowTitle = sprint("Graphics Engine | {}", DLLFileName);
-        string windowTitle = "Calculator";
-
-        auto windowFlags = window::SHOWN | window::RESIZABLE | window::VSYNC | window::FOCUS_ON_SHOW | window::CLOSE_ON_ALT_F4;
-        m.MainWindow = allocate<window>()->init(windowTitle, window::DONT_CARE, window::DONT_CARE, WindowWidth, WindowHeight, windowFlags);
-
-        auto icon = pixel_buffer("data/calc.png", false, pixel_format::RGBA);
-        array<pixel_buffer> icons;
-        append(icons, icon);
-        m.MainWindow->set_icon(icons);
-        free(icons);
-
-        m.MainWindow->Event.connect(main_window_event);
-
-        m.GetStateImpl = [](const string &name, s64 size, bool *created) {
-            string identifier = name;
-            append_string(identifier, "Ident");
-
-            auto **found = find(Memory->States, identifier).Value;
-            if (!found) {
-                // We allocate with alignment 16 because we use SIMD types
-                void *result = allocate_array<char>(size, {.Alignment = 16});
-                add(Memory->States, identifier, result);
-                *created = true;
-                return result;
-            }
-
-            free(identifier);
-            return *found;
-        };
-
-        // @TODO: TargetFPS currently does nothing, we rely on g.swap() and vsync to hit target monitor refresh rate
-
-        // This is affecting any physics time steps though
-        m.FrameDelta = 1.0f / TargetFPS;
-
-        graphics g;
-        Graphics = &g;
-
-        g.init(graphics_api::Direct3D);
-        g.set_blend(true);
-        g.set_depth_testing(false);
-
-        init_imgui_for_our_windows(m.MainWindow);
-        m.ImGuiContext = ImGui::GetCurrentContext();
-        exit_schedule(destroy_imgui);
-
-        // This state also needs to be shared
+    // This state also needs to be shared
 #if defined DEBUG_MEMORY
-        m.DEBUG_memory = DEBUG_memory;
+    m->DEBUG_memory = DEBUG_memory;
 #endif
 
-        imgui_renderer imguiRenderer;
-        imguiRenderer.init(&g);
-        defer(imguiRenderer.release());
+    imgui_renderer imguiRenderer;
+    imguiRenderer.init(g);
+    defer(imguiRenderer.release());
 
-        while (true) {
-            m.ReloadedThisFrame = check_for_dll_change();
-            if (m.RequestReloadNextFrame) {
-                m.ReloadedThisFrame = reload_code();
-                m.RequestReloadNextFrame = false;
-            }
+    while (true) {
+        m->ReloadedThisFrame = check_for_dll_change();
+        if (m->RequestReloadNextFrame) {
+            m->ReloadedThisFrame = reload_code();
+            m->RequestReloadNextFrame = false;
+        }
 
-            window::update();
-            if (m.MainWindow->IsDestroying) break;
+        window::update();
+        if (m->MainWindow->IsDestroying) break;
 
-            imgui_for_our_windows_new_frame(m.MainWindow);
-            ImGui::NewFrame();
-            if (UpdateAndRender) UpdateAndRender(&m, &g);
-            ImGui::Render();
+        imgui_for_our_windows_new_frame(m->MainWindow);
+        ImGui::NewFrame();
+        if (UpdateAndRender) UpdateAndRender(Memory, Graphics);
+        ImGui::Render();
 
-            if (m.MainWindow->is_visible()) {
-                g.set_target_window(m.MainWindow);
-                g.set_cull_mode(cull::None);
-                imguiRenderer.draw(ImGui::GetDrawData());
-                g.swap();
-            }
+        if (m->MainWindow->is_visible()) {
+            g->set_target_window(m->MainWindow);
+            g->set_cull_mode(cull::None);
+            imguiRenderer.draw(ImGui::GetDrawData());
+            g->swap();
+        }
 
-            if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-                ImGui::UpdatePlatformWindows();
-                ImGui::RenderPlatformWindowsDefault(null, &imguiRenderer);
-            }
+        if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault(null, &imguiRenderer);
         }
     }
 }
@@ -348,9 +332,9 @@ static cursor MouseCursors[ImGuiMouseCursor_COUNT] = {
     cursor(OS_ARROW), cursor(OS_IBEAM), cursor(OS_RESIZE_ALL), cursor(OS_RESIZE_NS),
     cursor(OS_RESIZE_WE), cursor(OS_RESIZE_NESW), cursor(OS_RESIZE_NWSE), cursor(OS_HAND)};
 
-static bool MouseButtons[Mouse_Button_Last + 1]{};
+file_scope bool MouseButtons[Mouse_Button_Last + 1]{};
 
-static void update_modifiers() {
+file_scope void update_modifiers() {
     ImGuiIO &io = ImGui::GetIO();
     io.KeyCtrl = io.KeysDown[Key_LeftControl] || io.KeysDown[Key_RightControl];
     io.KeyShift = io.KeysDown[Key_LeftShift] || io.KeysDown[Key_RightShift];
@@ -358,9 +342,7 @@ static void update_modifiers() {
     io.KeySuper = io.KeysDown[Key_LeftGUI] || io.KeysDown[Key_RightGUI];
 }
 
-void imgui_update_monitors();
-
-static bool common_event_callback(const event &e) {
+file_scope bool common_event_callback(const event &e) {
     ImGuiIO &io = ImGui::GetIO();
     if (e.Type == event::Keyboard_Pressed) {
         io.KeysDown[e.KeyCode] = true;
@@ -379,30 +361,14 @@ static bool common_event_callback(const event &e) {
     }
     return false;
 }
-
-static bool platform_event_callback(const event &e) {
-    ImGuiIO &io = ImGui::GetIO();
-
-    auto *viewport = ImGui::FindViewportByPlatformHandle(e.Window);
-    if (e.Type == event::Window_Closed) {
-        viewport->PlatformRequestClose = true;
-    } else if (e.Type == event::Window_Moved) {
-        viewport->PlatformRequestMove = true;
-    } else if (e.Type == event::Window_Resized) {
-        viewport->PlatformRequestResize = true;
-    }
-    return false;
-}
-
 #include <lstd/types/windows.h>
-
 // We provide a Win32 implementation because this is such a common issue for IME users
 #if OS == WINDOWS && !defined IMGUI_DISABLE_WIN32_FUNCTIONS && !defined IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS
 #define HAS_WIN32_IME 1
 #if COMPILER == MSVC
 #pragma comment(lib, "imm32")
 #endif
-static void imgui_set_ime_pos(ImGuiViewport *viewport, ImVec2 pos) {
+file_scope void imgui_set_ime_pos(ImGuiViewport *viewport, ImVec2 pos) {
     COMPOSITIONFORM cf = {
         CFS_FORCE_POSITION, {(s32)(pos.x - viewport->Pos.x), (s32)(pos.y - viewport->Pos.y)}, {0, 0, 0, 0}};
     if (HWND hWnd = (HWND) viewport->PlatformHandleRaw) {
@@ -416,7 +382,7 @@ static void imgui_set_ime_pos(ImGuiViewport *viewport, ImVec2 pos) {
 #define HAS_WIN32_IME 0
 #endif
 
-static void imgui_update_monitors() {
+file_scope void imgui_update_monitors() {
     ImGuiPlatformIO &platformIO = ImGui::GetPlatformIO();
 
     platformIO.Monitors.resize(0);
@@ -440,7 +406,7 @@ static void imgui_update_monitors() {
 }
 
 // Slightly modified version of "Photoshop" theme by @Derydoca (https://github.com/ocornut/imgui/issues/707)
-static void imgui_init_photoshop_style() {
+file_scope void imgui_init_photoshop_style() {
     ImGuiStyle *style = &ImGui::GetStyle();
 
     ImVec4 *colors = style->Colors;
@@ -507,11 +473,7 @@ static void imgui_init_photoshop_style() {
     style->WindowRounding = 4.0f;
 }
 
-static void update_monitors(const monitor_event &e) {
-    imgui_update_monitors();
-}
-
-static void init_imgui_for_our_windows(window *mainWindow) {
+file_scope void init_imgui_for_our_windows(window *mainWindow) {
     os_poll_monitors();  // @Cleanup: In the ideal case we shouldn't need this.
 
     ImGui::CreateContext();
@@ -610,7 +572,19 @@ static void init_imgui_for_our_windows(window *mainWindow) {
             win->set_pos((s32) viewport->Pos.x, (s32) viewport->Pos.y);
 
             win->Event.connect(common_event_callback);
-            win->Event.connect(platform_event_callback);
+            win->Event.connect(delegate<bool(const event &)>([](auto e) {
+                ImGuiIO &io = ImGui::GetIO();
+
+                auto *viewport = ImGui::FindViewportByPlatformHandle(e.Window);
+                if (e.Type == event::Window_Closed) {
+                    viewport->PlatformRequestClose = true;
+                } else if (e.Type == event::Window_Moved) {
+                    viewport->PlatformRequestMove = true;
+                } else if (e.Type == event::Window_Resized) {
+                    viewport->PlatformRequestResize = true;
+                }
+                return false;
+            }));
         };
 
         platformIO.Platform_DestroyWindow = [](auto *viewport) {
@@ -679,11 +653,13 @@ static void init_imgui_for_our_windows(window *mainWindow) {
 #endif
 
         imgui_update_monitors();
-        g_MonitorEvent.connect(update_monitors);
+        g_MonitorEvent.connect(delegate<void(const monitor_event &)>([](auto e) {
+            imgui_update_monitors();
+        }));
     }
 }
 
-static void imgui_for_our_windows_new_frame(window *mainWindow) {
+file_scope void imgui_for_our_windows_new_frame(window *mainWindow) {
     ImGuiIO &io = ImGui::GetIO();
     assert(io.Fonts->IsBuilt());
 
