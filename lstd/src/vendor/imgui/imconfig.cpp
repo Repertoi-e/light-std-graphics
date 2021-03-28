@@ -2,6 +2,8 @@
 
 extern "C" {
 
+// .. but declare these as functions, not intrinsics. We have our optimized versions.
+// See comment below.
 #pragma function(memset)
 void *memset(void *ptr, int value, size_t n) { return LSTD_NAMESPACE::fill_memory(ptr, value, n); }
 #pragma function(memcpy)
