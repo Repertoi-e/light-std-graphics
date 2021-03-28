@@ -1232,7 +1232,10 @@ s64 (*compare_memory)(const void *ptr1, const void *ptr2, u64 size) = optimized_
 void default_panic_handler(const string &message, const array<os_function_call> &callStack) {
     if (Context._HandlingPanic) return;
 
-    WITH_CONTEXT_VAR(_HandlingPanic, true) {
+    auto newContext = Context;
+    newContext._HandlingPanic = true;
+
+    PUSH_CONTEXT(newContext) {
         print("\n\n{!}(context.cpp / default_crash_handler): A panic occured and the program must terminate.\n");
         print("{!GRAY}        Error: {!RED}{}{!}\n\n", message);
         print("        ... and here is the call stack:\n");

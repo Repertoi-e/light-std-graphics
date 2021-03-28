@@ -23,6 +23,13 @@ import path.general;
 
 LSTD_BEGIN_NAMESPACE
 
+extern "C" { 
+    wchar_t *utf8_to_utf16(const string &str, allocator alloc);
+}
+
+wchar_t *utf8_to_utf16_temp(const string &str) { return utf8_to_utf16(str, {}); }
+
+
 export {
     constexpr char OS_PATH_SEPARATOR = '\\';
 
@@ -225,24 +232,6 @@ export {
     // the path_walker API directly (take a look at the implementation of this function further down the file).
     // The reason we return an array is because that's what is most useful in the general case.
     [[nodiscard("Leak")]] array<string> path_walk(const string &path, bool recursively = false);
-}
-
-s32 wchar_size_required(const string &str) {
-    s32 size = MultiByteToWideChar(CP_UTF8, 0, str.Data, (s32) str.Count, null, 0);
-    assert(size != 0);  // _MultiByteToWideChar_ might fail for a number of reasons but we just panic.
-                        // In the future we may want to actually be more helpful with what went wrong...
-    return size;
-}
-
-// Uses the temporary allocator to get a utf16 path from our utf8 string.
-// utf16..................... sigh!
-utf16 *utf8_to_utf16_temp(const string &str) {
-    if (!str.Length) return null;
-
-    s32 size = wchar_size_required(str) + 1;
-    auto *result = allocate_array<utf16>(size, {.Alloc = Context.Temp});
-    utf8_to_utf16(str.Data, str.Length, result);
-    return result;
 }
 
 #define CREATE_FILE_HANDLE_CHECKED(handleName, call, returnOnFail)                                             \
@@ -627,7 +616,7 @@ export {
             free(walker.CurrentFileName);
 
             auto *fileName = ((WIN32_FIND_DATAW *) walker.PlatformFileInfo)->cFileName;
-            reserve(walker.CurrentFileName, c_string_length(fileName) * 2);                                // @Bug c_string_length * 2 is not enough
+            reserve(walker.CurrentFileName, c_string_length(fileName) * 4);                                // @Cleanup
             utf16_to_utf8(fileName, (utf8 *) walker.CurrentFileName.Data, &walker.CurrentFileName.Count);  // @Constcast
             walker.CurrentFileName.Length = utf8_length(walker.CurrentFileName.Data, walker.CurrentFileName.Count);
         } while (walker.CurrentFileName == ".." || walker.CurrentFileName == ".");

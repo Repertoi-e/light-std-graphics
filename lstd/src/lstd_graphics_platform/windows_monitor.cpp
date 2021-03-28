@@ -78,10 +78,16 @@ file_scope DWORD ForegroundLockTimeout;
 
 void win64_poll_monitors();
 
+allocator win64_get_persistent_allocator();
+
 void win64_monitor_uninit() {
     g_MonitorEvent.release();
 
-    For(Monitors) free(it);
+    For(Monitors) {
+        free(it->Name);
+        free(it->DisplayModes);
+        free(it);
+    }
     free(Monitors);
 
     SystemParametersInfoW(SPI_SETFOREGROUNDLOCKTIMEOUT, 0, UIntToPtr(ForegroundLockTimeout), SPIF_SENDCHANGE);
@@ -117,6 +123,8 @@ void win64_monitor_init() {
     }
 }
 
+string utf16_to_utf8(const utf16 *str, allocator alloc);
+
 file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *display) {
     DEVMODEW dm;
     zero_memory(&dm, sizeof(dm));
@@ -136,16 +144,14 @@ file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *di
         heightMM = (s32)(dm.dmPelsHeight * 25.4f / GetDeviceCaps(dc, LOGPIXELSY));
     }
 
-    auto *mon = allocate<monitor>();
+    auto *mon = allocate<monitor>({.Alloc = win64_get_persistent_allocator()});
     mon->WidthMM = widthMM;
     mon->HeightMM = heightMM;
 
     wchar_t *name = adapter->DeviceString;
     if (display) name = display->DeviceString;
 
-    reserve(mon->Name, c_string_length(name) * 2);                   // @Bug c_string_length * 2 is not enough
-    utf16_to_utf8(name, (char *) mon->Name.Data, &mon->Name.Count);  // @Constcast
-    mon->Name.Length = utf8_length(mon->Name.Data, mon->Name.Count);
+    mon->Name = utf16_to_utf8(name, win64_get_persistent_allocator());
 
     if (adapter->StateFlags & DISPLAY_DEVICE_MODESPRUNED) mon->PlatformData.Win32.ModesPruned = true;
 
@@ -188,9 +194,14 @@ file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *di
 
 file_scope void do_monitor_event(monitor *mon, monitor_event::action action, bool insertLast) {
     if (action == monitor_event::CONNECTED) {
-        insert(Monitors, insertLast ? Monitors.Count : 0, mon);
+        PUSH_ALLOC(win64_get_persistent_allocator()) {
+            insert(Monitors, insertLast ? Monitors.Count : 0, mon);
+        }
     } else {
         remove_at_index(Monitors, find(Monitors, mon));
+        
+        free(mon->Name);
+        free(mon->DisplayModes);
         free(mon);
     }
 
@@ -267,6 +278,8 @@ rect os_get_work_area(monitor *mon) {
     return {mi.rcWork.left, mi.rcWork.top, mi.rcWork.right - mi.rcWork.left, mi.rcWork.bottom - mi.rcWork.top};
 }
 
+void platform_report_error(string, source_location loc = source_location::current());
+
 bool os_set_display_mode(monitor *mon, display_mode desired) {
     display_mode best = choose_video_mode(mon, desired);
     if (os_get_current_display_mode(mon) == best) return true;
@@ -295,7 +308,7 @@ bool os_set_display_mode(monitor *mon, display_mode desired) {
         if (result == DISP_CHANGE_NOTUPDATED) description = "Failed to write to registry";
         if (result == DISP_CHANGE_RESTART) description = "Computer restart required";
 
-        print(">>> Failed to set video mode: {!YELLOW}{}{!}\n", description);
+        platform_report_error(sprint("Failed to set video mode: {!YELLOW}{}{!}", description));
         return false;
     }
 
@@ -358,7 +371,9 @@ file_scope void get_display_modes(array<display_mode> &modes, monitor *mon) {
 // Poll for changes in the set of connected monitors
 void win64_poll_monitors() {
     array<monitor *> disconnected;
-    clone(&disconnected, Monitors);
+    PUSH_ALLOC(win64_get_persistent_allocator()) {
+        clone(&disconnected, Monitors);
+    }
     defer(free(disconnected));
 
     DISPLAY_DEVICEW adapter, display;
@@ -418,7 +433,9 @@ void win64_poll_monitors() {
     }
 
     For(Monitors) {
-        get_display_modes(it->DisplayModes, it);
+        PUSH_ALLOC(win64_get_persistent_allocator()) {
+            get_display_modes(it->DisplayModes, it);
+        }
         quick_sort(it->DisplayModes.Data, it->DisplayModes.Data + it->DisplayModes.Count - 1);
     }
 }

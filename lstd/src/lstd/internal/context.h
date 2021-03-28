@@ -29,14 +29,28 @@ void fmt_default_parse_error_handler(const string &message, const string &format
 struct context {
     thread::id ThreadID;  // The current thread's ID (Context is thread-local)
 
+    //
     // :TemporaryAllocator: Take a look at the docs of this allocator in "allocator.h"
     // (or the allocator module if you are living in the future).
+    //
+    // We store a arena allocator in the Context that is meant to be used as temporary storage.
+    // It can be used to allocate memory that is not meant to last long (e.g. returning arrays or strings from functions
+    // that don't need to last long and you shouldn't worry about freeing it - e.g. converting utf8 to utf16 to pass to a windows call).
+    //
+    // One very good example use case for the temporary allocator: if you are programming a game and you need to calculate
+    //   some mesh stuff for a given frame, using this allocator means having the freedom of dynamically allocating
+    //   without compromising performance. At the end of the frame when the memory is no longer used you call free_all(Context.TempAlloc)
+    //   and start the next frame.
     //
     // This gets initialized the first time it gets used in a thread.
     // Each thread gets a unique temporary allocator to prevent data races and to remain fast.
     // Default size is 8 KiB but you can increase that by adding a pool with allocator_add_pool().
-    arena_allocator_data TempAllocData;  // Initialized the first time it is used
-    allocator Temp;                      // The "allocator object" for the temporary allocator with which allocations are made.
+    // When out of memory, it allocates and adds a new bigger pool.
+    //
+    // We print warnings when allocating new pools. Use that as a guide to see where you need to pay more attention
+    // - perhaps increase the pool size or call free_all() more often.
+    //
+    allocator TempAlloc;
 
     ///////////////////////////////////////////////////////////////////////////////////////
     //
@@ -66,7 +80,7 @@ struct context {
     //
     // This is a pair of a function and a data pointer.
     // Gets initialized to default (malloc) in *platform*_common.cpp
-    // Change this (recommended way is to use the WITH_ALLOC macro) in order to
+    // Change this (recommended way is to use the PUSH_ALLOC macro) in order to
     // change the allocator which a piece of code uses transparently.
     //
     // This makes it so when you call a function, the caller doesn't have to pass a parameter,
@@ -118,8 +132,8 @@ struct context {
 //
 // The current state gets copied from parent thread to the new thread when creating a thread.
 //
-// Modify this with the macros WITH_CONTEXT_VAR, WITH_ALLOC, ... etc,
-// they restore the old value at the end of the scope that immediately follows them.
+// Modify this with the macros PUSH_CONTEXT or OVERRIDE_CONTEXT, the first one restores the old value at the
+// end of the following scope, while the latter changes the context globally.
 //
 // Note that you can modify this "globally" by using a cast and circumventing the C++ type system,
 // but please don't do that :D. The reason this is a const variable is that it enforces the programmer
@@ -130,36 +144,52 @@ struct context {
 // at least this way we are sure it's not a bug).
 inline const thread_local context Context;
 
+// We store this outside the context because having a member point to another member in the struct is dangerous.
+// It is invalidated the moment when the Context is copied. One of our points in the type policy says that
+// stuff should work if it is copied byte by byte.
+inline const thread_local arena_allocator_data __TempAllocData;
+
+
 // This is a helper macro to safely modify a variable in the implicit context in a block of code.
 // Usage:
-//    WITH_CONTEXT_VAR(variable, newVariableValue) {
-//        ... code with new context variable ...
-//    }
-//    ... old context variable value is restored ...
+//    auto newContext = Context;
+//    newContext.var1 = newValue1;
+//    newContext.var2 = newValue2;
 //
-// @Constcast
-#define WITH_CONTEXT_VAR(var, newValue)                          \
-    auto LINE_NAME(oldVar) = Context.var;                        \
-    auto LINE_NAME(restored) = false;                            \
-    defer({                                                      \
-        if (!LINE_NAME(restored)) {                              \
-            ((context *) &Context)->var = LINE_NAME(oldVar);     \
-        }                                                        \
-    });                                                          \
-    if (true) {                                                  \
-        ((context *) &Context)->var = newValue;                  \
-        goto LINE_NAME(body);                                    \
-    } else                                                       \
-        while (true)                                             \
-            if (true) {                                          \
-                ((context *) &Context)->var = LINE_NAME(oldVar); \
-                LINE_NAME(restored) = true;                      \
-                break;                                           \
-            } else                                               \
+//    PUSH_CONTEXT(newContext) {
+//        ... code with new context variables ...
+//    }
+//    ... old context variables are restored ...
+//
+//    OVERRIDE_CONTEXT(newContext);   // Changes the context variables globally (useful at program startup to set the allocator and the logging output).
+//
+
+#define OVERRIDE_CONTEXT(newContext) *((context *) &Context) = (newContext)
+
+#define PUSH_CONTEXT(newContext)                          \
+    auto LINE_NAME(oldContext) = LSTD_NAMESPACE::Context; \
+    auto LINE_NAME(restored) = false;                     \
+    defer({                                               \
+        if (!LINE_NAME(restored)) {                       \
+            OVERRIDE_CONTEXT(LINE_NAME(oldContext));      \
+        }                                                 \
+    });                                                   \
+    if (true) {                                           \
+        OVERRIDE_CONTEXT(newContext);                     \
+        goto LINE_NAME(body);                             \
+    } else                                                \
+        while (true)                                      \
+            if (true) {                                   \
+                OVERRIDE_CONTEXT(LINE_NAME(oldContext));  \
+                LINE_NAME(restored) = true;               \
+                break;                                    \
+            } else                                        \
                 LINE_NAME(body) :
 
-// Shortcut for allocators
-#define WITH_ALLOC(newAlloc) WITH_CONTEXT_VAR(Alloc, newAlloc)
+#define PUSH_ALLOC(newAlloc)                              \
+    auto LINE_NAME(newContext) = LSTD_NAMESPACE::Context; \
+    LINE_NAME(newContext).Alloc = newAlloc;               \
+    PUSH_CONTEXT(LINE_NAME(newContext))
 
 //
 // These were moved from allocator.h where they made sense to be, but we need to access Context.Alloc here.
@@ -298,7 +328,7 @@ requires(!types::is_const<T>) T *lstd_reallocate_array_impl(T *block, s64 newCou
 //   That means that we don't call copy/move constructors when reallocating.
 //
 // We are following a data oriented design with this library.
-// Our array<> type also expects type to be simple data. If you need extra logic when copying memory, implement that explicitly 
+// Our array<> type also expects type to be simple data. If you need extra logic when copying memory, implement that explicitly
 // (not with a copy constructor). We do that to avoid C++ complicated shit that drives sane people insane.
 // Here we don't do C++ style exceptions, we don't do copy/move constructors, we don't do destructors, we don't do any of that.
 //
@@ -317,11 +347,11 @@ requires(!types::is_const<T>) T *lstd_reallocate_array_impl(T *block, s64 newCou
 //     auto *node = allocate<ast_binop>();
 //     auto *node = allocate<ast_binop>({.Alloc = AstNodeAllocator});
 //     auto *node = allocate<ast_binop>({.Options = LEAK});
-//     
+//
 //     auto *simdType = allocate<f32v4>({.Alignment = 16});
-//     
+//
 //     auto *memory = allocate_array<byte>(200);
-//     auto *memory = allocate_array<byte>(200, {.Alloc = Context.Temp, .Alignment = 64, .Options = LEAK});
+//     auto *memory = allocate_array<byte>(200, {.Alloc = Context.TempAlloc, .Alignment = 64, .Options = LEAK});
 //
 //
 // The functions take source_location as a final parameter. This is set to current() automatically which means the caller's site.

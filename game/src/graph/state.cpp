@@ -3,10 +3,7 @@
 extern "C" bool lstd_init_global() { return false; }
 
 void copy_state_from_exe() {
-    auto *c = (context *) &Context;    // @Constcast
-    c->Alloc = Memory->Alloc;
-    c->AllocAlignment = 16;  // For SIMD
-
+    // @Cleanup
 #if defined DEBUG_MEMORY
     DEBUG_memory = Memory->DEBUG_memory;
 #endif
@@ -22,6 +19,12 @@ void copy_state_from_exe() {
 
 void reload_global_state() {
     copy_state_from_exe();
+
+    auto newContext = Context;
+    newContext.Alloc = Memory->Alloc;
+    newContext.AllocAlignment = 16;  // For SIMD
+    newContext.Log = &cout;
+    OVERRIDE_CONTEXT(newContext);
 
     MANAGE_GLOBAL_VARIABLE(GraphState);
 }

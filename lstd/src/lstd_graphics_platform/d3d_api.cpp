@@ -13,6 +13,9 @@
 
 LSTD_BEGIN_NAMESPACE
 
+// @TODO: These are so useful that we should include them in the API
+string utf16_to_utf8(const utf16 *str, allocator alloc = {});
+
 void d3d_init(graphics *g) {
     IDXGIFactory *factory;
     DX_CHECK(CreateDXGIFactory(__uuidof(IDXGIFactory), (void **) &factory));
@@ -30,17 +33,13 @@ void d3d_init(graphics *g) {
     DX_CHECK(adapterOutput->GetDisplayModeList(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_ENUM_MODES_INTERLACED, &numModes, null));
     assert(numModes);
 
-    DXGI_MODE_DESC *displayModeList = allocate_array<DXGI_MODE_DESC>(numModes, {.Alloc = Context.Temp});
+    DXGI_MODE_DESC *displayModeList = allocate_array<DXGI_MODE_DESC>(numModes, {.Alloc = Context.TempAlloc});
     DX_CHECK(adapterOutput->GetDisplayModeList(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_ENUM_MODES_INTERLACED, &numModes, displayModeList));
 
     DXGI_ADAPTER_DESC adapterDesc;
     DX_CHECK(adapter->GetDesc(&adapterDesc));
 
-    string adapterStr;  // @Bug c_string_length * 2 is not enough
-    reserve(adapterStr, c_string_length(adapterDesc.Description) * 2);
-    utf16_to_utf8(adapterDesc.Description, (char *) adapterStr.Data, &adapterStr.Count); // @Constcast
-    adapterStr.Length = utf8_length(adapterStr.Data, adapterStr.Count);
-
+    string adapterStr = utf16_to_utf8(adapterDesc.Description); 
     print("{!YELLOW}----------------------------------\n");
     print(" Direct3D 11:\n");
     print("    {}\n", adapterStr);

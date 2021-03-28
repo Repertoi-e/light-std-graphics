@@ -42,7 +42,7 @@ extern "C" IMAGE_DOS_HEADER __ImageBase;
 #define MODULE_HANDLE ((HMODULE) &__ImageBase)
 
 struct win64_common_state {
-    allocator PersistentAlloc;  // Used to store global state, tlsf
+    allocator PersistentAlloc;  // Used to store global state, a tlsf allocator
     thread::mutex PersistentAllocMutex;
 
     allocator TempAlloc;  // Used for temporary storage (e.g. converting strings from utf8 to utf16 for windows calls).
@@ -87,7 +87,6 @@ file_scope byte State[sizeof(win64_common_state)];
 allocator win64_get_persistent_allocator() { return S->PersistentAlloc; }
 allocator win64_get_temporary_allocator() { return S->TempAlloc; }
 
-// This is used before the Context is initted.
 file_scope void report_warning_no_allocations(string message) {
     DWORD ignored;
 
@@ -100,7 +99,13 @@ file_scope void report_warning_no_allocations(string message) {
     WriteFile(S->CerrHandle, postMessage.Data, (DWORD) postMessage.Count, &ignored, null);
 }
 
-file_scope void report_error(string message, source_location loc = source_location::current()) {
+// @TODO: Add option to print call stack?
+void platform_report_warning(string message, source_location loc = source_location::current()) {
+    print(">>> {!YELLOW}Platform warning{!} {}:{} (in function: {}): {}.\n", loc.File, loc.Line, loc.Function, message);
+}
+
+// @TODO: Add option to print call stack?
+void platform_report_error(string message, source_location loc = source_location::current()) {
     print(">>> {!RED}Platform error{!} {}:{} (in function: {}): {}.\n", loc.File, loc.Line, loc.Function, message);
 }
 
@@ -129,17 +134,18 @@ void *win64_temp_alloc(allocator_mode mode, void *context, s64 size, void *oldMe
         if (size > TempStorageSize) {
             // If we try to allocate a block with size bigger than the temporary storage block, we make a new, larger temporary storage block
 
-            report_warning_no_allocations("Tried to allocate a temporary block with size which was bigger than what we could handle. Increasing the starting pool size.");
+            platform_report_warning("Not enough memory in the temporary allocator; expanding the pool");
 
             allocator_remove_pool(S->TempAlloc, TempStorageBlock);
             os_free_block(TempStorageBlock);
 
             create_temp_storage_block(size * 2);
+            result = arena_allocator(allocator_mode::ALLOCATE, context, size, null, 0, options);
         } else if (!result) {
             // If we couldn't allocate but the temporary storage block has enough space, we just call free_all
             free_all(S->TempAlloc);
+            result = arena_allocator(allocator_mode::ALLOCATE, context, size, null, 0, options);
         }
-        result = arena_allocator(allocator_mode::ALLOCATE, context, size, null, 0, options);
     }
 
     return result;
@@ -165,7 +171,7 @@ void *win64_persistent_alloc(allocator_mode mode, void *context, s64 size, void 
     auto *result = tlsf_allocator(mode, context, size, oldMemory, oldSize, options);
     if (mode == allocator_mode::ALLOCATE) {
         if (!result) {
-            report_warning_no_allocations("Not enough memory in the persistent allocator. Adding a new pool.");
+            platform_report_warning("Not enough memory in the persistent allocator; adding a pool");
 
             create_persistent_alloc_block(size * 3);
         }
@@ -216,16 +222,16 @@ file_scope void init_global_vars() {
 
 // When our program runs, but also needs to happen when a new thread starts!
 void win64_common_init_context() {
-    context *c = (context *) &Context;  // @Constcast
-
-    *c = {};  // Constructor gets called later again (cpp global constructors for thread local variables), but doesn't reinit the thread id.
-    c->ThreadID = thread::id((u64) GetCurrentThreadId());
+    context newContext = {};
+    newContext.ThreadID = thread::id((u64) GetCurrentThreadId());
+    newContext.TempAlloc = {default_temp_allocator, (void *) &__TempAllocData};
+    OVERRIDE_CONTEXT(newContext);
 }
 
 void exit_schedule(const delegate<void()> &function) {
     thread::scoped_lock _(&S->ExitScheduleMutex);
 
-    WITH_CONTEXT_VAR(AllocOptions, Context.AllocOptions | LEAK) {
+    PUSH_ALLOC(S->PersistentAlloc) {
         append(S->ExitFunctions, function);
     }
 }
@@ -311,9 +317,6 @@ file_scope s32 pre_termination() {
     return 0;
 }
 
-#pragma push_macro("allocate")
-#undef allocate
-
 typedef s32 cb(void);
 #pragma const_seg(".CRT$XIU")
 __declspec(allocate(".CRT$XIU")) cb *g_CInit = c_init;
@@ -327,18 +330,19 @@ __declspec(allocate(".CRT$XDU")) cb *g_TLSInit = tls_init;
 __declspec(allocate(".CRT$XPU")) cb *g_PreTermination = pre_termination;
 #pragma const_seg()
 
-#pragma pop_macro("allocate")
-
 #else
 #error @TODO: See how this works on other compilers!
 #endif
 
 // Windows uses utf16.. Sigh...
-file_scope utf16 *utf8_to_utf16_temp(const string &str) {
+extern "C" {
+utf16 *utf8_to_utf16(const string &str, allocator alloc = {}) {
     if (!str.Length) return null;
 
+    if (!alloc) alloc = S->TempAlloc;
+
     utf16 *result;
-    WITH_ALLOC(S->TempAlloc) {
+    PUSH_ALLOC(alloc) {
         // src.Length * 2 because one unicode character might take 2 wide chars.
         // This is just an approximation, not all space will be used!
         result = allocate_array<utf16>(str.Length * 2 + 1);
@@ -347,11 +351,14 @@ file_scope utf16 *utf8_to_utf16_temp(const string &str) {
     utf8_to_utf16(str.Data, str.Length, result);
     return result;
 }
+}
 
-file_scope string utf16_to_utf8_temp(const utf16 *str) {
+string utf16_to_utf8(const utf16 *str, allocator alloc = {}) {
     string result;
 
-    WITH_ALLOC(S->TempAlloc) {
+    if (!alloc) alloc = S->TempAlloc;
+
+    PUSH_ALLOC(alloc) {
         // String length * 4 because one unicode character might take 4 bytes in utf8.
         // This is just an approximation, not all space will be used!
         reserve(result, c_string_length(str) * 4);
@@ -363,12 +370,7 @@ file_scope string utf16_to_utf8_temp(const utf16 *str) {
     return result;
 }
 
-//
-// Initializes the state we need to function.
-//
-void win64_common_init_global_state() {
-    init_global_vars();
-
+file_scope void setup_console() {
     if (!AttachConsole(ATTACH_PARENT_PROCESS)) {
         AllocConsole();
 
@@ -387,19 +389,20 @@ void win64_common_init_global_state() {
         report_warning_no_allocations("Couldn't set console code page to UTF8 - some characters might be messed up");
     }
 
-    // Enable ANSI escape sequences
+    // Enable ANSI escape sequences for the console
     DWORD dw = 0;
     GetConsoleMode(S->CoutHandle, &dw);
     SetConsoleMode(S->CoutHandle, dw | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 
     GetConsoleMode(S->CerrHandle, &dw);
     SetConsoleMode(S->CerrHandle, dw | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+}
 
-    // Used to time stuff
-    QueryPerformanceFrequency(&S->PerformanceFrequency);
-
+file_scope void get_module_name() {
     // Get the module name
-    utf16 *buffer = allocate_array<utf16>(MAX_PATH, {.Alloc = S->TempAlloc});
+    utf16 *buffer = allocate_array<utf16>(MAX_PATH, {.Alloc = S->PersistentAlloc});
+    defer(free(buffer));
+
     s64 reserved = MAX_PATH;
 
     while (true) {
@@ -407,18 +410,21 @@ void win64_common_init_global_state() {
         if (written == reserved) {
             if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
                 reserved *= 2;
-                buffer = allocate_array<utf16>(reserved, {.Alloc = S->TempAlloc});
+                free(buffer);
+                buffer = allocate_array<utf16>(reserved, {.Alloc = S->PersistentAlloc});
                 continue;
             }
         }
         break;
     }
 
-    string moduleName = utf16_to_utf8_temp(buffer);
-    WITH_ALLOC(S->PersistentAlloc) {
+    string moduleName = utf16_to_utf8(buffer);
+    PUSH_ALLOC(S->PersistentAlloc) {
         S->ModuleName = path_normalize(moduleName);
     }
+}
 
+file_scope void parse_arguments() {
     // Get the arguments
     utf16 **argv;
     s32 argc;
@@ -428,15 +434,32 @@ void win64_common_init_global_state() {
     argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (argv == null) {
         report_warning_no_allocations("Couldn't parse command line arguments, os_get_command_line_arguments() will return an empty array in all cases");
-    } else {
-        WITH_ALLOC(S->TempAlloc) {
-            reserve(S->Argv, argc - 1);
-        }
-
-        // Skip the .exe name
-        For(range(1, argc)) append(S->Argv, utf16_to_utf8_temp(argv[it]));
-        LocalFree(argv);
+        return;
     }
+
+    defer(LocalFree(argv));
+
+    PUSH_ALLOC(S->PersistentAlloc) {
+        reserve(S->Argv, argc - 1);
+    }
+
+    // Loop over all arguments and add them, skip the .exe name
+    For(range(1, argc)) append(S->Argv, utf16_to_utf8(argv[it], S->PersistentAlloc));
+}
+
+//
+// Initializes the state we need to function.
+//
+void win64_common_init_global_state() {
+    init_global_vars();
+
+    setup_console();
+
+    get_module_name();
+
+    parse_arguments();
+
+    QueryPerformanceFrequency(&S->PerformanceFrequency);
 }
 
 //
@@ -561,7 +584,7 @@ s64 os_get_block_size(void *ptr) {
     }
 
 void os_write_shared_block(const string &name, void *data, s64 size) {
-    CREATE_MAPPING_CHECKED(h, CreateFileMappingW(INVALID_HANDLE_VALUE, null, PAGE_READWRITE, 0, (DWORD) size, utf8_to_utf16_temp(name)), );
+    CREATE_MAPPING_CHECKED(h, CreateFileMappingW(INVALID_HANDLE_VALUE, null, PAGE_READWRITE, 0, (DWORD) size, utf8_to_utf16(name)), );
     defer(CloseHandle(h));
 
     void *result = MapViewOfFile(h, FILE_MAP_WRITE, 0, 0, size);
@@ -574,7 +597,7 @@ void os_write_shared_block(const string &name, void *data, s64 size) {
 }
 
 void os_read_shared_block(const string &name, void *out, s64 size) {
-    CREATE_MAPPING_CHECKED(h, OpenFileMappingW(FILE_MAP_READ, false, utf8_to_utf16_temp(name)), );
+    CREATE_MAPPING_CHECKED(h, OpenFileMappingW(FILE_MAP_READ, false, utf8_to_utf16(name)), );
     defer(CloseHandle(h));
 
     void *result = MapViewOfFile(h, FILE_MAP_READ, 0, 0, size);
@@ -616,63 +639,62 @@ string os_get_current_module() {
 }
 
 string os_get_working_dir() {
-    thread::scoped_lock _(&S->WorkingDirMutex);
-
     DWORD required = GetCurrentDirectoryW(0, null);
-    auto *dir16 = allocate_array<utf16>(required + 1, {.Alloc = Context.Temp});
 
+    auto *dir16 = allocate_array<utf16>(required + 1, {.Alloc = S->TempAlloc});
     if (!GetCurrentDirectoryW(required + 1, dir16)) {
         windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "GetCurrentDirectory");
         return "";
     }
 
-    string workingDir = utf16_to_utf8_temp(dir16);
-    WITH_ALLOC(Context.Alloc) {
+    thread::scoped_lock _(&S->WorkingDirMutex);
+
+    string workingDir = utf16_to_utf8(dir16);
+    PUSH_ALLOC(S->PersistentAlloc) {
         S->WorkingDir = path_normalize(workingDir);
     }
     return S->WorkingDir;
 }
 
 void os_set_working_dir(const string &dir) {
-    string path(dir);
-    assert(path_is_absolute(path));
+    assert(path_is_absolute(dir));
+
+    WIN32_CHECKBOOL(SetCurrentDirectoryW(utf8_to_utf16(dir)));
 
     thread::scoped_lock _(&S->WorkingDirMutex);
-
-    WIN32_CHECKBOOL(SetCurrentDirectoryW(utf8_to_utf16_temp(dir)));
-
-    S->WorkingDir = dir;
+    PUSH_ALLOC(S->PersistentAlloc) {
+        clone(&S->WorkingDir, dir);
+    }
 }
 
 //
-// Cache environment variables when running the program in order to avoid allocating
-// and possibly running out of memory every time we call this function.
+// @TODO: Cache environment variables when running the program in order to avoid allocating.
 //
-os_get_env_result os_get_env(const string &name, bool silent) {
-    auto *name16 = utf8_to_utf16_temp(name);
+[[nodiscard("Leak")]] os_get_env_result os_get_env(const string &name, bool silent) {
+    auto *name16 = utf8_to_utf16(name);
 
     DWORD bufferSize = 65535;  // Limit according to http://msdn.microsoft.com/en-us/library/ms683188.aspx
 
-    auto *buffer = allocate_array<utf16>(bufferSize, {.Alloc = Context.Temp});
+    auto *buffer = allocate_array<utf16>(bufferSize, {.Alloc = S->TempAlloc});
     auto r = GetEnvironmentVariableW(name16, buffer, bufferSize);
 
     if (r == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
         if (!silent) {
-            report_error(tsprint("Couldn't find environment variable with value \"{}\"", name));
+            platform_report_error(tsprint("Couldn't find environment variable with value \"{}\"", name));
         }
         return {"", false};
     }
 
     // 65535 may be the limit but let's not take risks
     if (r > bufferSize) {
-        buffer = allocate_array<utf16>(r, {.Alloc = Context.Temp});
+        buffer = allocate_array<utf16>(r, {.Alloc = S->TempAlloc});
         GetEnvironmentVariableW(name16, buffer, r);
         bufferSize = r;
 
         // Possible to fail a second time ?
     }
 
-    return {utf16_to_utf8_temp(buffer), true};
+    return {utf16_to_utf8(buffer, S->PersistentAlloc), true};
 }
 
 void os_set_env(const string &name, const string &value) {
@@ -681,47 +703,47 @@ void os_set_env(const string &name, const string &value) {
         assert(false);
     }
 
-    WIN32_CHECKBOOL(SetEnvironmentVariableW(utf8_to_utf16_temp(name), utf8_to_utf16_temp(value)));
+    WIN32_CHECKBOOL(SetEnvironmentVariableW(utf8_to_utf16(name), utf8_to_utf16(value)));
 }
 
 void os_remove_env(const string &name) {
-    WIN32_CHECKBOOL(SetEnvironmentVariableW(utf8_to_utf16_temp(name), null));
+    WIN32_CHECKBOOL(SetEnvironmentVariableW(utf8_to_utf16(name), null));
 }
 
-string os_get_clipboard_content() {
+[[nodiscard("Leak")]] string os_get_clipboard_content() {
     if (!OpenClipboard(null)) {
-        report_error("Failed to open clipboard");
+        platform_report_error("Failed to open clipboard");
         return "";
     }
     defer(CloseClipboard());
 
     HANDLE object = GetClipboardData(CF_UNICODETEXT);
     if (!object) {
-        report_error("Failed to convert clipboard to string");
+        platform_report_error("Failed to convert clipboard to string");
         return "";
     }
 
     auto *clipboard16 = (utf16 *) GlobalLock(object);
     if (!clipboard16) {
-        report_error("Failed to lock global handle");
+        platform_report_error("Failed to lock global handle");
         return "";
     }
     defer(GlobalUnlock(object));
 
-    return utf16_to_utf8_temp(clipboard16);
+    return utf16_to_utf8(clipboard16, S->PersistentAlloc);
 }
 
 void os_set_clipboard_content(const string &content) {
     HANDLE object = GlobalAlloc(GMEM_MOVEABLE, content.Length * 2 * sizeof(utf16));
     if (!object) {
-        report_error("Failed to open clipboard");
+        platform_report_error("Failed to open clipboard");
         return;
     }
     defer(GlobalFree(object));
 
     auto *clipboard16 = (utf16 *) GlobalLock(object);
     if (!clipboard16) {
-        report_error("Failed to lock global handle");
+        platform_report_error("Failed to lock global handle");
         return;
     }
 
@@ -729,7 +751,7 @@ void os_set_clipboard_content(const string &content) {
     GlobalUnlock(object);
 
     if (!OpenClipboard(null)) {
-        report_error("Failed to open clipboard.");
+        platform_report_error("Failed to open clipboard.");
         return;
     }
     defer(CloseClipboard());
@@ -739,7 +761,6 @@ void os_set_clipboard_content(const string &content) {
     CloseClipboard();
 }
 
-// Doesn't include the exe name.
 array<string> os_get_command_line_arguments() { return S->Argv; }
 
 u32 os_get_pid() { return (u32) GetCurrentProcessId(); }
@@ -768,14 +789,12 @@ guid guid_new() {
 // Implementation of dynamic_library.h
 //
 bool dynamic_library::load(const string &name) {
-    Handle = (void *) LoadLibraryW(utf8_to_utf16_temp(name));
+    Handle = (void *) LoadLibraryW(utf8_to_utf16(name));
     return Handle;
 }
 
 void *dynamic_library::get_symbol(const string &name) {
-    auto *cString = to_c_string(name);
-    defer(free(cString));
-    return (void *) GetProcAddress((HMODULE) Handle, (LPCSTR) cString);
+    return (void *) GetProcAddress((HMODULE) Handle, (LPCSTR) to_c_string(name, S->TempAlloc));
 }
 
 void dynamic_library::close() {

@@ -54,8 +54,7 @@ time_t os_get_time();
 // Converts a time stamp acquired by _os_get_time()_ to seconds
 f64 os_time_to_seconds(time_t time);
 
-// Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
-string os_get_clipboard_content();
+[[nodiscard("Leak")]] string os_get_clipboard_content();
 void os_set_clipboard_content(const string &content);
 
 // Returns the path of the current executable or dynamic library (full dir + name).

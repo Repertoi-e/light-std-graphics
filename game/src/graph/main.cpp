@@ -28,7 +28,7 @@ LE_GAME_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
         render_viewport();
     }
 
-    free_all(Context.Temp);
+    free_all(Context.TempAlloc);
 }
 
 LE_GAME_API MAIN_WINDOW_EVENT(main_window_event, const event &e) {

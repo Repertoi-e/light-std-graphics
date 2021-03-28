@@ -76,7 +76,7 @@ void free(string &s) {
     return result;
 }
 
-utf8 *temp_to_c_string(const string &s) { return to_c_string(s, Context.Temp); }
+utf8 *temp_to_c_string(const string &s) { return to_c_string(s, Context.TempAlloc); }
 
 void set(string &s, s64 index, utf32 codePoint) {
     s64 cpSize = get_size_of_cp(codePoint);

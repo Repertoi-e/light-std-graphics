@@ -82,6 +82,7 @@ static bool check_for_dll_change() {
 void init_imgui_for_our_windows(window *mainWindow);
 void imgui_for_our_windows_new_frame(window *mainWindow);
 
+// @TODO: Provide a library construct for parsing arguments automatically
 static void parse_arguments() {
     array<string> usage;
     append(usage, string("Usage:\n"));
@@ -220,7 +221,30 @@ static void destroy_imgui() {
     ImGui::DestroyContext();
 }
 
-s32 main_logic() {
+
+template <typename T>
+T *os_allocate_block_and_prepend_data(s64 size) {
+    void *block = os_allocate_block(sizeof(T) + size);
+
+    auto *t = (T *) block;
+    *t = {};
+    return t;
+}
+
+s32 main() {
+    auto persistentMemorySize = MemoryInMiB * 1_MiB;
+
+    // We allocate the allocator data struct together with the pool to reduce fragmentation.
+    auto *persistentData = os_allocate_block_and_prepend_data<tlsf_allocator_data>(persistentMemorySize);
+    PersistentAlloc = {tlsf_allocator, persistentData};
+
+    allocator_add_pool(PersistentAlloc, persistentData + 1, persistentMemorySize);
+
+    auto newContext = Context;
+    newContext.Log = &cout;
+    newContext.Alloc = PersistentAlloc;
+    OVERRIDE_CONTEXT(newContext);
+
     parse_arguments();
 
     memory m;
@@ -228,13 +252,12 @@ s32 main_logic() {
 
     m.Alloc = PersistentAlloc;
 
-    // We tell imgui to use our allocator (by default it uses raw malloc, not operator new)
     ImGui::SetAllocatorFunctions([](size_t size, void *) { return (void *) allocate_array<char>(size, {.Alloc = PersistentAlloc}); },
                                  [](void *ptr, void *) { ::lstd::free(ptr); });  // Without the namespace this selects the CRT free for some bizarre reason...
 
     setup_paths();
 
-    WITH_ALLOC(PersistentAlloc) {
+    PUSH_ALLOC(PersistentAlloc) {
         // string windowTitle = sprint("Graphics Engine | {}", DLLFileName);
         string windowTitle = "Calculator";
 
@@ -317,32 +340,6 @@ s32 main_logic() {
                 ImGui::UpdatePlatformWindows();
                 ImGui::RenderPlatformWindowsDefault(null, &imguiRenderer);
             }
-        }
-    }
-}
-
-template <typename T>
-T *os_allocate_block_and_prepend_data(s64 size) {
-    void *block = os_allocate_block(sizeof(T) + size);
-
-    auto *t = (T *) block;
-    *t = {};
-    return t;
-}
-
-s32 main() {
-    auto persistentMemorySize = MemoryInMiB * 1_MiB;
-
-    // We allocate the allocator data struct together with the pool to reduce fragmentation.
-    auto *persistentData = os_allocate_block_and_prepend_data<tlsf_allocator_data>(persistentMemorySize);
-    PersistentAlloc = {tlsf_allocator, persistentData};
-    
-    allocator_add_pool(PersistentAlloc, persistentData + 1, persistentMemorySize);
-
-    // We need to set up a valid Context allocator before calling the logic in main().
-    WITH_ALLOC(PersistentAlloc) {
-        WITH_CONTEXT_VAR(Log, &cout) {
-            return main_logic();
         }
     }
 }

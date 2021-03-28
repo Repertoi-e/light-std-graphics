@@ -379,6 +379,8 @@ void window::release() {
     ID = INVALID_ID;
 }
 
+string utf16_to_utf8(const utf16 *str, allocator alloc);
+
 string window::get_title() {
     s32 length = GetWindowTextLengthW(PlatformData.Win32.hWnd) + 1;
 
@@ -386,14 +388,8 @@ string window::get_title() {
     defer(free(titleUtf16));
 
     GetWindowTextW(PlatformData.Win32.hWnd, titleUtf16, length);
-
-    WITH_ALLOC(win64_get_persistent_allocator()) {
-        string result;
-        reserve(result, length * 2);
-        utf16_to_utf8(titleUtf16, (utf8 *) result.Data, &result.Count);  // @Constcast
-        result.Length = utf8_length(result.Data, result.Count);
-        return result;
-    }
+    
+    return utf16_to_utf8(titleUtf16, win64_get_persistent_allocator());
 }
 
 void window::set_title(const string &title) {
@@ -1438,22 +1434,20 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             DragQueryPoint(drop, &pt);
             do_mouse_move(win, {pt.x, pt.y});
 
-            array<string> paths;
             s32 count = DragQueryFileW(drop, 0xffffffff, null, 0);
+
+            array<string> paths;
+            PUSH_ALLOC(win64_get_persistent_allocator()) {
+                reserve(paths, count);
+            }
+
             For(range(count)) {
                 u32 length = DragQueryFileW(drop, (u32) it, null, 0);
-                // @Bug ?
+
                 utf16 *buffer = allocate_array<utf16>(length + 1, {.Alloc = win64_get_temporary_allocator()});
                 DragQueryFileW(drop, (u32) it, buffer, length + 1);
 
-                WITH_ALLOC(win64_get_persistent_allocator()) {
-                    string file;
-                    reserve(file, length * 2);  // @Bug length * 2 is not enough
-                    utf16_to_utf8(buffer, const_cast<utf8 *>(file.Data), &file.Count);
-                    file.Length = utf8_length(file.Data, file.Count);
-
-                    append(paths, file);
-                }
+                append(paths, utf16_to_utf8(buffer, win64_get_persistent_allocator()));
             }
 
             event e;

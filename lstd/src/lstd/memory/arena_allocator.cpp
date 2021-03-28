@@ -1,5 +1,7 @@
 #include "../internal/context.h"
+#include "../os.h"
 #include "allocator.h"
+#include "string.h"
 
 LSTD_BEGIN_NAMESPACE
 
@@ -76,6 +78,41 @@ void *arena_allocator(allocator_mode mode, void *context, s64 size, void *oldMem
             assert(false);
     }
     return null;
+}
+
+void platform_report_warning(string, source_location loc = source_location::current());
+
+void *default_temp_allocator(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
+    auto *data = (arena_allocator_data *) context;
+
+    if (!data->Base) {
+        s64 startingPoolSize = 8_KiB;
+
+        // Make sure the starting pool has enough space for the allocation we are about to do
+        if (mode == allocator_mode::ALLOCATE) {
+            if (startingPoolSize < size) startingPoolSize = ceil_pow_of_2(size * 2);
+        }
+
+        allocator_add_pool({arena_allocator, data}, os_allocate_block(startingPoolSize), startingPoolSize);
+    }
+
+    auto *result = arena_allocator(mode, context, size, oldMemory, oldSize, options);
+    if (mode == allocator_mode::ALLOCATE && !result) {
+        // If we tried to allocate a block but didn't have enough space, we make a new, larger pool and print a warning.
+        // This is default behaviour which you can override by providing your own custom allocator extension.
+        //
+        // You can avoid this by freeing all periodically or by manually adding a large enough pool at the beginning of your program.
+        platform_report_warning("Not enough space in temporary allocator; adding a pool");
+
+        s64 poolSize = 8_KiB;
+        if (poolSize < size) poolSize = ceil_pow_of_2(size * 2);
+
+        allocator_add_pool({arena_allocator, data}, os_allocate_block(poolSize), poolSize);
+
+        result = arena_allocator(allocator_mode::ALLOCATE, context, size, null, 0, options);
+    }
+
+    return result;
 }
 
 #if COMPILER == MSVC

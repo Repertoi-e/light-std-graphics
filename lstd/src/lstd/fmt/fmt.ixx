@@ -448,7 +448,7 @@ export {
     // Formats to a string. Uses the temporary allocator.
     template <typename... Args>
     string tsprint(const string &fmtString, Args &&...arguments) {
-        WITH_ALLOC(Context.Temp) {
+        PUSH_ALLOC(Context.TempAlloc) {
             return sprint(fmtString, ((Args &&) arguments)...);
         }
     }
@@ -456,7 +456,7 @@ export {
     // Formats to a string. Uses the temporary allocator.
     template <typename... Args>
     utf8 *mprint(const string &fmtString, Args &&...arguments) {
-        WITH_ALLOC(Context.Temp) {
+        PUSH_ALLOC(Context.TempAlloc) {
             return to_c_string(sprint(fmtString, ((Args &&) arguments)...));
         }
     }

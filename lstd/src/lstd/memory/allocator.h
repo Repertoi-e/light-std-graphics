@@ -496,23 +496,24 @@ struct arena_allocator_data {
 // This is the simplest but not the best behaviour in some cases.
 // Be wary that if you have many pools performance will not be optimal. In that case I suggest
 // writing a specialized allocator (by taking arena_allocator as an example - implemented in arena_allocator.cpp).
-//
-// :TemporaryAllocator: Read here.
-//    We store an thread-local arena allocator in the Context that is meant to be used as temporary storage.
-//    It can be used globally to allocate memory that is not meant to last long (e.g. return value of a function
-//    that converts utf8 to utf16 to pass to a windows call - you shouldn't worry about freeing it).
-//
-//    Notes:
-//     * This allocator is NOT initialized by default. You should initialize it with allocator_add_pool().
-//     * The arena allocator doesn't handle overflows (when no pool has enough space for an allocation).
-//       When out of memory, you should add another pool (with allocator_add_pool()) or provide a larger starting pool.
-//       (See note above on performance implications of adding many pools).
-//
-//    One good example use case for the temporary allocator: if you are programming a game and you need to calculate
-//        some mesh stuff for a given frame, using this allocator means having the freedom of dynamically allocating
-//        without compromising performance. At the end of the frame when the memory is no longer used you FREE_ALL and
-//        start the next frame.
-//
 void *arena_allocator(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options);
+
+//
+// :TemporaryAllocator: See context.h
+//
+// This is an extension to the arena allocator, things that are different:
+// * This allocator is not initialized by default, but the first allocation you do with it adds a starting pool (of size 8_KiB).
+//   You can initialize it yourself in a given thread by calling allocator_add_pool() yourself.
+// * When you try to allocate a block but there is no available space, this automatically adds another pool (and prints a warning to the console).
+//
+// One good example use case for the temporary allocator: if you are programming a game and you need to calculate
+//   some mesh stuff for a given frame, using this allocator means having the freedom of dynamically allocating
+//   without compromising performance. At the end of the frame when the memory is no longer used you FREE_ALL and
+//   start the next frame.
+//
+// We print warnings when allocating new pools. Use that as a guide to see where you need to pay more attention 
+// - perhaps increase the pool size or call free_all() more often.
+//
+void *default_temp_allocator(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options);
 
 LSTD_END_NAMESPACE

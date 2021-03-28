@@ -298,21 +298,26 @@ void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options
     }
 
 #if defined DEBUG_MEMORY
+    s64 id = -1;
+
     if (DEBUG_memory) {
         thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
 
         DEBUG_memory->maybe_verify_heap();
 
-        s64 id = DEBUG_memory->AllocationCount;
+        id = DEBUG_memory->AllocationCount;
+    }
 
-        if (id == 1238) {
-            s32 k = 42;
-        }
+    if (id == 1352) {
+        s32 k = 42;
     }
 #endif
 
     if (Context.LogAllAllocations && !Context._LoggingAnAllocation) {
-        WITH_CONTEXT_VAR(_LoggingAnAllocation, true) {
+        auto newContext = Context;
+        newContext._LoggingAnAllocation = true;
+
+        PUSH_CONTEXT(newContext) {
             write(Context.Log, ">>> Allocation made at: ");
             log_file_and_line(loc);
             write(Context.Log, "\n");
@@ -328,6 +333,8 @@ void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options
 #endif
 
     void *block = alloc.Function(allocator_mode::ALLOCATE, alloc.Context, required, null, 0, options);
+    assert(block);
+
     auto *result = encode_header(block, userSize, alignment, alloc, options);
 
 #if defined DEBUG_MEMORY
@@ -362,7 +369,10 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
 #endif
 
     if (Context.LogAllAllocations && !Context._LoggingAnAllocation) {
-        WITH_CONTEXT_VAR(_LoggingAnAllocation, true) {
+        auto newContext = Context;
+        newContext._LoggingAnAllocation = true;
+
+        PUSH_CONTEXT(newContext) {
             write(Context.Log, ">>> Reallocation made at: ");
             log_file_and_line(loc);
             write(Context.Log, "\n");
@@ -393,6 +403,8 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
     if (!newBlock) {
         // Memory needs to be moved
         void *newBlock = alloc.Function(allocator_mode::ALLOCATE, alloc.Context, newSize, null, 0, options);
+        assert(newBlock);
+
         auto *newPointer = encode_header(newBlock, newUserSize, header->Alignment, alloc, options);
 
         auto *newHeader = (allocation_header *) newPointer - 1;

@@ -108,7 +108,7 @@ void d3d_buffer_set_input_layout(buffer *b, const buffer_layout &layout) {
 
     COM_SAFE_RELEASE(b->D3D.Layout);
 
-    auto *desc = allocate_array<D3D11_INPUT_ELEMENT_DESC>(layout.Elements.Count, {.Alloc = Context.Temp});
+    auto *desc = allocate_array<D3D11_INPUT_ELEMENT_DESC>(layout.Elements.Count, {.Alloc = Context.TempAlloc});
     auto *p = desc;
     For(layout.Elements) {
         const char *name = temp_to_c_string(it.Name);

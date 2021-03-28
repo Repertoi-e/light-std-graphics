@@ -87,7 +87,7 @@ string validate_and_parse_formula(function_entry *f) {
 
     token_stream tokens;
 
-    WITH_ALLOC(Context.Temp) {
+    PUSH_ALLOC(Context.TempAlloc) {
         tokens = tokenize(string(f->Formula));
         if (tokens.Error) {
             return tokens.Error;
@@ -128,7 +128,7 @@ void display_ast(ast *node) {
         auto *var = (ast_term *) node;
 
         string_builder_writer w;
-        WITH_ALLOC(Context.Temp) {
+        PUSH_ALLOC(Context.TempAlloc) {
             fmt_to_writer(&w, "{:g} ", var->Coeff);
             for (auto [k, v] : var->Letters) {
                 fmt_to_writer(&w, "{:c}^{} ", *k, *v);
@@ -183,7 +183,7 @@ void ui_functions() {
 
                 if (!it.FormulaMessage) {
                     hash_table<char32_t, f64> oldParams;
-                    WITH_ALLOC(Context.Temp) {
+                    PUSH_ALLOC(Context.TempAlloc) {
                         clone(&oldParams, it.Parameters);
                     }
                     free(it.Parameters);
