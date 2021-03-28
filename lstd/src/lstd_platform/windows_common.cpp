@@ -180,14 +180,11 @@ void *win64_persistent_alloc(allocator_mode mode, void *context, s64 size, void 
 }
 
 file_scope void create_persistent_alloc_block(s64 size) {
-    // We allocate the tlsf allocator data and the starting pool in one big block in order to reduce fragmentation.
-    void *block = os_allocate_block(sizeof(tlsf_allocator_data) + size);
-
-    auto *data = (tlsf_allocator_data *) block;
-    zero_memory(data, sizeof(tlsf_allocator_data));
+    // We allocate the arena allocator data and the starting pool in one big block in order to reduce fragmentation.
+    auto pools = to_stack_array(size);
+    auto [data, pool] = os_allocate_packed<tlsf_allocator_data>(pools);
     S->PersistentAlloc = {win64_persistent_alloc, data};
-
-    allocator_add_pool(S->PersistentAlloc, data + 1, size);
+    allocator_add_pool(S->PersistentAlloc, pool, size);
 }
 
 file_scope void init_allocators() {

@@ -196,3 +196,9 @@ int mtherr();
 
 /* Variable for error reporting.  See mtherr.c.  */
 extern int merror;
+
+// :WEMODIFIEDCEPHES: When building with MSVC in Release, some math functions are optimized away with intrinsics.
+// In that case we don't define them in the Cephes library.
+#if defined _MSC_VER && not defined NDEBUG
+#define INTRINSIC
+#endif

@@ -8,16 +8,18 @@ void *memset(void *ptr, int value, size_t n) { return LSTD_NAMESPACE::fill_memor
 void *memcpy(void *dest, const void *src, size_t n) { return LSTD_NAMESPACE::copy_memory(dest, src, n); }
 #pragma function(memmove)
 void *memmove(void *dest, const void *src, size_t n) { return LSTD_NAMESPACE::copy_memory(dest, src, n); }
-#pragma function(strlen)
+
+// If we are building with MSVC in Release, the compiler optimizes the following functions as instrinsics.
+// In that case we don't define them, because these are slow anyway. Similar thing happens with some math
+// functions in the Cephes library (search for :WEMODIFIEDCEPHES:)
+#if COMPILER == MSVC and not defined NDEBUG
 u64 strlen(const char *str) { return LSTD_NAMESPACE::c_string_length(str); }
 
-#pragma function(strcmp)
 int strcmp(const char *s1, const char *s2) {
     while (*s1 && (*s1 == *s2)) s1++, s2++;
     return *(const unsigned char *) s1 - *(const unsigned char *) s2;
 }
 
-#pragma function(memcmp)
 int memcmp(const void *ptr1, const void *ptr2, u64 n) {
     auto *s1 = (const char *) ptr1;
     auto *s2 = (const char *) ptr2;
@@ -27,22 +29,6 @@ int memcmp(const void *ptr1, const void *ptr2, u64 n) {
     return 0;
 }
 
-const char *strstr(const char *ss1, const char *ss2) {
-    auto s1 = LSTD_NAMESPACE::string(ss1);
-    auto s2 = LSTD_NAMESPACE::string(ss2);
-    auto r = LSTD_NAMESPACE::find_substring(s1, s2);
-    if (r == -1) return null;
-    return ss1 + r;
-}
-
-const char *strchr(const char *str, int character) {
-    auto s = LSTD_NAMESPACE::string(str);
-    auto r = LSTD_NAMESPACE::find_cp(s, character);
-    if (r == -1) return null;
-    return str + r;
-}
-
-#pragma function(strcpy)
 char *strcpy(char *destination, const char *source) {
     if (!destination) return null;
     char *ptr = destination;
@@ -56,7 +42,6 @@ char *strcpy(char *destination, const char *source) {
     return ptr;
 }
 
-#pragma function(memchr)
 const void *memchr(const void *ptr, int value, u64 n) {
     const unsigned char *src = (const unsigned char *) ptr;
     while (n-- > 0) {
@@ -67,7 +52,6 @@ const void *memchr(const void *ptr, int value, u64 n) {
     return NULL;
 }
 
-#if 0
 double fmod(double x, double y) {
     union {
         double f;
@@ -139,6 +123,21 @@ double fmod(double x, double y) {
     return ux.f;
 }
 #endif
+
+const char *strstr(const char *ss1, const char *ss2) {
+    auto s1 = LSTD_NAMESPACE::string(ss1);
+    auto s2 = LSTD_NAMESPACE::string(ss2);
+    auto r = LSTD_NAMESPACE::find_substring(s1, s2);
+    if (r == -1) return null;
+    return ss1 + r;
+}
+
+const char *strchr(const char *str, int character) {
+    auto s = LSTD_NAMESPACE::string(str);
+    auto r = LSTD_NAMESPACE::find_cp(s, character);
+    if (r == -1) return null;
+    return str + r;
+}
 
 int toupper(int c) { return LSTD_NAMESPACE::to_upper(c); }
 }
