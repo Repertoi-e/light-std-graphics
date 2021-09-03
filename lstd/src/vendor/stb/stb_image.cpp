@@ -1,4 +1,3 @@
-#include "lstd/internal/context.h"
 #include "lstd/memory/string.h"
 #include "lstd_graphics/graphics.h"
 
@@ -10,8 +9,11 @@
 #define STBI_FREE(ptr) LSTD_NAMESPACE::free(ptr)
 
 #define STBI_WINDOWS_UTF8
-// #define STBI_NO_STDIO 
+#define STBI_NO_STDIO 
 #define STBI_FAILURE_USERMSG
+#define STBI_NO_HDR
+
+#define abs LSTD_NAMESPACE::abs
 
 // The next 4 defines were added by us (we modified stb_image.h)
 #define STBI_MEMSET LSTD_NAMESPACE::fill_memory

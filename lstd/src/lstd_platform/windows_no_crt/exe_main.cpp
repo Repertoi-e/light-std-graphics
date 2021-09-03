@@ -1,25 +1,26 @@
-#include "lstd/internal/common.h"
+#include "lstd/common/common.h"
 
 #if defined LSTD_NO_CRT
 
 #include "common.h"
-#include "lstd/internal/context.h"
-#include "lstd/os.h"
-#include "lstd/types/windows.h"  // For definitions
+#include "lstd/common/context.h"
+#include "lstd/common/windows.h"  // For definitions
+
+import os;
 
 #if OS != WINDOWS
 #error LSTD_NO_CRT is Windows-only
 #endif
 
 // Define these as nullptr
-extern "C" _CRTALLOC(".CRT$XIA") _PIFV __xi_a[] = {nullptr};  // C initializers (first)
-extern "C" _CRTALLOC(".CRT$XIZ") _PIFV __xi_z[] = {nullptr};  // C initializers (last)
-extern "C" _CRTALLOC(".CRT$XCA") _PVFV __xc_a[] = {nullptr};  // C++ initializers (first)
-extern "C" _CRTALLOC(".CRT$XCZ") _PVFV __xc_z[] = {nullptr};  // C++ initializers (last)
-extern "C" _CRTALLOC(".CRT$XPA") _PVFV __xp_a[] = {nullptr};  // C pre-terminators (first)
-extern "C" _CRTALLOC(".CRT$XPZ") _PVFV __xp_z[] = {nullptr};  // C pre-terminators (last)
-extern "C" _CRTALLOC(".CRT$XTA") _PVFV __xt_a[] = {nullptr};  // C terminators (first)
-extern "C" _CRTALLOC(".CRT$XTZ") _PVFV __xt_z[] = {nullptr};  // C terminators (last)
+extern "C" _CRTALLOC(".CRT$XIA") _PIFV __xi_a[] = {nullptr}; // C initializers (first)
+extern "C" _CRTALLOC(".CRT$XIZ") _PIFV __xi_z[] = {nullptr}; // C initializers (last)
+extern "C" _CRTALLOC(".CRT$XCA") _PVFV __xc_a[] = {nullptr}; // C++ initializers (first)
+extern "C" _CRTALLOC(".CRT$XCZ") _PVFV __xc_z[] = {nullptr}; // C++ initializers (last)
+extern "C" _CRTALLOC(".CRT$XPA") _PVFV __xp_a[] = {nullptr}; // C pre-terminators (first)
+extern "C" _CRTALLOC(".CRT$XPZ") _PVFV __xp_z[] = {nullptr}; // C pre-terminators (last)
+extern "C" _CRTALLOC(".CRT$XTA") _PVFV __xt_a[] = {nullptr}; // C terminators (first)
+extern "C" _CRTALLOC(".CRT$XTZ") _PVFV __xt_z[] = {nullptr}; // C terminators (last)
 
 // Commented out the stuff we don't care about.
 // Turns out we commented the entire function.
@@ -139,22 +140,8 @@ extern "C" int main();
 extern "C" const PIMAGE_TLS_CALLBACK __dyn_tls_init_callback;
 
 LSTD_BEGIN_NAMESPACE
-extern void win64_common_init_global_state();
-extern void win64_common_init_context();
-extern void win64_crash_handler_init();
+void win64_crash_handler_init();
 LSTD_END_NAMESPACE
-
-// We need to reinit the context after the TLS initalizer fires and resets our state.. sigh.
-// We can't just do it once because global variables might still use the context and TLS fires a bit later.
-s32 tls_init() {
-    LSTD_NAMESPACE::win64_common_init_context();
-    return 0;
-}
-
-#pragma const_seg(".CRT$XDU")
-__declspec(allocate(".CRT$XDU")) _PIFV g_TLSInit = tls_init;
-#pragma const_seg()
-
 
 //
 // Entry point for executables
@@ -166,14 +153,15 @@ __declspec(allocate(".CRT$XDU")) _PIFV g_TLSInit = tls_init;
 extern "C" void main_no_crt() {
     // This initializaton is similar to the CRT initialization that happens before calling the user main function.
     // Actually these happen before calling any C/C++ initialization functions/constructors,
-    // because the user code might want to use stuff from the library in e.g. a constructor of a global variable.
+    // because the user code might want to use stuff from the library in e.g. in a constructor of a global variable.
     // Basically all this stuff needs to work before ANY actual programmer code is run.
     //
-    // We can put these in the beginning of the linker tables (CRT does this), but why bother?
-    // This also needs to happen for DLLs.
-    //
-    LSTD_NAMESPACE::win64_common_init_context();  // This prepares the global thread-local immutable Context variable (see "lstd/internal/context.h")
-    LSTD_NAMESPACE::win64_common_init_global_state();
+    // When we link with the CRT (and don't compile all this stub code) we put these in the in linker tables. 
+    // See e.g. windows_common.cpp
+
+    // :PlatformStateInit
+    LSTD_NAMESPACE::internal::platform_init_context(); // This prepares the global thread-local immutable Context variable (see "lstd/common/context.h")
+    LSTD_NAMESPACE::internal::platform_init_global_state();
     LSTD_NAMESPACE::win64_crash_handler_init();
 
     // These call the tables that the linker has filled with initialization routines for global variables
@@ -184,7 +172,7 @@ extern "C" void main_no_crt() {
     lstd_initterm(__xc_a, __xc_z);
 
     // Defined in tls.cpp.
-    extern bool __cdecl __scrt_is_nonwritable_in_current_image(void const *const target);
+    extern bool __cdecl __scrt_is_nonwritable_in_current_image(void const *target);
 
     // * If this module has any dynamically initialized __declspec(thread) (thread local) variables,
     // * then we invoke their initialization for the primary thread used to start the process:
@@ -205,9 +193,9 @@ extern "C" void main_no_crt() {
     // if (!__scrt_is_managed_app())
     //     exit(main_result);
 
-    // os_exit does any uninitting we need to do.
-    // os_exit also calls functions scheduled with exit_schedule.
-    LSTD_NAMESPACE::os_exit(mainResult);
+    // exit does any uninitting we need to do.
+    // exit also calls functions scheduled with exit_schedule.
+    LSTD_NAMESPACE::exit(mainResult);
 }
 
 #endif

@@ -4,7 +4,6 @@
 #include "lstd/memory/array.h"
 #include "lstd/memory/signal.h"
 #include "lstd/memory/string.h"
-#include "lstd/os.h"
 
 LSTD_BEGIN_NAMESPACE
 

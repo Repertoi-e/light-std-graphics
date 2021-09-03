@@ -1,4 +1,7 @@
-#include "lstd/os.h"
+#include "lstd/common/namespace.h"
+#include "lstd/common/debug_break.h"
+
+import os;
 
 // The DECLARE_ALTERNATE_NAME macro provides an architecture-neutral way
 // of specifying /alternatename comments to the linker.  It prepends the leading
@@ -12,7 +15,7 @@
 // and the programmer forgot their entry point.
 extern "C" int main_stub(int argc, char *argv[]) {
     debug_break();
-    (void) ("Did you forget to add an entry point to your program?");
+    (void) "Did you forget to add an entry point to your program?";
     return 666;
 }
 
@@ -20,7 +23,7 @@ DECLARE_ALTERNATE_NAME_DATA(main, main_stub)
 
 extern "C" int __cdecl _purecall() {
     debug_break();
-    LSTD_NAMESPACE::os_abort();
+    LSTD_NAMESPACE::abort();
     return 0;
 }
 

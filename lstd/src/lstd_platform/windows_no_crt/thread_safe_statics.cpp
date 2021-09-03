@@ -7,19 +7,20 @@
 //
 
 #include "common.h"
-#include "lstd/os.h"
-#include "lstd/types/windows.h"
+#include "lstd/common/windows.h"
 
-static DWORD const xp_timeout = 100;  // ms
-static int const uninitialized = 0;
+import os;
+
+static DWORD const xp_timeout      = 100; // ms
+static int const uninitialized     = 0;
 static int const being_initialized = -1;
-static int const epoch_start = S32_MIN;
+static int const epoch_start       = S32_MIN;
 
 // Access to these variables is guarded in the below functions.  They may only
 // be modified while the lock is held.  _Tss_epoch is readable from user
 // code and is read without taking the lock.
 extern "C" {
-int _Init_global_epoch = epoch_start;
+int _Init_global_epoch                    = epoch_start;
 __declspec(thread) int _Init_thread_epoch = epoch_start;
 }
 
@@ -62,7 +63,7 @@ static void __cdecl __scrt_initialize_thread_safe_statics_platform_specific() no
 
     if (kernel_dll == nullptr) {
         // __scrt_fastfail(FAST_FAIL_FATAL_APP_EXIT);
-        LSTD_NAMESPACE::os_exit(-1);
+        LSTD_NAMESPACE::exit(-1);
     }
 
 #define GET_PROC_ADDRESS(m, f) reinterpret_cast<decltype(f) *>(GetProcAddress(m, _CRT_STRINGIZE(f)))
@@ -79,7 +80,7 @@ static void __cdecl __scrt_initialize_thread_safe_statics_platform_specific() no
         g_tss_event = CreateEventW(NULL, 1, 0, NULL);
         if (g_tss_event == nullptr) {
             // __scrt_fastfail(FAST_FAIL_FATAL_APP_EXIT);
-            LSTD_NAMESPACE::os_exit(-1);
+            LSTD_NAMESPACE::exit(-1);
         }
     }
 }
@@ -213,7 +214,7 @@ extern "C" void __cdecl _Init_thread_abort(int *const pOnce) noexcept {
 extern "C" void __cdecl _Init_thread_footer(int *const pOnce) noexcept {
     _Init_thread_lock();
     ++_Init_global_epoch;
-    *pOnce = _Init_global_epoch;
+    *pOnce             = _Init_global_epoch;
     _Init_thread_epoch = _Init_global_epoch;
     _Init_thread_unlock();
     _Init_thread_notify();

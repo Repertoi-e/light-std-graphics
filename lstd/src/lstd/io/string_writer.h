@@ -9,13 +9,14 @@ LSTD_BEGIN_NAMESPACE
 struct string_builder_writer : writer {
     string_builder Builder;
 
-    string_builder_writer() {}
+    string_builder_writer() {
+    }
 
     void write(const byte *data, s64 size) override {
         //
         // @Robustness: Optional utf8 validation would be good here?
         //
-        append_pointer_and_size(Builder, (const utf8 *) data, size);
+        string_append(Builder, (const utf8 *) data, size);
     }
 };
 

@@ -1,23 +1,25 @@
-#include "lstd/internal/common.h"
+#include "lstd/common/common.h"
 
 #if OS == WINDOWS
 
+#include "lstd/common/windows.h"
 #include "lstd/fmt/fmt.h"
-#include "lstd/types/windows.h"
 #include "lstd_graphics/video/monitor.h"
 #include "lstd_graphics/video/window.h"
 
+import os;
+
 #ifndef DPI_ENUMS_DECLARED
 typedef enum {
-    PROCESS_DPI_UNAWARE = 0,
-    PROCESS_SYSTEM_DPI_AWARE = 1,
+    PROCESS_DPI_UNAWARE           = 0,
+    PROCESS_SYSTEM_DPI_AWARE      = 1,
     PROCESS_PER_MONITOR_DPI_AWARE = 2
 } PROCESS_DPI_AWARENESS;
 typedef enum {
     MDT_EFFECTIVE_DPI = 0,
-    MDT_ANGULAR_DPI = 1,
-    MDT_RAW_DPI = 2,
-    MDT_DEFAULT = MDT_EFFECTIVE_DPI
+    MDT_ANGULAR_DPI   = 1,
+    MDT_RAW_DPI       = 2,
+    MDT_DEFAULT       = MDT_EFFECTIVE_DPI
 } MONITOR_DPI_TYPE;
 #endif
 
@@ -50,19 +52,19 @@ struct {
 
 BOOL is_windows_version_or_greater(WORD major, WORD minor, WORD sp) {
     OSVERSIONINFOEXW osvi = {sizeof(osvi), major, minor, 0, 0, {0}, sp};
-    DWORD mask = VER_MAJORVERSION | VER_MINORVERSION | VER_SERVICEPACKMAJOR;
-    ULONGLONG cond = VerSetConditionMask(0, VER_MAJORVERSION, VER_GREATER_EQUAL);
-    cond = VerSetConditionMask(cond, VER_MINORVERSION, VER_GREATER_EQUAL);
-    cond = VerSetConditionMask(cond, VER_SERVICEPACKMAJOR, VER_GREATER_EQUAL);
+    DWORD mask            = VER_MAJORVERSION | VER_MINORVERSION | VER_SERVICEPACKMAJOR;
+    ULONGLONG cond        = VerSetConditionMask(0, VER_MAJORVERSION, VER_GREATER_EQUAL);
+    cond                  = VerSetConditionMask(cond, VER_MINORVERSION, VER_GREATER_EQUAL);
+    cond                  = VerSetConditionMask(cond, VER_SERVICEPACKMAJOR, VER_GREATER_EQUAL);
     return RtlVerifyVersionInfo(&osvi, mask, cond) == 0;
 }
 
 BOOL is_windows_10_build_or_greater(WORD build) {
     OSVERSIONINFOEXW osvi = {sizeof(osvi), 10, 0, build};
-    DWORD mask = VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER;
-    ULONGLONG cond = VerSetConditionMask(0, VER_MAJORVERSION, VER_GREATER_EQUAL);
-    cond = VerSetConditionMask(cond, VER_MINORVERSION, VER_GREATER_EQUAL);
-    cond = VerSetConditionMask(cond, VER_BUILDNUMBER, VER_GREATER_EQUAL);
+    DWORD mask            = VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER;
+    ULONGLONG cond        = VerSetConditionMask(0, VER_MAJORVERSION, VER_GREATER_EQUAL);
+    cond                  = VerSetConditionMask(cond, VER_MINORVERSION, VER_GREATER_EQUAL);
+    cond                  = VerSetConditionMask(cond, VER_BUILDNUMBER, VER_GREATER_EQUAL);
     return RtlVerifyVersionInfo(&osvi, mask, cond) == 0;
 }
 
@@ -77,8 +79,6 @@ file_scope array<monitor *> Monitors;
 file_scope DWORD ForegroundLockTimeout;
 
 void win64_poll_monitors();
-
-allocator win64_get_persistent_allocator();
 
 void win64_monitor_uninit() {
     g_MonitorEvent.release();
@@ -106,7 +106,7 @@ void win64_monitor_init() {
     shcore.hInstance = LoadLibraryW(L"shcore.dll");
     if (shcore.hInstance) {
         shcore.SetProcessDpiAwareness_ = (PFN_SetProcessDpiAwareness) GetProcAddress(shcore.hInstance, "SetProcessDpiAwareness");
-        shcore.GetDpiForMonitor_ = (PFN_GetDpiForMonitor) GetProcAddress(shcore.hInstance, "GetDpiForMonitor");
+        shcore.GetDpiForMonitor_       = (PFN_GetDpiForMonitor) GetProcAddress(shcore.hInstance, "GetDpiForMonitor");
     }
 
     ntdll.hInstance = LoadLibraryW(L"ntdll.dll");
@@ -123,8 +123,6 @@ void win64_monitor_init() {
     }
 }
 
-string utf16_to_utf8(const utf16 *str, allocator alloc);
-
 file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *display) {
     DEVMODEW dm;
     zero_memory(&dm, sizeof(dm));
@@ -137,21 +135,21 @@ file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *di
 
     s32 widthMM, heightMM;
     if (IS_WINDOWS_8_POINT_1_OR_GREATER()) {
-        widthMM = GetDeviceCaps(dc, HORZSIZE);
+        widthMM  = GetDeviceCaps(dc, HORZSIZE);
         heightMM = GetDeviceCaps(dc, VERTSIZE);
     } else {
-        widthMM = (s32)(dm.dmPelsWidth * 25.4f / GetDeviceCaps(dc, LOGPIXELSX));
-        heightMM = (s32)(dm.dmPelsHeight * 25.4f / GetDeviceCaps(dc, LOGPIXELSY));
+        widthMM  = (s32) (dm.dmPelsWidth * 25.4f / GetDeviceCaps(dc, LOGPIXELSX));
+        heightMM = (s32) (dm.dmPelsHeight * 25.4f / GetDeviceCaps(dc, LOGPIXELSY));
     }
 
-    auto *mon = allocate<monitor>({.Alloc = win64_get_persistent_allocator()});
-    mon->WidthMM = widthMM;
+    auto *mon     = allocate<monitor>({.Alloc = internal::platform_get_persistent_allocator()});
+    mon->WidthMM  = widthMM;
     mon->HeightMM = heightMM;
 
     wchar_t *name = adapter->DeviceString;
     if (display) name = display->DeviceString;
 
-    mon->Name = utf16_to_utf8(name, win64_get_persistent_allocator());
+    mon->Name = internal::platform_utf16_to_utf8(name, internal::platform_get_persistent_allocator());
 
     if (adapter->StateFlags & DISPLAY_DEVICE_MODESPRUNED) mon->PlatformData.Win32.ModesPruned = true;
 
@@ -166,14 +164,13 @@ file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *di
     auto dmPosition = dm.DUMMYUNIONNAME.dmPosition;  // What's up with this?
 
     RECT rect;
-    rect.left = dmPosition.x;
-    rect.top = dmPosition.y;
-    rect.right = dmPosition.x + dm.dmPelsWidth;
+    rect.left   = dmPosition.x;
+    rect.top    = dmPosition.y;
+    rect.right  = dmPosition.x + dm.dmPelsWidth;
     rect.bottom = dmPosition.y + dm.dmPelsHeight;
 
     EnumDisplayMonitors(
-        null, &rect,
-        [](HMONITOR handle, HDC dc, RECT *rect, LPARAM data) {
+        null, &rect, [](HMONITOR handle, HDC dc, RECT *rect, LPARAM data) {
             MONITORINFOEXW mi;
             zero_memory(&mi, sizeof(mi));
             mi.cbSize = sizeof(mi);
@@ -194,12 +191,12 @@ file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *di
 
 file_scope void do_monitor_event(monitor *mon, monitor_event::action action, bool insertLast) {
     if (action == monitor_event::CONNECTED) {
-        PUSH_ALLOC(win64_get_persistent_allocator()) {
-            insert(Monitors, insertLast ? Monitors.Count : 0, mon);
+        PUSH_ALLOC(internal::platform_get_persistent_allocator()) {
+            array_insert_at(Monitors, insertLast ? Monitors.Count : 0, mon);
         }
     } else {
-        remove_at_index(Monitors, find(Monitors, mon));
-        
+        array_remove_at(Monitors, find(Monitors, mon));
+
         free(mon->Name);
         free(mon->DisplayModes);
         free(mon);
@@ -214,7 +211,7 @@ file_scope void split_bpp(s32 bpp, s32 *red, s32 *green, s32 *blue) {
     if (bpp == 32) bpp = 24;
 
     *red = *green = *blue = bpp / 3;
-    delta = bpp - (*red * 3);
+    delta                 = bpp - (*red * 3);
     if (delta >= 1) *green = *green + 1;
     if (delta == 2) *red = *red + 1;
 }
@@ -227,7 +224,7 @@ display_mode os_get_current_display_mode(monitor *mon) {
     EnumDisplaySettingsW(mon->PlatformData.Win32.AdapterName, ENUM_CURRENT_SETTINGS, &dm);
 
     display_mode mode;
-    mode.Width = dm.dmPelsWidth;
+    mode.Width  = dm.dmPelsWidth;
     mode.Height = dm.dmPelsHeight;
 
     mode.RefreshRate = dm.dmDisplayFrequency;
@@ -237,8 +234,8 @@ display_mode os_get_current_display_mode(monitor *mon) {
 
 // Chooses the video mode most closely matching the desired one
 file_scope display_mode choose_video_mode(monitor *mon, display_mode desired) {
-    u32 sizeDiff, leastSizeDiff = numeric_info<u32>::max();
-    u32 rateDiff, leastRateDiff = numeric_info<u32>::max();
+    u32 sizeDiff, leastSizeDiff   = numeric_info<u32>::max();
+    u32 rateDiff, leastRateDiff   = numeric_info<u32>::max();
     u32 colorDiff, leastColorDiff = numeric_info<u32>::max();
 
     assert(mon->DisplayModes.Count);
@@ -262,9 +259,9 @@ file_scope display_mode choose_video_mode(monitor *mon, display_mode desired) {
 
         if ((colorDiff < leastColorDiff) || (colorDiff == leastColorDiff && sizeDiff < leastSizeDiff) ||
             (colorDiff == leastColorDiff && sizeDiff == leastSizeDiff && rateDiff < leastRateDiff)) {
-            closest = it;
-            leastSizeDiff = sizeDiff;
-            leastRateDiff = rateDiff;
+            closest        = it;
+            leastSizeDiff  = sizeDiff;
+            leastRateDiff  = rateDiff;
             leastColorDiff = colorDiff;
         }
     }
@@ -278,8 +275,6 @@ rect os_get_work_area(monitor *mon) {
     return {mi.rcWork.left, mi.rcWork.top, mi.rcWork.right - mi.rcWork.left, mi.rcWork.bottom - mi.rcWork.top};
 }
 
-void platform_report_error(string, source_location loc = source_location::current());
-
 bool os_set_display_mode(monitor *mon, display_mode desired) {
     display_mode best = choose_video_mode(mon, desired);
     if (os_get_current_display_mode(mon) == best) return true;
@@ -287,9 +282,9 @@ bool os_set_display_mode(monitor *mon, display_mode desired) {
     DEVMODEW dm;
     zero_memory(&dm, sizeof(dm));
     {
-        dm.dmSize = sizeof(dm);
-        dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL | DM_DISPLAYFREQUENCY;
-        dm.dmPelsWidth = best.Width;
+        dm.dmSize       = sizeof(dm);
+        dm.dmFields     = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL | DM_DISPLAYFREQUENCY;
+        dm.dmPelsWidth  = best.Width;
         dm.dmPelsHeight = best.Height;
         dm.dmBitsPerPel = best.RedBits + best.GreenBits + best.BlueBits;
         if (dm.dmBitsPerPel < 15 || dm.dmBitsPerPel >= 24) dm.dmBitsPerPel = 32;
@@ -308,7 +303,7 @@ bool os_set_display_mode(monitor *mon, display_mode desired) {
         if (result == DISP_CHANGE_NOTUPDATED) description = "Failed to write to registry";
         if (result == DISP_CHANGE_RESTART) description = "Computer restart required";
 
-        platform_report_error(sprint("Failed to set video mode: {!YELLOW}{}{!}", description));
+        internal::platform_report_error(sprint("Failed to set video mode: {!YELLOW}{}{!}", description));
         return false;
     }
 
@@ -338,8 +333,8 @@ file_scope void get_display_modes(array<display_mode> &modes, monitor *mon) {
         if (dm.dmBitsPerPel < 15) continue;
 
         display_mode mode;
-        mode.Width = dm.dmPelsWidth;
-        mode.Height = dm.dmPelsHeight;
+        mode.Width       = dm.dmPelsWidth;
+        mode.Height      = dm.dmPelsHeight;
         mode.RefreshRate = dm.dmDisplayFrequency;
         split_bpp(dm.dmBitsPerPel, &mode.RedBits, &mode.GreenBits, &mode.BlueBits);
 
@@ -359,19 +354,19 @@ file_scope void get_display_modes(array<display_mode> &modes, monitor *mon) {
                 continue;
             }
         }
-        append(modes, mode);
+        array_append(modes, mode);
     }
 
     if (!modes.Count) {
         // Hack: Report the current mode if no valid modes were found
-        append(modes, os_get_current_display_mode(mon));
+        array_append(modes, os_get_current_display_mode(mon));
     }
 }
 
 // Poll for changes in the set of connected monitors
 void win64_poll_monitors() {
     array<monitor *> disconnected;
-    PUSH_ALLOC(win64_get_persistent_allocator()) {
+    PUSH_ALLOC(internal::platform_get_persistent_allocator()) {
         clone(&disconnected, Monitors);
     }
     defer(free(disconnected));
@@ -400,7 +395,7 @@ void win64_poll_monitors() {
                 auto *it = disconnected[index];
                 if (it && compare_c_string(it->PlatformData.Win32.DisplayName, display.DeviceName) == -1) {
                     disconnected[index] = null;
-                    toContinue = true;
+                    toContinue          = true;
                     break;
                 }
             }
@@ -418,7 +413,7 @@ void win64_poll_monitors() {
                 auto *it = disconnected[index];
                 if (it && compare_c_string(it->PlatformData.Win32.AdapterName, adapter.DeviceName) == -1) {
                     disconnected[index] = null;
-                    toContinue = true;
+                    toContinue          = true;
                     break;
                 }
             }
@@ -433,10 +428,10 @@ void win64_poll_monitors() {
     }
 
     For(Monitors) {
-        PUSH_ALLOC(win64_get_persistent_allocator()) {
+        PUSH_ALLOC(internal::platform_get_persistent_allocator()) {
             get_display_modes(it->DisplayModes, it);
         }
-        quick_sort(it->DisplayModes.Data, it->DisplayModes.Data + it->DisplayModes.Count - 1);
+        quick_sort(it->DisplayModes.Data, it->DisplayModes.Count);
     }
 }
 
@@ -478,8 +473,8 @@ v2 os_get_monitor_content_scale(monitor *mon) {
         GetDpiForMonitor(handle, MDT_EFFECTIVE_DPI, &xdpi, &ydpi);
     } else {
         const HDC dc = GetDC(null);
-        xdpi = GetDeviceCaps(dc, LOGPIXELSX);
-        ydpi = GetDeviceCaps(dc, LOGPIXELSY);
+        xdpi         = GetDeviceCaps(dc, LOGPIXELSX);
+        ydpi         = GetDeviceCaps(dc, LOGPIXELSY);
         ReleaseDC(null, dc);
     }
     return {xdpi / (f32) USER_DEFAULT_SCREEN_DPI, ydpi / (f32) USER_DEFAULT_SCREEN_DPI};

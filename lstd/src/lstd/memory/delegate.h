@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../internal/common.h"
+#include "../common/common.h"
 #include "array_like.h"
 
 //
@@ -42,7 +42,7 @@ struct delegate;
 // which means that the variable needs to outlive the delegate. 
 //
 // e.g.
-//     auto appender = [&](const string &str) { append_string(*dest, str); };
+//     auto appender = [&](const string &str) { string_append(*dest, str); };
 //     traverse(src, &appender);
 //
 // Where traverse just takes a delegate:
@@ -55,7 +55,7 @@ struct delegate;
 // Remember to update this!
 //
 template <typename R, typename... A>
-struct delegate<R(A...)> {
+struct delegate<R(A ...)> {
     using stub_t = R (*)(void *, A &&...);
     using return_t = R;
 
@@ -65,12 +65,9 @@ struct delegate<R(A...)> {
         Signature FunctionPtr;
     };
 
-    struct default_type_;                                          // Unknown default type (undefined)
-    using default_function = void (default_type_::*)(void);        // Unknown default function (undefined)
-    using default_type = target<default_type_, default_function>;  // Default target type
-
-    // :CodeReusability: Automatically generates ==, !=, <, <=, >, >=, compare_*, find_*, has functions etc.. take a look at "array_like.h"
-    static constexpr bool IS_ARRAY_LIKE = true;
+    struct default_type_;                                         // Unknown default type (undefined)
+    using default_function = void (default_type_::*)(void);       // Unknown default function (undefined)
+    using default_type = target<default_type_, default_function>; // Default target type
 
     static constexpr s64 Count = sizeof(default_type);
 
@@ -80,52 +77,53 @@ struct delegate<R(A...)> {
     // Invoke static method / free function
     template <null_t, typename Signature>
     static R invoke(void *data, A &&... args) {
-        return (*reinterpret_cast<const target<null_t, Signature> *>(data)->FunctionPtr)((A &&)(args)...);
+        return (*reinterpret_cast<const target<null_t, Signature> *>(data)->FunctionPtr)((A &&) args...);
     }
 
     // Invoke method
     template <typename Type, typename Signature>
     static R invoke(void *data, A &&... args) {
-        return (reinterpret_cast<const target<Type, Signature> *>(data)->InstancePtr->*reinterpret_cast<const target<Type, Signature> *>(data)->FunctionPtr)((A &&)(args)...);
+        return (reinterpret_cast<const target<Type, Signature> *>(data)->InstancePtr->*reinterpret_cast<const target<Type, Signature> *>(data)->FunctionPtr)((A &&) args...);
     }
 
     // Invoke function object (functor)
     template <typename Type, null_t>
     static R invoke(void *data, A &&... args) {
-        return (*reinterpret_cast<const target<Type, null_t> *>(data)->InstancePtr)((A &&)(args)...);
+        return (*reinterpret_cast<const target<Type, null_t> *>(data)->InstancePtr)((A &&) args...);
     }
 
-    delegate() {}
+    delegate() {
+    }
 
     // Construct from null
-    delegate(null_t) {}
+    delegate (null_t){}
 
     // Construct delegate with static method / free function
-    delegate(R (*function)(A...)) {
+    delegate(R (*function)(A ...)) {
         using Signature = decltype(function);
 
-        auto storage = (target<null_t, Signature> *) &Data[0];
+        auto storage         = (target<null_t, Signature> *) &Data[0];
         storage->InstancePtr = null;
         storage->FunctionPtr = function;
-        Invoker = &delegate::invoke<null, Signature>;
+        Invoker              = &delegate::template invoke<null, Signature>;
     }
 
     // Construct delegate with method
     template <typename Type, typename Signature>
     delegate(Type *object, Signature method) {
-        auto storage = (target<Type, Signature> *) &Data[0];
+        auto storage         = (target<Type, Signature> *) &Data[0];
         storage->InstancePtr = object;
         storage->FunctionPtr = method;
-        Invoker = &delegate::invoke<Type, Signature>;
+        Invoker              = &delegate::template invoke<Type, Signature>;
     }
 
     // Construct delegate with function object (functor) / lambda
     template <typename Type>
     delegate(Type *functor) {
-        auto storage = (target<Type, null_t> *) &Data[0];
+        auto storage         = (target<Type, null_t> *) &Data[0];
         storage->InstancePtr = functor;
         storage->FunctionPtr = null;
-        Invoker = &delegate::invoke<Type, null>;
+        Invoker              = &delegate::template invoke<Type, null>;
     }
 
     // Assign null pointer
@@ -141,8 +139,8 @@ struct delegate<R(A...)> {
     operator bool() const { return Invoker; }
 
     // Calls the delegate
-    R operator()(A... args) const {
-        return (*Invoker)((void *) &Data[0], (A &&)(args)...);
+    R operator()(A ... args) const {
+        return (*Invoker)((void *) &Data[0], (A &&) args...);
     }
 };
 

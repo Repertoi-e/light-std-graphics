@@ -1,14 +1,17 @@
-#include "lstd/internal/common.h"
+#include "lstd/common/common.h"
 
 #if OS == WINDOWS
 
-#include "lstd/fmt/fmt.h"
-#include "lstd/os.h"
-#include "lstd_graphics/graphics/api.h"
-#include "lstd_graphics/graphics/shader.h"
+#define LSTD_JUST_DX
+#include "lstd/common/windows.h"
+#undef LSTD_JUST_DX
 
 #include <d3d11.h>
 #include <d3dcompiler.h>
+
+#include "lstd/fmt/fmt.h"
+#include "lstd_graphics/graphics/api.h"
+#include "lstd_graphics/graphics/shader.h"
 
 LSTD_BEGIN_NAMESPACE
 
@@ -26,13 +29,13 @@ static ID3DBlob *compile_shader(const string &source, const char *profile, const
 static gtype string_to_gtype(const string &type) {
     s64 digit = find_any_of(type, "0123456789");
     if (digit != -1) {
-        s64 x = find(type, 'x');
+        s64 x             = find(type, 'x');
         string scalarType = substring(type, 0, digit);
-        s64 offset = (type[digit] - '0' - 1) * 4 + (x == -1 ? 0 : type[x + 1] - '0' - 1);
-        if (scalarType == "bool") return (gtype)((u32) gtype::BOOL_1x1 + offset);
-        if (scalarType == "int" || scalarType == "int32") return (gtype)((u32) gtype::S32_1x1 + offset);
-        if (scalarType == "uint" || scalarType == "uint32" || scalarType == "dword") return (gtype)((u32) gtype::U32_1x1 + offset);
-        if (scalarType == "float") return (gtype)((u32) gtype::F32_1x1 + offset);
+        s64 offset        = (type[digit] - '0' - 1) * 4 + (x == -1 ? 0 : type[x + 1] - '0' - 1);
+        if (scalarType == "bool") return (gtype) ((u32) gtype::BOOL_1x1 + offset);
+        if (scalarType == "int" || scalarType == "int32") return (gtype) ((u32) gtype::S32_1x1 + offset);
+        if (scalarType == "uint" || scalarType == "uint32" || scalarType == "dword") return (gtype) ((u32) gtype::U32_1x1 + offset);
+        if (scalarType == "float") return (gtype) ((u32) gtype::F32_1x1 + offset);
     } else {
         if (type == "bool") return gtype::BOOL;
         if (type == "int" || type == "int32") return gtype::S32;

@@ -1,7 +1,6 @@
 #pragma once
 
-#include "../internal/common.h"
-#include "../types/sequence.h"
+#include "../types.h"
 #include "array_like.h"
 #include "string_utils.h"
 
@@ -23,10 +22,9 @@ constexpr T *quick_sort_partition(T *first, T *last, T *pivot, quick_sort_compar
         if (func(first, last) > 0) {
             swap(*pivot, *first);
             return first;
-        } else {
-            swap(*first, *last);
-            ++first;
         }
+        swap(*first, *last);
+        ++first;
     }
 }
 
@@ -41,14 +39,19 @@ template <typename T>
 constexpr void quick_sort(T *first, T *last, quick_sort_comparison_func<T> func = default_comparison<T>) {
     if (first >= last) return;
 
-    auto *pivot = first + (last - first) / 2;
+    auto *pivot     = first + (last - first) / 2;
     auto *nextPivot = quick_sort_partition(first, last, pivot, func);
     quick_sort(first, nextPivot, func);
     quick_sort(nextPivot + 1, last, func);
 }
 
 template <typename T>
-struct array_view;
+constexpr void quick_sort(T *first, s64 count, quick_sort_comparison_func<T> func = default_comparison<T>) {
+    quick_sort(first, first + count - 1, func);
+}
+
+template <typename T>
+struct array;
 
 //
 // A wrapper around T arr[..] which makes it easier to pass around and work with.
@@ -69,13 +72,13 @@ struct array_view;
 // }
 //
 // Different from array<T>, because the latter supports dynamic resizing.
-// This object contains no other member than T Data[N], _Count_ is a static member for the given type and doesn't take space.
+// This object contains no other member than T Data[N], _Count_ is a static member for the given type and doesn't take space,
+// which means that sizeof(stack_array<T, N>) == sizeof(T) * N.
+//
+// :CodeReusability: This is considered array_like (take a look at array_like.h)
 template <typename T_, s64 N>
 struct stack_array {
     using T = T_;
-
-    // :CodeReusability: Automatically generates ==, !=, <, <=, >, >=, compare_*, find_*, has functions etc.. take a look at "array_like.h"
-    static constexpr bool IS_ARRAY_LIKE = true;
 
     T Data[N ? N : 1];
     static constexpr s64 Count = N;
@@ -94,7 +97,7 @@ struct stack_array {
     //
     // Operators:
     //
-    operator array_view<T>() const;
+    operator array<T>() const;
 
     constexpr T &operator[](s64 index) { return Data[translate_index(index, Count)]; }
     constexpr const T &operator[](s64 index) const { return Data[translate_index(index, Count)]; }
@@ -105,18 +108,20 @@ template <typename D, typename...>
 struct return_type_helper {
     using type = D;
 };
+
 template <typename... Types>
-struct return_type_helper<void, Types...> : types::common_type<Types...> {};
+struct return_type_helper<void, Types...> : types::common_type<Types...> {
+};
 
 template <class T, s64 N, s64... I>
-constexpr stack_array<types::remove_cv_t<T>, N> to_array_impl(T (&a)[N], integer_sequence<I...>) {
+constexpr stack_array<types::remove_cv_t<T>, N> to_array_impl(T(&a)[N], integer_sequence<I...>) {
     return {{a[I]...}};
 }
-}  // namespace internal
+} // namespace internal
 
 template <typename D = void, class... Types>
 constexpr stack_array<typename internal::return_type_helper<D, Types...>::type, sizeof...(Types)> to_stack_array(Types &&...t) {
-    return {(Types &&)(t)...};
+    return {(Types &&) t...};
 }
 
 template <typename T, s64 N>

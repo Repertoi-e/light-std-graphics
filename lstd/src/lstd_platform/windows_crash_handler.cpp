@@ -1,20 +1,19 @@
-#include "lstd/internal/common.h"
+#include "lstd/common/common.h"
 
 #if OS == WINDOWS
-#include "lstd/internal/os_function_call.h"
+#include "lstd/common/os_function_call.h"
 #include "lstd/io.h"
 #include "lstd/memory/hash_table.h"
-#include "lstd/os.h"
-#include "lstd/types/windows.h"
+#include "lstd/common/windows.h"  // Declarations of Win32 functions
 
 import fmt;
+import os;
 
 LSTD_BEGIN_NAMESPACE
 
 #define CALLSTACK_DEPTH 6
 
 file_scope DWORD MachineType;
-file_scope hash_table<DWORD, const char *> CodeDescs;
 
 // @TODO: Factor the stack walking part of this function into a os_get_call_stack() which can be used anywhere in the program.
 
@@ -31,12 +30,12 @@ file_scope LONG exception_filter(LPEXCEPTION_POINTERS e) {
     STACKFRAME64 sf;
     fill_memory(&sf, 0, sizeof(STACKFRAME64));
 
-    sf.AddrPC.Offset = c->Rip;
+    sf.AddrPC.Offset    = c->Rip;
     sf.AddrStack.Offset = c->Rsp;
     sf.AddrFrame.Offset = c->Rbp;
-    sf.AddrPC.Mode = AddrModeFlat;
-    sf.AddrStack.Mode = AddrModeFlat;
-    sf.AddrFrame.Mode = AddrModeFlat;
+    sf.AddrPC.Mode      = AddrModeFlat;
+    sf.AddrStack.Mode   = AddrModeFlat;
+    sf.AddrFrame.Mode   = AddrModeFlat;
 
     array<os_function_call> callStack;
 
@@ -46,15 +45,15 @@ file_scope LONG exception_filter(LPEXCEPTION_POINTERS e) {
         constexpr auto s = (sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR) + sizeof(ULONG64) - 1) / sizeof(ULONG64);
         ULONG64 symbolBuffer[s];
 
-        PSYMBOL_INFO symbol = (PSYMBOL_INFO) symbolBuffer;
+        PSYMBOL_INFO symbol  = (PSYMBOL_INFO) symbolBuffer;
         symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
-        symbol->MaxNameLen = MAX_SYM_NAME;
+        symbol->MaxNameLen   = MAX_SYM_NAME;
 
         os_function_call call;
 
         DWORD64 symDisplacement = 0;
         if (SymFromAddr(hProcess, sf.AddrPC.Offset, &symDisplacement, symbol)) {
-            clone(&call.Name, string(symbol->Name));
+            call.Name = string(symbol->Name);
             if (call.Name.Length == 0) {
                 free(call.Name);
                 call.Name = "UnknownFunction";
@@ -65,7 +64,7 @@ file_scope LONG exception_filter(LPEXCEPTION_POINTERS e) {
 
         DWORD lineDisplacement = 0;
         if (SymGetLineFromAddrW64(hProcess, sf.AddrPC.Offset, &lineDisplacement, &lineInfo)) {
-            clone(&call.File, string(lineInfo.FileName));
+            call.File = internal::platform_utf16_to_utf8(lineInfo.FileName, internal::platform_get_persistent_allocator());
             if (call.File.Length == 0) {
                 free(call.File);
                 call.File = "UnknownFile";
@@ -73,12 +72,63 @@ file_scope LONG exception_filter(LPEXCEPTION_POINTERS e) {
             call.LineNumber = lineInfo.LineNumber;
         }
 
-        append(callStack, call);
+        array_append(callStack, call);
     }
 
-    auto desc = find(CodeDescs, exceptionCode).Value;
+#define CODE_DESCR(code) \
+    if (exceptionCode = code) desc = #code
 
-    string message = sprint("{} ({:#x})", desc ? *desc : "Unknown exception", exceptionCode);
+    const char *desc = null;
+
+    CODE_DESCR(EXCEPTION_ACCESS_VIOLATION);
+    else
+        CODE_DESCR(EXCEPTION_ACCESS_VIOLATION);
+        else
+            CODE_DESCR(EXCEPTION_DATATYPE_MISALIGNMENT);
+            else
+                CODE_DESCR(EXCEPTION_BREAKPOINT);
+                else
+                    CODE_DESCR(EXCEPTION_SINGLE_STEP);
+                    else
+                        CODE_DESCR(EXCEPTION_ARRAY_BOUNDS_EXCEEDED);
+                        else
+                            CODE_DESCR(EXCEPTION_FLT_DENORMAL_OPERAND);
+                            else
+                                CODE_DESCR(EXCEPTION_FLT_DIVIDE_BY_ZERO);
+                                else
+                                    CODE_DESCR(EXCEPTION_FLT_INEXACT_RESULT);
+                                    else
+                                        CODE_DESCR(EXCEPTION_FLT_INVALID_OPERATION);
+                                        else
+                                            CODE_DESCR(EXCEPTION_FLT_OVERFLOW);
+                                            else
+                                                CODE_DESCR(EXCEPTION_FLT_STACK_CHECK);
+                                                else
+                                                    CODE_DESCR(EXCEPTION_FLT_UNDERFLOW);
+                                                    else
+                                                        CODE_DESCR(EXCEPTION_INT_DIVIDE_BY_ZERO);
+                                                        else
+                                                            CODE_DESCR(EXCEPTION_INT_OVERFLOW);
+                                                            else
+                                                                CODE_DESCR(EXCEPTION_PRIV_INSTRUCTION);
+                                                                else
+                                                                    CODE_DESCR(EXCEPTION_IN_PAGE_ERROR);
+                                                                    else
+                                                                        CODE_DESCR(EXCEPTION_ILLEGAL_INSTRUCTION);
+                                                                        else
+                                                                            CODE_DESCR(EXCEPTION_NONCONTINUABLE_EXCEPTION);
+                                                                            else
+                                                                                CODE_DESCR(EXCEPTION_STACK_OVERFLOW);
+                                                                                else
+                                                                                    CODE_DESCR(EXCEPTION_INVALID_DISPOSITION);
+                                                                                    else
+                                                                                        CODE_DESCR(EXCEPTION_GUARD_PAGE);
+                                                                                        else
+                                                                                            CODE_DESCR(EXCEPTION_INVALID_HANDLE);
+                                                                                            else
+                                                                                                CODE_DESCR(EXCEPTION_POSSIBLE_DEADLOCK);
+
+    string message = sprint("{} ({:#x})", desc ? desc : "Unknown exception", exceptionCode);
     defer(free(message));
 
     Context.PanicHandler(message, callStack);
@@ -92,48 +142,23 @@ file_scope LONG exception_filter(LPEXCEPTION_POINTERS e) {
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
-void release_code_descs() {
-    free(CodeDescs);
-}
-
 void win64_crash_handler_init() {
-    auto [processor, success] = os_get_env("PROCESSOR_ARCHITECTURE");
-    if (success) {
-        defer(free(processor));
-        if (processor == "EM64T" || processor == "AMD64") {
-            MachineType = IMAGE_FILE_MACHINE_AMD64;
-        } else if (processor == "x86") {
-            MachineType = IMAGE_FILE_MACHINE_I386;
-        }
+    const DWORD bufferSize = 65535;
+    utf16 buffer[bufferSize];
+
+    auto r = GetEnvironmentVariableW(L"PROCESSOR_ARCHITECTURE", buffer, bufferSize);
+    if (r == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
+        assert(false && "Couldn't find environment variable PROCESSOR_ARCHITECTURE");
     }
+
+    const utf16 *processor = buffer;
+    if (compare_c_string(processor, L"EM64T") == -1 || compare_c_string(processor, L"AMD64") == -1) {
+        MachineType = IMAGE_FILE_MACHINE_AMD64;
+    } else if (compare_c_string(processor, L"x86") == -1) {
+        MachineType = IMAGE_FILE_MACHINE_I386;
+    }
+
     assert(MachineType && "Machine type not supported");
-
-    exit_schedule(release_code_descs);
-
-#define CODE_DESCR(code) code, #code
-    add(CodeDescs, CODE_DESCR(EXCEPTION_ACCESS_VIOLATION));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_DATATYPE_MISALIGNMENT));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_BREAKPOINT));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_SINGLE_STEP));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_ARRAY_BOUNDS_EXCEEDED));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_FLT_DENORMAL_OPERAND));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_FLT_DIVIDE_BY_ZERO));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_FLT_INEXACT_RESULT));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_FLT_INVALID_OPERATION));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_FLT_OVERFLOW));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_FLT_STACK_CHECK));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_FLT_UNDERFLOW));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_INT_DIVIDE_BY_ZERO));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_INT_OVERFLOW));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_PRIV_INSTRUCTION));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_IN_PAGE_ERROR));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_ILLEGAL_INSTRUCTION));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_NONCONTINUABLE_EXCEPTION));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_STACK_OVERFLOW));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_INVALID_DISPOSITION));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_GUARD_PAGE));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_INVALID_HANDLE));
-    add(CodeDescs, CODE_DESCR(EXCEPTION_POSSIBLE_DEADLOCK));
 
     SetUnhandledExceptionFilter(exception_filter);
 }

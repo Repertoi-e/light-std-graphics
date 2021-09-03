@@ -14,18 +14,22 @@ struct collector_last {
         Last = r;
         return true;
     }
+
     const result_t &result() { return Last; }
 };
 
 template <typename Result>
-struct collector_default : collector_last<Result> {};
+struct collector_default : collector_last<Result> {
+};
 
 // Specialization for signals with void return type.
 template <>
 struct collector_default<void> {
     using result_t = void;
 
-    void result() const {}
+    void result() const {
+    }
+
     bool operator()() const { return true; }
 };
 
@@ -39,6 +43,7 @@ struct collector_until0 {
         Last = r;
         return Last ? true : false;
     }
+
     const result_t &result() { return Last; }
 };
 
@@ -51,6 +56,7 @@ struct collector_until {
         Last = r;
         return Last == target ? false : true;
     }
+
     const result_t &result() { return Last; }
 };
 
@@ -77,6 +83,7 @@ struct collector_while {
         Last = r;
         return Last == target ? true : false;
     }
+
     const result_t &result() { return Last; }
 };
 
@@ -87,7 +94,7 @@ struct collector_array {
     result_t Array;
 
     bool operator()(Result r) {
-        append(Array, r);
+        array_append(Array, r);
         return true;
     }
 
@@ -102,38 +109,38 @@ struct collector_invocation;
 
 // Specialization for regular signals.
 template <typename Collector, typename R, typename... Args>
-struct collector_invocation<Collector, R(Args...)> {
-    bool invoke(Collector &collector, const delegate<R(Args...)> &cb, Args... args) { return collector(cb(args...)); }
+struct collector_invocation<Collector, R(Args ...)> {
+    bool invoke(Collector &collector, const delegate<R(Args ...)> &cb, Args ... args) { return collector(cb(args...)); }
 };
 
 // Specialization for signals with void return type.
 template <typename Collector, typename... Args>
-struct collector_invocation<Collector, void(Args...)> {
-    bool invoke(Collector &collector, const delegate<void(Args...)> &cb, Args... args) {
+struct collector_invocation<Collector, void(Args ...)> {
+    bool invoke(Collector &collector, const delegate<void(Args ...)> &cb, Args ... args) {
         cb(args...);
         return collector();
     }
 };
-}  // namespace internal
+} // namespace internal
 
 template <typename Signature, typename Collector = collector_default<typename delegate<Signature>::return_t>>
 struct signal;
 
 template <typename R, typename... Args, typename Collector>
-struct signal<R(Args...), Collector> : public non_copyable {
+struct signal<R(Args ...), Collector> : public non_copyable {
     using result_t = R;
-    using callback_t = delegate<R(Args...)>;
+    using callback_t = delegate<R(Args ...)>;
     using collector_result_t = typename Collector::result_t;
 
     array<callback_t> Callbacks;
-    internal::collector_invocation<Collector, R(Args...)> Invoker;
+    internal::collector_invocation<Collector, R(Args ...)> Invoker;
 
     bool CurrentlyEmitting = false;
     array<s64> ToRemove;
 
     // Connects default callback if non-null.
     signal(const callback_t &cb = null) {
-        if (cb) append(Callbacks, cb);
+        if (cb) array_append(Callbacks, cb);
     }
 
     // We no longer use destructors for deallocation.
@@ -147,7 +154,7 @@ struct signal<R(Args...), Collector> : public non_copyable {
     // Add a new callback, returns a handler ID which you can use to remove the callback later
     template <typename... CBArgs>
     s64 connect(const callback_t &cb) {
-        if (cb) append(Callbacks, cb);
+        if (cb) array_append(Callbacks, cb);
         return Callbacks.Count - 1;
     }
 
@@ -160,10 +167,9 @@ struct signal<R(Args...), Collector> : public non_copyable {
                 return true;
             }
             return false;
-        } else {
-            append(ToRemove, index);
-            return false;  // We will remove the callback once we have finished emitting
         }
+        array_append(ToRemove, index);
+        return false; // We will remove the callback once we have finished emitting
     }
 
     // Emit a signal, i.e. invoke all callbacks and collect return types with the Collector.
@@ -171,11 +177,11 @@ struct signal<R(Args...), Collector> : public non_copyable {
     //
     // [[nodiscard]] to issue a warning if a leak happens because the caller ignored the return value.
     // This library follows the convention that if the function is marked as [[nodiscard]], the returned value should be freed.
-    [[nodiscard]] collector_result_t emit(Args... args) {
+    [[nodiscard]] collector_result_t emit(Args ... args) {
         CurrentlyEmitting = true;
         Collector collector;
         For(Callbacks) {
-            if (it && !Invoker.invoke(collector, it, ((Args &&) args)...)) break;
+            if (it && !Invoker.invoke(collector, it, (Args &&) args...)) break;
         }
         CurrentlyEmitting = false;
 
@@ -183,7 +189,7 @@ struct signal<R(Args...), Collector> : public non_copyable {
             assert(it <= Callbacks.Count);
             if (Callbacks[it]) Callbacks[it] = null;
         }
-        reset(ToRemove);
+        array_reset(ToRemove);
 
         if constexpr (!types::is_same<collector_result_t, void>) {
             return collector.result();

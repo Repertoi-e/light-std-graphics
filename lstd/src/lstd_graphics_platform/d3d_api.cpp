@@ -1,15 +1,20 @@
-#include "lstd/internal/common.h"
+#include "lstd/common/common.h"
 
 #if OS == WINDOWS
 
+#define LSTD_JUST_DX
+#include "lstd/common/windows.h"
+#undef LSTD_JUST_DX
+
+#include <d3d11.h>
+#include <dxgi.h>
+
 #include "lstd/fmt/fmt.h"
-#include "lstd/os.h"
 #include "lstd_graphics/graphics/api.h"
 #include "lstd_graphics/graphics/texture.h"
 #include "lstd_graphics/video.h"
 
-#include <d3d11.h>
-#include <dxgi.h>
+import os;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -39,7 +44,7 @@ void d3d_init(graphics *g) {
     DXGI_ADAPTER_DESC adapterDesc;
     DX_CHECK(adapter->GetDesc(&adapterDesc));
 
-    string adapterStr = utf16_to_utf8(adapterDesc.Description); 
+    string adapterStr = internal::platform_utf16_to_utf8(adapterDesc.Description);
     print("{!YELLOW}----------------------------------\n");
     print(" Direct3D 11:\n");
     print("    {}\n", adapterStr);
@@ -59,16 +64,16 @@ void d3d_init(graphics *g) {
     D3D11_BLEND_DESC blendDest;
     zero_memory(&blendDest, sizeof(blendDest));
     {
-        blendDest.AlphaToCoverageEnable = false;
+        blendDest.AlphaToCoverageEnable  = false;
         blendDest.IndependentBlendEnable = false;
 
-        blendDest.RenderTarget[0].BlendEnable = true;
-        blendDest.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
-        blendDest.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
-        blendDest.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-        blendDest.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;  // @TODO: Provide more flexibility for choosing the blend function and factors
-        blendDest.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-        blendDest.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+        blendDest.RenderTarget[0].BlendEnable           = true;
+        blendDest.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+        blendDest.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+        blendDest.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+        blendDest.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ONE;  // @TODO: Provide more flexibility for choosing the blend function and factors
+        blendDest.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_ZERO;
+        blendDest.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
         blendDest.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
         // @TODO blendDest.RenderTarget is an array of 8 targets
     }
@@ -76,7 +81,7 @@ void d3d_init(graphics *g) {
 
     zero_memory(&blendDest, sizeof(blendDest));
     {
-        blendDest.RenderTarget[0].BlendEnable = false;
+        blendDest.RenderTarget[0].BlendEnable           = false;
         blendDest.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
     }
     DX_CHECK(g->D3D.Device->CreateBlendState(&blendDest, &g->D3D.BlendStates[1]));
@@ -84,39 +89,39 @@ void d3d_init(graphics *g) {
     D3D11_DEPTH_STENCIL_DESC stencilDesc;
     zero_memory(&stencilDesc, sizeof(stencilDesc));
     {
-        stencilDesc.DepthEnable = true;
+        stencilDesc.DepthEnable    = true;
         stencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-        stencilDesc.DepthFunc = D3D11_COMPARISON_LESS;
+        stencilDesc.DepthFunc      = D3D11_COMPARISON_LESS;
 
-        stencilDesc.StencilEnable = true;
-        stencilDesc.StencilReadMask = 0xff;
+        stencilDesc.StencilEnable    = true;
+        stencilDesc.StencilReadMask  = 0xff;
         stencilDesc.StencilWriteMask = 0xff;
 
-        stencilDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+        stencilDesc.FrontFace.StencilFailOp      = D3D11_STENCIL_OP_KEEP;
         stencilDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
-        stencilDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-        stencilDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+        stencilDesc.FrontFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP;
+        stencilDesc.FrontFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
 
-        stencilDesc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+        stencilDesc.BackFace.StencilFailOp      = D3D11_STENCIL_OP_KEEP;
         stencilDesc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR;
-        stencilDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-        stencilDesc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+        stencilDesc.BackFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP;
+        stencilDesc.BackFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
     }
     DX_CHECK(g->D3D.Device->CreateDepthStencilState(&stencilDesc, &g->D3D.DepthStencilStates[0]));
 
     zero_memory(&stencilDesc, sizeof(stencilDesc));
     {
-        stencilDesc.DepthEnable = false;
+        stencilDesc.DepthEnable    = false;
         stencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-        stencilDesc.DepthFunc = D3D11_COMPARISON_ALWAYS;
+        stencilDesc.DepthFunc      = D3D11_COMPARISON_ALWAYS;
 
         stencilDesc.StencilEnable = false;
 
-        stencilDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+        stencilDesc.FrontFace.StencilFailOp      = D3D11_STENCIL_OP_KEEP;
         stencilDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
-        stencilDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-        stencilDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
-        stencilDesc.BackFace = stencilDesc.FrontFace;
+        stencilDesc.FrontFace.StencilPassOp      = D3D11_STENCIL_OP_KEEP;
+        stencilDesc.FrontFace.StencilFunc        = D3D11_COMPARISON_ALWAYS;
+        stencilDesc.BackFace                     = stencilDesc.FrontFace;
     }
     DX_CHECK(g->D3D.Device->CreateDepthStencilState(&stencilDesc, &g->D3D.DepthStencilStates[1]));
 }
@@ -132,21 +137,21 @@ void d3d_init_target_window(graphics *g, graphics::target_window *targetWindow) 
     DXGI_SWAP_CHAIN_DESC desc;
     zero_memory(&desc, sizeof(desc));
     {
-        desc.BufferCount = 1;
-        desc.BufferDesc.Width = windowSize.x;
+        desc.BufferCount       = 1;
+        desc.BufferDesc.Width  = windowSize.x;
         desc.BufferDesc.Height = windowSize.y;
         desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         desc.BufferDesc.RefreshRate.Numerator =
             win->Flags & window::VSYNC ? os_monitor_from_window(win)->CurrentMode.RefreshRate : 0;
         desc.BufferDesc.RefreshRate.Denominator = 1;
-        desc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-        desc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-        desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        desc.OutputWindow = (HWND) win->PlatformData.Win32.hWnd;
-        desc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-        desc.SampleDesc.Count = 1;
-        desc.Windowed = !win->is_fullscreen();
+        desc.BufferDesc.ScanlineOrdering        = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+        desc.BufferDesc.Scaling                 = DXGI_MODE_SCALING_UNSPECIFIED;
+        desc.BufferDesc.Format                  = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.BufferUsage                        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+        desc.OutputWindow                       = (HWND) win->PlatformData.Win32.hWnd;
+        desc.SwapEffect                         = DXGI_SWAP_EFFECT_DISCARD;
+        desc.SampleDesc.Count                   = 1;
+        desc.Windowed                           = !win->is_fullscreen();
     }
 
     IDXGIDevice *device;
@@ -203,14 +208,14 @@ void d3d_target_window_resized(graphics *g, graphics::target_window *targetWindo
     D3D11_TEXTURE2D_DESC textureDesc;
     zero_memory(&textureDesc, sizeof(textureDesc));
     {
-        textureDesc.Width = width;
-        textureDesc.Height = height;
-        textureDesc.MipLevels = 1;
-        textureDesc.ArraySize = 1;
-        textureDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+        textureDesc.Width            = width;
+        textureDesc.Height           = height;
+        textureDesc.MipLevels        = 1;
+        textureDesc.ArraySize        = 1;
+        textureDesc.Format           = DXGI_FORMAT_D24_UNORM_S8_UINT;
         textureDesc.SampleDesc.Count = 1;
-        textureDesc.Usage = D3D11_USAGE_DEFAULT;
-        textureDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+        textureDesc.Usage            = D3D11_USAGE_DEFAULT;
+        textureDesc.BindFlags        = D3D11_BIND_DEPTH_STENCIL;
     }
 
     DX_CHECK(g->D3D.Device->CreateTexture2D(&textureDesc, null, &targetWindow->D3D.DepthStencilBuffer));
@@ -219,23 +224,23 @@ void d3d_target_window_resized(graphics *g, graphics::target_window *targetWindo
     D3D11_RASTERIZER_DESC rDesc;
     zero_memory(&rDesc, sizeof(rDesc));
     {
-        rDesc.FillMode = D3D11_FILL_SOLID;
-        rDesc.CullMode = D3D11_CULL_NONE;
-        rDesc.ScissorEnable = true;
+        rDesc.FillMode        = D3D11_FILL_SOLID;
+        rDesc.CullMode        = D3D11_CULL_NONE;
+        rDesc.ScissorEnable   = true;
         rDesc.DepthClipEnable = true;
     }
     DX_CHECK(g->D3D.Device->CreateRasterizerState(&rDesc, &targetWindow->D3D.RasterStates[(s64) cull::None]));
     {
-        rDesc.FillMode = D3D11_FILL_SOLID;
-        rDesc.CullMode = D3D11_CULL_FRONT;
-        rDesc.ScissorEnable = true;
+        rDesc.FillMode        = D3D11_FILL_SOLID;
+        rDesc.CullMode        = D3D11_CULL_FRONT;
+        rDesc.ScissorEnable   = true;
         rDesc.DepthClipEnable = true;
     }
     DX_CHECK(g->D3D.Device->CreateRasterizerState(&rDesc, &targetWindow->D3D.RasterStates[(s64) cull::Front]));
     {
-        rDesc.FillMode = D3D11_FILL_SOLID;
-        rDesc.CullMode = D3D11_CULL_BACK;
-        rDesc.ScissorEnable = true;
+        rDesc.FillMode        = D3D11_FILL_SOLID;
+        rDesc.CullMode        = D3D11_CULL_BACK;
+        rDesc.ScissorEnable   = true;
         rDesc.DepthClipEnable = true;
     }
     DX_CHECK(g->D3D.Device->CreateRasterizerState(&rDesc, &targetWindow->D3D.RasterStates[(s64) cull::Back]));
@@ -245,8 +250,8 @@ void d3d_set_viewport(graphics *g, rect viewport) {
     D3D11_VIEWPORT rect;
     rect.TopLeftX = (f32) viewport.Top;
     rect.TopLeftY = (f32) viewport.Left;
-    rect.Width = (f32) viewport.width();
-    rect.Height = (f32) viewport.height();
+    rect.Width    = (f32) viewport.width();
+    rect.Height   = (f32) viewport.height();
     rect.MinDepth = 0.0f;
     rect.MaxDepth = 1.0f;
 
@@ -255,9 +260,9 @@ void d3d_set_viewport(graphics *g, rect viewport) {
 
 void d3d_set_scissor_rect(graphics *g, rect scissorRect) {
     D3D11_RECT rect;
-    rect.left = scissorRect.Left;
-    rect.top = scissorRect.Top;
-    rect.right = scissorRect.Right;
+    rect.left   = scissorRect.Left;
+    rect.top    = scissorRect.Top;
+    rect.right  = scissorRect.Right;
     rect.bottom = scissorRect.Bot;
 
     g->D3D.DeviceContext->RSSetScissorRects(1, &rect);

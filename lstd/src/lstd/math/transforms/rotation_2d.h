@@ -8,7 +8,9 @@ template <typename T>
 struct rotation_2d_helper : non_copyable {
     T Angle;
 
-    rotation_2d_helper(T angle) : Angle(angle) {}
+    rotation_2d_helper(T angle)
+        : Angle(angle) {
+    }
 
     template <typename U, bool MPacked>
     operator mat<U, 3, 3, MPacked>() const {
@@ -33,8 +35,8 @@ struct rotation_2d_helper : non_copyable {
 
     template <typename U, s64 RC, s64 CC, bool MPacked>
     void set_impl(mat<U, RC, CC, MPacked> &m) const {
-        T C = (T) Math_Cos_flt32(Angle);
-        T S = (T) Math_Sin_flt32(Angle);
+        T C = (T) cos(Angle);
+        T S = (T) sin(Angle);
 
         // Indices according to follow vector order
         m(0, 0) = U(C);

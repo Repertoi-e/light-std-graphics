@@ -1,13 +1,14 @@
-#include "lstd/internal/common.h"
+#include "lstd/common/common.h"
 
 #if OS == WINDOWS
 
+#include "lstd/common/windows.h"
+
 #include "lstd/fmt/fmt.h"
-#include "lstd/os.h"
-#include "lstd/types/windows.h"
 #include "lstd_graphics/video/window.h"
 
 import path;
+import os;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -15,10 +16,6 @@ LSTD_BEGIN_NAMESPACE
 extern BOOL is_windows_10_build_or_greater(WORD build);
 #define IS_WINDOWS_10_ANNIVERSARY_UPDATE_OR_GREATER() is_windows_10_build_or_greater(14393)
 #define IS_WINDOWS_10_CREATORS_UPDATE_OR_GREATER() is_windows_10_build_or_greater(15063)
-
-// Defined in windows_common.cpp
-allocator win64_get_persistent_allocator();
-allocator win64_get_temporary_allocator();
 
 //
 // @ThreadSafety.
@@ -28,7 +25,7 @@ allocator win64_get_temporary_allocator();
 file_scope utf16 *WindowClassName;
 
 file_scope s32 AcquiredMonitorCount = 0;
-file_scope u32 MouseTrailSize = 0;
+file_scope u32 MouseTrailSize       = 0;
 
 file_scope window *DisabledCursorWindow = null;
 file_scope vec2<s32> RestoreCursorPos;
@@ -90,9 +87,9 @@ file_scope void update_framebuffer_transparency(window *win) {
         HRGN region = CreateRectRgn(0, 0, -1, -1);
 
         DWM_BLURBEHIND bb = {0};
-        bb.dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION;
-        bb.hRgnBlur = region;
-        bb.fEnable = true;
+        bb.dwFlags        = DWM_BB_ENABLE | DWM_BB_BLURREGION;
+        bb.hRgnBlur       = region;
+        bb.fEnable        = true;
 
         if (SUCCEEDED(DwmEnableBlurBehindWindow(win->PlatformData.Win32.hWnd, &bb))) {
             // Decorated windows don't repaint the transparent background leaving a trail behind animations.
@@ -139,14 +136,14 @@ window *window::init(const string &title, s32 x, s32 y, s32 width, s32 height, u
         MonitorCallbackAdded = true;
     }
 
-    DisplayMode.Width = width;
-    DisplayMode.Height = height;
+    DisplayMode.Width   = width;
+    DisplayMode.Height  = height;
     DisplayMode.RedBits = DisplayMode.GreenBits = DisplayMode.BlueBits = 8;
-    DisplayMode.RefreshRate = DONT_CARE;
+    DisplayMode.RefreshRate                                            = DONT_CARE;
 
     Flags = flags & CREATION_FLAGS;
 
-    DWORD style = get_window_style(this);
+    DWORD style   = get_window_style(this);
     DWORD exStyle = get_window_ex_style(this);
 
     vec2<s32> fullSize = get_full_window_size(style, exStyle, width, height, USER_DEFAULT_SCREEN_DPI);
@@ -185,7 +182,7 @@ window *window::init(const string &title, s32 x, s32 y, s32 width, s32 height, u
     WINDOWPLACEMENT wp = {sizeof(wp)};
     GetWindowPlacement(PlatformData.Win32.hWnd, &wp);
     wp.rcNormalPosition = rect;
-    wp.showCmd = SW_HIDE;
+    wp.showCmd          = SW_HIDE;
     SetWindowPlacement(PlatformData.Win32.hWnd, &wp);
 
     if (Flags & window::ALPHA) update_framebuffer_transparency(this);
@@ -207,7 +204,7 @@ window *window::init(const string &title, s32 x, s32 y, s32 width, s32 height, u
     ID = s_NextID;
     atomic_inc(&s_NextID);
 
-    Next = WindowsList;
+    Next        = WindowsList;
     WindowsList = this;
 
     return this;
@@ -221,7 +218,7 @@ file_scope void do_key_input_event(window *win, u32 key, bool pressed, bool asyn
     bool repeated = false;
 
     bool wasPressed = win->Keys[key];
-    win->Keys[key] = pressed;
+    win->Keys[key]  = pressed;
     if (pressed && wasPressed) repeated = true;
 
     event e;
@@ -242,9 +239,9 @@ file_scope void do_mouse_input_event(window *win, u32 button, bool pressed, bool
     vec2<s32> pos = win->get_cursor_pos();
 
     event e;
-    e.Window = win;
-    e.Type = pressed ? event::Mouse_Button_Pressed : event::Mouse_Button_Released;
-    e.Button = button;
+    e.Window        = win;
+    e.Type          = pressed ? event::Mouse_Button_Pressed : event::Mouse_Button_Released;
+    e.Button        = button;
     e.DoubleClicked = doubleClick;
     (void) win->Event.emit(e);
 }
@@ -252,16 +249,16 @@ file_scope void do_mouse_input_event(window *win, u32 button, bool pressed, bool
 file_scope void do_mouse_move(window *win, vec2<s32> pos) {
     if (win->VirtualCursorPos == pos) return;
 
-    vec2<s32> delta = pos - win->VirtualCursorPos;
+    vec2<s32> delta       = pos - win->VirtualCursorPos;
     win->VirtualCursorPos = pos;
 
     event e;
     e.Window = win;
-    e.Type = event::Mouse_Moved;
-    e.X = pos.x;
-    e.Y = pos.y;
-    e.DX = delta.x;
-    e.DY = delta.y;
+    e.Type   = event::Mouse_Moved;
+    e.X      = pos.x;
+    e.Y      = pos.y;
+    e.DX     = delta.x;
+    e.DY     = delta.y;
     (void) win->Event.emit(e);
 }
 
@@ -305,7 +302,7 @@ void window::update() {
         For(range(Mouse_Button_Last + 1)) {
             win->MouseButtonsThisFrame[it] = win->MouseButtons[it] && !win->LastFrameMouseButtons[it];
         }
-        win->LastFrameKeys = win->Keys;
+        win->LastFrameKeys         = win->Keys;
         win->LastFrameMouseButtons = win->MouseButtons;
 
         win = win->Next;
@@ -355,7 +352,7 @@ void window::release() {
 
     event e;
     e.Window = this;
-    e.Type = event::Window_Closed;
+    e.Type   = event::Window_Closed;
     (void) Event.emit(e);
 
     if (Monitor) release_monitor(this);
@@ -379,23 +376,21 @@ void window::release() {
     ID = INVALID_ID;
 }
 
-string utf16_to_utf8(const utf16 *str, allocator alloc);
-
 string window::get_title() {
     s32 length = GetWindowTextLengthW(PlatformData.Win32.hWnd) + 1;
 
-    auto *titleUtf16 = allocate_array<utf16>(length, {.Alloc = win64_get_temporary_allocator()});
+    auto *titleUtf16 = allocate_array<utf16>(length, {.Alloc = internal::platform_get_temporary_allocator()});
     defer(free(titleUtf16));
 
     GetWindowTextW(PlatformData.Win32.hWnd, titleUtf16, length);
-    
-    return utf16_to_utf8(titleUtf16, win64_get_persistent_allocator());
+
+    return internal::platform_utf16_to_utf8(titleUtf16, internal::platform_get_persistent_allocator());
 }
 
 void window::set_title(const string &title) {
     // title.Length * 2 because one unicode character might take 2 wide chars.
     // This is just an approximation, not all space will be used!
-    auto *titleUtf16 = allocate_array<utf16>(title.Length * 2 + 1, {.Alloc = win64_get_temporary_allocator()});
+    auto *titleUtf16 = allocate_array<utf16>(title.Length * 2 + 1, {.Alloc = internal::platform_get_temporary_allocator()});
     utf8_to_utf16(title.Data, title.Length, titleUtf16);
 
     SetWindowTextW(PlatformData.Win32.hWnd, titleUtf16);
@@ -408,8 +403,8 @@ file_scope void fit_to_monitor(window *win) {
 }
 
 void window::set_fullscreen(monitor *mon, s32 width, s32 height, s32 refreshRate) {
-    DisplayMode.Width = width;
-    DisplayMode.Height = height;
+    DisplayMode.Width       = width;
+    DisplayMode.Height      = height;
     DisplayMode.RefreshRate = refreshRate;
 
     if (Monitor == mon) {
@@ -485,21 +480,21 @@ file_scope HICON create_icon(const pixel_buffer &image, int xhot, int yhot, bool
     BITMAPV5HEADER bi;
     zero_memory(&bi, sizeof(bi));
     {
-        bi.bV5Size = sizeof(bi);
-        bi.bV5Width = image.Width;
-        bi.bV5Height = -(s32)(image.Height);
-        bi.bV5Planes = 1;
-        bi.bV5BitCount = 32;
+        bi.bV5Size        = sizeof(bi);
+        bi.bV5Width       = image.Width;
+        bi.bV5Height      = -(s32) (image.Height);
+        bi.bV5Planes      = 1;
+        bi.bV5BitCount    = 32;
         bi.bV5Compression = BI_BITFIELDS;
-        bi.bV5RedMask = 0x00ff0000;
-        bi.bV5GreenMask = 0x0000ff00;
-        bi.bV5BlueMask = 0x000000ff;
-        bi.bV5AlphaMask = 0xff000000;
+        bi.bV5RedMask     = 0x00ff0000;
+        bi.bV5GreenMask   = 0x0000ff00;
+        bi.bV5BlueMask    = 0x000000ff;
+        bi.bV5AlphaMask   = 0xff000000;
     }
 
     u8 *target = null;
 
-    HDC dc = GetDC(null);
+    HDC dc        = GetDC(null);
     HBITMAP color = CreateDIBSection(dc, (BITMAPINFO *) &bi, DIB_RGB_COLORS, (void **) &target, null, (DWORD) 0);
     ReleaseDC(null, dc);
 
@@ -529,10 +524,10 @@ file_scope HICON create_icon(const pixel_buffer &image, int xhot, int yhot, bool
     ICONINFO ii;
     zero_memory(&ii, sizeof(ii));
     {
-        ii.fIcon = icon;
+        ii.fIcon    = icon;
         ii.xHotspot = xhot;
         ii.yHotspot = yhot;
-        ii.hbmMask = mask;
+        ii.hbmMask  = mask;
         ii.hbmColor = color;
     }
 
@@ -553,9 +548,9 @@ file_scope s64 choose_icon(array<pixel_buffer> icons, s32 width, s32 height) {
     s64 closest = -1;
     For(range(icons.Count)) {
         auto icon = icons[it];
-        s32 diff = abs((s32)(icon.Width * icon.Height - width * height));
+        s32 diff  = abs((s32) (icon.Width * icon.Height - width * height));
         if (diff < leastDiff) {
-            closest = it;
+            closest   = it;
             leastDiff = diff;
         }
     }
@@ -566,13 +561,13 @@ void window::set_icon(array<pixel_buffer> icons) {
     HICON bigIcon = null, smallIcon = null;
 
     if (icons.Count) {
-        s64 closestBig = choose_icon(icons, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
+        s64 closestBig   = choose_icon(icons, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
         s64 closestSmall = choose_icon(icons, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
 
-        bigIcon = create_icon(icons[closestBig], 0, 0, true);
+        bigIcon   = create_icon(icons[closestBig], 0, 0, true);
         smallIcon = create_icon(icons[closestSmall], 0, 0, true);
     } else {
-        bigIcon = (HICON) GetClassLongPtrW(PlatformData.Win32.hWnd, GCLP_HICON);
+        bigIcon   = (HICON) GetClassLongPtrW(PlatformData.Win32.hWnd, GCLP_HICON);
         smallIcon = (HICON) GetClassLongPtrW(PlatformData.Win32.hWnd, GCLP_HICONSM);
     }
 
@@ -583,7 +578,7 @@ void window::set_icon(array<pixel_buffer> icons) {
     if (PlatformData.Win32.SmallIcon) DestroyIcon(PlatformData.Win32.SmallIcon);
 
     if (icons.Count) {
-        PlatformData.Win32.BigIcon = bigIcon;
+        PlatformData.Win32.BigIcon   = bigIcon;
         PlatformData.Win32.SmallIcon = smallIcon;
     }
 }
@@ -633,7 +628,7 @@ file_scope void disable_raw_mouse_motion(window *win) {
 // Apply disabled cursor mode to a focused window
 file_scope void disable_cursor(window *win) {
     DisabledCursorWindow = win;
-    RestoreCursorPos = win->get_cursor_pos();
+    RestoreCursorPos     = win->get_cursor_pos();
     update_cursor_image(win);
     win->set_cursor_pos(win->get_size() / 2);
     update_clip_rect(win);
@@ -702,7 +697,7 @@ vec2<s32> window::get_size() {
 }
 
 void window::set_size(vec2<s32> size) {
-    DisplayMode.Width = size.x;
+    DisplayMode.Width  = size.x;
     DisplayMode.Height = size.y;
 
     if (size == get_size()) return;
@@ -779,11 +774,11 @@ file_scope void apply_aspect_ratio(window *win, s32 edge, RECT *area) {
     vec2<s32> off = get_full_window_size(get_window_style(win), get_window_ex_style(win), 0, 0, dpi);
 
     if (edge == WMSZ_LEFT || edge == WMSZ_BOTTOMLEFT || edge == WMSZ_RIGHT || edge == WMSZ_BOTTOMRIGHT) {
-        area->bottom = area->top + off.y + (s32)((area->right - area->left - off.x) / ratio);
+        area->bottom = area->top + off.y + (s32) ((area->right - area->left - off.x) / ratio);
     } else if (edge == WMSZ_TOPLEFT || edge == WMSZ_TOPRIGHT) {
-        area->top = area->bottom - off.y - (s32)((area->right - area->left - off.x) / ratio);
+        area->top = area->bottom - off.y - (s32) ((area->right - area->left - off.x) / ratio);
     } else if (edge == WMSZ_TOP || edge == WMSZ_BOTTOM) {
-        area->right = area->left + off.x + (s32)((area->bottom - area->top - off.y) * ratio);
+        area->right = area->left + off.x + (s32) ((area->bottom - area->top - off.y) * ratio);
     }
 }
 
@@ -795,7 +790,7 @@ void window::set_forced_aspect_ratio(s32 numerator, s32 denominator) {
         }
     }
 
-    AspectRatioNumerator = numerator;
+    AspectRatioNumerator   = numerator;
     AspectRatioDenominator = denominator;
 
     if (numerator == DONT_CARE || denominator == DONT_CARE) return;
@@ -822,7 +817,7 @@ void window::set_raw_mouse(bool enabled) {
 void window::set_cursor_mode(cursor_mode mode) {
     if (CursorMode == mode) return;
 
-    CursorMode = mode;
+    CursorMode       = mode;
     VirtualCursorPos = get_cursor_pos();
 
     if (mode == CURSOR_DISABLED) {
@@ -849,7 +844,7 @@ void window::set_opacity(f32 opacity) {
     assert(opacity >= 0 && opacity <= 1.0f);
 
     if (opacity < 1.0f) {
-        BYTE alpha = (BYTE)(255 * opacity);
+        BYTE alpha  = (BYTE) (255 * opacity);
         DWORD style = GetWindowLongW(PlatformData.Win32.hWnd, GWL_EXSTYLE);
         style |= WS_EX_LAYERED;
         SetWindowLongW(PlatformData.Win32.hWnd, GWL_EXSTYLE, style);
@@ -879,6 +874,10 @@ file_scope void update_window_style(window *win) {
     ClientToScreen(win->PlatformData.Win32.hWnd, (POINT *) &rect.right);
     SetWindowLongW(win->PlatformData.Win32.hWnd, GWL_STYLE, style);
     SetWindowPos(win->PlatformData.Win32.hWnd, HWND_TOP, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOZORDER);
+}
+
+void set_bit(u32 *number, u32 bit, s32 enabled) {
+    *number ^= (-enabled ^ *number) & BIT(bit);
 }
 
 void window::set_borderless(bool enabled) {
@@ -954,11 +953,11 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
     }
 
     event e;
-    e.Window = win;
-    e.Type = event::Window_Platform_Message_Sent;
+    e.Window  = win;
+    e.Type    = event::Window_Platform_Message_Sent;
     e.Message = message;
-    e.Param1 = wParam;
-    e.Param2 = lParam;
+    e.Param1  = wParam;
+    e.Param2  = lParam;
     (void) win->Event.emit(e);
 
     switch (message) {
@@ -979,8 +978,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
 
             {
                 event e;
-                e.Window = win;
-                e.Type = event::Window_Focused;
+                e.Window  = win;
+                e.Type    = event::Window_Focused;
                 e.Focused = true;
                 (void) win->Event.emit(e);
             }
@@ -996,8 +995,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
 
             {
                 event e;
-                e.Window = win;
-                e.Type = event::Window_Focused;
+                e.Window  = win;
+                e.Type    = event::Window_Focused;
                 e.Focused = false;
                 (void) win->Event.emit(e);
             }
@@ -1029,7 +1028,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             {
                 event e;
                 e.Window = win;
-                e.Type = event::Window_Closed;
+                e.Type   = event::Window_Closed;
                 (void) win->Event.emit(e);
             }
             win->release();
@@ -1046,13 +1045,13 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 win->PlatformData.Win32.Surrogate = (u16) cp;
             } else {
                 if ((cp >= 0xDC00) && (cp <= 0xDFFF)) {
-                    cp = ((win->PlatformData.Win32.Surrogate - 0xD800) << 10) + (cp - 0xDC00) + 0x0010000;
+                    cp                                = ((win->PlatformData.Win32.Surrogate - 0xD800) << 10) + (cp - 0xDC00) + 0x0010000;
                     win->PlatformData.Win32.Surrogate = 0;
                 }
                 event e;
                 e.Window = win;
-                e.Type = event::Code_Point_Typed;
-                e.CP = cp;
+                e.Type   = event::Code_Point_Typed;
+                e.CP     = cp;
                 (void) win->Event.emit(e);
             }
             return 0;
@@ -1064,7 +1063,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             u32 key = ((lParam >> 16) & 0x7f) | ((lParam & (1 << 24)) != 0 ? 0x80 : 0);
             if (key >= 256) break;
 
-            u32 keyHid = internal::g_KeycodeNativeToHid[key];
+            u32 keyHid   = internal::g_KeycodeNativeToHid[key];
             bool pressed = ((lParam >> 31) & 1) ? false : true;
 
             if (!pressed && wParam == VK_SHIFT) {
@@ -1146,8 +1145,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 TRACKMOUSEEVENT tme;
                 zero_memory(&tme, sizeof(tme));
                 {
-                    tme.cbSize = sizeof(tme);
-                    tme.dwFlags = TME_LEAVE;
+                    tme.cbSize    = sizeof(tme);
+                    tme.dwFlags   = TME_LEAVE;
                     tme.hwndTrack = win->PlatformData.Win32.hWnd;
                 }
                 TrackMouseEvent(&tme);
@@ -1156,7 +1155,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
 
                 event e;
                 e.Window = win;
-                e.Type = event::Mouse_Entered_Window;
+                e.Type   = event::Mouse_Entered_Window;
                 (void) win->Event.emit(e);
             }
 
@@ -1182,7 +1181,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             u32 size = 0;
             GetRawInputData(ri, RID_INPUT, null, &size, sizeof(RAWINPUTHEADER));
 
-            auto *rawInput = allocate_array<RAWINPUT>(size / sizeof(RAWINPUT), {.Alloc = win64_get_temporary_allocator()});
+            auto *rawInput = allocate_array<RAWINPUT>(size / sizeof(RAWINPUT), {.Alloc = internal::platform_get_temporary_allocator()});
             if (GetRawInputData(ri, RID_INPUT, rawInput, &size, sizeof(RAWINPUTHEADER)) == (u32) -1) {
                 print(">>> {}:{} Failed to retrieve raw input data.\n", __FILE__, __LINE__);
                 break;
@@ -1207,15 +1206,15 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             {
                 event e;
                 e.Window = win;
-                e.Type = event::Mouse_Left_Window;
+                e.Type   = event::Mouse_Left_Window;
                 (void) win->Event.emit(e);
             }
             return 0;
         case WM_MOUSEWHEEL: {
             event e;
-            e.Window = win;
-            e.Type = event::Mouse_Wheel_Scrolled;
-            e.ScrollY = (u32)(GET_WHEEL_DELTA_WPARAM(wParam) / (f32) WHEEL_DELTA);
+            e.Window  = win;
+            e.Type    = event::Mouse_Wheel_Scrolled;
+            e.ScrollY = (u32) (GET_WHEEL_DELTA_WPARAM(wParam) / (f32) WHEEL_DELTA);
             (void) win->Event.emit(e);
             return 0;
         }
@@ -1223,9 +1222,9 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             // NOTE: The X-axis is inverted for consistency with macOS and X11
             {
                 event e;
-                e.Window = win;
-                e.Type = event::Mouse_Wheel_Scrolled;
-                e.ScrollX = (u32)(-(GET_WHEEL_DELTA_WPARAM(wParam) / (f32) WHEEL_DELTA));
+                e.Window  = win;
+                e.Type    = event::Mouse_Wheel_Scrolled;
+                e.ScrollX = (u32) (-(GET_WHEEL_DELTA_WPARAM(wParam) / (f32) WHEEL_DELTA));
                 (void) win->Event.emit(e);
             }
             return 0;
@@ -1253,8 +1252,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 win->minimize();
 
                 event e;
-                e.Window = win;
-                e.Type = event::Window_Minimized;
+                e.Window    = win;
+                e.Type      = event::Window_Minimized;
                 e.Minimized = true;
                 (void) win->Event.emit(e);
             }
@@ -1262,8 +1261,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 win->Flags &= ~window::MINIMIZED;
 
                 event e;
-                e.Window = win;
-                e.Type = event::Window_Minimized;
+                e.Window    = win;
+                e.Type      = event::Window_Minimized;
                 e.Minimized = false;
                 (void) win->Event.emit(e);
             }
@@ -1273,8 +1272,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 win->maximize();
 
                 event e;
-                e.Window = win;
-                e.Type = event::Window_Maximized;
+                e.Window    = win;
+                e.Type      = event::Window_Maximized;
                 e.Maximized = true;
                 (void) win->Event.emit(e);
             }
@@ -1282,16 +1281,16 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 win->Flags &= ~window::MAXIMIZED;
 
                 event e;
-                e.Window = win;
-                e.Type = event::Window_Maximized;
+                e.Window    = win;
+                e.Type      = event::Window_Maximized;
                 e.Maximized = false;
                 (void) win->Event.emit(e);
             }
 
             event e;
             e.Window = win;
-            e.Type = event::Window_Framebuffer_Resized;
-            e.Width = LOWORD(lParam);
+            e.Type   = event::Window_Framebuffer_Resized;
+            e.Width  = LOWORD(lParam);
             e.Height = HIWORD(lParam);
             (void) win->Event.emit(e);
             e.Type = event::Window_Resized;
@@ -1308,17 +1307,17 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             return 0;
         }
         case WM_SHOWWINDOW:
-            set_bit(&win->Flags, (u32) window::SHOWN, wParam);
-            set_bit(&win->Flags, (u32) window::HIDDEN, !wParam);
+            set_bit(&win->Flags, (u32) window::SHOWN, (bool) wParam);
+            set_bit(&win->Flags, (u32) window::HIDDEN, (bool) !wParam);
             break;
         case WM_MOVE:
             if (DisabledCursorWindow == win) update_clip_rect(win);
             {
                 event e;
                 e.Window = win;
-                e.Type = event::Window_Moved;
-                e.X = GET_X_LPARAM(lParam);
-                e.Y = GET_Y_LPARAM(lParam);
+                e.Type   = event::Window_Moved;
+                e.X      = GET_X_LPARAM(lParam);
+                e.Y      = GET_Y_LPARAM(lParam);
                 (void) win->Event.emit(e);
             }
             return 0;
@@ -1354,15 +1353,15 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
 
                 mmi->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
                 mmi->ptMaxPosition.y = mi.rcWork.top - mi.rcMonitor.top;
-                mmi->ptMaxSize.x = mi.rcWork.right - mi.rcWork.left;
-                mmi->ptMaxSize.y = mi.rcWork.bottom - mi.rcWork.top;
+                mmi->ptMaxSize.x     = mi.rcWork.right - mi.rcWork.left;
+                mmi->ptMaxSize.y     = mi.rcWork.bottom - mi.rcWork.top;
             }
             return 0;
         }
         case WM_PAINT: {
             event e;
             e.Window = win;
-            e.Type = event::Window_Refreshed;
+            e.Type   = event::Window_Refreshed;
             (void) win->Event.emit(e);
         } break;
         case WM_ERASEBKGND:
@@ -1403,8 +1402,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             }
             event e;
             e.Window = win;
-            e.Type = event::Window_Content_Scale_Changed;
-            e.Scale = {xscale, yscale};
+            e.Type   = event::Window_Content_Scale_Changed;
+            e.Scale  = {xscale, yscale};
             (void) win->Event.emit(e);
             break;
         }
@@ -1437,23 +1436,23 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             s32 count = DragQueryFileW(drop, 0xffffffff, null, 0);
 
             array<string> paths;
-            PUSH_ALLOC(win64_get_persistent_allocator()) {
-                reserve(paths, count);
+            PUSH_ALLOC(internal::platform_get_persistent_allocator()) {
+                array_reserve(paths, count);
             }
 
             For(range(count)) {
                 u32 length = DragQueryFileW(drop, (u32) it, null, 0);
 
-                utf16 *buffer = allocate_array<utf16>(length + 1, {.Alloc = win64_get_temporary_allocator()});
+                utf16 *buffer = allocate_array<utf16>(length + 1, {.Alloc = internal::platform_get_temporary_allocator()});
                 DragQueryFileW(drop, (u32) it, buffer, length + 1);
 
-                append(paths, utf16_to_utf8(buffer, win64_get_persistent_allocator()));
+                array_append(paths, internal::platform_utf16_to_utf8(buffer, internal::platform_get_persistent_allocator()));
             }
 
             event e;
             e.Window = win;
-            e.Type = event::Window_Files_Dropped;
-            e.Paths = paths;
+            e.Type   = event::Window_Files_Dropped;
+            e.Paths  = paths;
             (void) win->Event.emit(e);
 
             For(paths) free(it);
@@ -1468,17 +1467,17 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
 
 void win64_window_init() {
     GUID guid;
-    WIN32_CHECKHR(CoCreateGuid(&guid));
-    WIN32_CHECKHR(StringFromCLSID(guid, &WindowClassName));
+    WIN_CHECKHR(CoCreateGuid(&guid));
+    WIN_CHECKHR(StringFromCLSID(guid, &WindowClassName));
 
     WNDCLASSEXW wc;
     zero_memory(&wc, sizeof(wc));
     {
-        wc.cbSize = sizeof(wc);
-        wc.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-        wc.lpfnWndProc = wnd_proc;
-        wc.hInstance = GetModuleHandleW(null);
-        wc.hCursor = LoadCursorW(null, IDC_ARROW);
+        wc.cbSize        = sizeof(wc);
+        wc.style         = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+        wc.lpfnWndProc   = wnd_proc;
+        wc.hInstance     = GetModuleHandleW(null);
+        wc.hCursor       = LoadCursorW(null, IDC_ARROW);
         wc.lpszClassName = WindowClassName;
 
         // Load user-provided icon if available
@@ -1500,7 +1499,7 @@ cursor::cursor(const pixel_buffer &image, vec2<s32> hot) {
     if (!PlatformData.Win32.hCursor) return;
     PlatformData.Win32.ShouldDestroy = true;
 
-    Next = CursorsList;
+    Next        = CursorsList;
     CursorsList = this;
 }
 
@@ -1528,7 +1527,7 @@ cursor::cursor(os_cursor osCursor) {
     }
     PlatformData.Win32.ShouldDestroy = false;
 
-    Next = CursorsList;
+    Next        = CursorsList;
     CursorsList = this;
 }
 

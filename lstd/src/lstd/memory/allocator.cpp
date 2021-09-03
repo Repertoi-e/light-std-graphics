@@ -1,12 +1,12 @@
 #include "allocator.h"
 
-#include "../internal/context.h"
+#include "../common/context.h"
 #include "../io.h"
 #include "../math.h"
-#include "../os.h"
 
 import path;
 import fmt;
+import os;
 
 #if defined BRACE_B
 #error ""
@@ -19,46 +19,61 @@ import fmt;
 LSTD_BEGIN_NAMESPACE
 
 #if defined DEBUG_MEMORY
-void debug_memory::unlink_header(allocation_header *header) {
-    assert(header);
+void debug_memory::unlink_header(allocation_header *h) {
     assert(Head);
+    assert(h);
+    assert(h->DEBUG_Previous);
 
-    if (header == Head) {
-        Head = header->DEBUG_Next;
-    }
-
-    if (header->DEBUG_Next) {
-        header->DEBUG_Next->DEBUG_Previous = header->DEBUG_Previous;
-    }
-
-    if (header->DEBUG_Previous) {
-        header->DEBUG_Previous->DEBUG_Next = header->DEBUG_Next;
-    }
-}
-
-void debug_memory::add_header(allocation_header *header) {
-    header->DEBUG_Next = Head;
-    if (Head) {
-        Head->DEBUG_Previous = header;
-    }
-    Head = header;
-}
-void debug_memory::swap_header(allocation_header *oldHeader, allocation_header *newHeader) {
-    auto *prev = oldHeader->DEBUG_Previous;
-    auto *next = oldHeader->DEBUG_Next;
-
-    assert(Head);  // ?
-
-    if (prev) {
-        prev->DEBUG_Next = newHeader;
-        newHeader->DEBUG_Previous = prev;
+    if (h->DEBUG_Previous == h) {
+        Head = null;
+    } else if (Head == h) {
+        h->DEBUG_Next->DEBUG_Previous = h->DEBUG_Previous;
+        Head = h->DEBUG_Next;
     } else {
-        Head = newHeader;
+        h->DEBUG_Previous->DEBUG_Next = h->DEBUG_Next;
+        if (h->DEBUG_Next) {
+            h->DEBUG_Next->DEBUG_Previous = h->DEBUG_Previous;
+        } else {
+            Head->DEBUG_Previous = h->DEBUG_Previous;
+        }
     }
+}
 
-    if (next) {
-        next->DEBUG_Previous = newHeader;
-        newHeader->DEBUG_Next = next;
+void debug_memory::add_header(allocation_header *h) {
+    h->DEBUG_Next = Head;
+    if (Head) {
+        h->DEBUG_Previous = Head->DEBUG_Previous;
+        Head->DEBUG_Previous = h;
+    } else {
+        h->DEBUG_Previous = h;
+    }
+    Head = h;
+}
+
+void debug_memory::swap_header(allocation_header *o, allocation_header *n) {
+    assert(Head);
+    assert(o);
+    assert(n);
+
+    if (Head == o) {
+        Head = n;
+        n->DEBUG_Next = o->DEBUG_Next;
+
+        if (!o->DEBUG_Next) {
+            n->DEBUG_Previous = n;
+        } else {
+            n->DEBUG_Previous = o->DEBUG_Previous;
+            n->DEBUG_Next->DEBUG_Previous = n;
+        }
+    } else {
+        n->DEBUG_Next = o->DEBUG_Next;
+        n->DEBUG_Previous = o->DEBUG_Previous;
+        n->DEBUG_Previous->DEBUG_Next = n;
+        if (!o->DEBUG_Next) {
+            Head->DEBUG_Previous = n;
+        } else {
+            n->DEBUG_Next->DEBUG_Previous = n;
+        }
     }
 }
 
@@ -86,7 +101,7 @@ constexpr string get_short_file_name(const string &str) {
     }
 
     string result = str;
-    return substring(result, findResult, result.Length);
+    return result[{findResult, result.Length}];
 }
 
 void debug_memory::report_leaks() {
@@ -107,8 +122,11 @@ void debug_memory::report_leaks() {
             it = it->DEBUG_Next;
         }
     }
-    // @Cleanup: We can mark this as LEAK?
-    leaks = allocate_array<allocation_header *>(leaksCount);
+
+    // @Cleanup @Platform @TODO @Memory Don't use the platform allocator. In the future we should have a seperate allocator for debug info.
+    leaks = allocate_array<allocation_header *>(leaksCount, {.Alloc = internal::platform_get_persistent_allocator()});
+    defer(free(leaks));
+
     leaksID = ((allocation_header *) leaks - 1)->ID;
 
     {
@@ -150,7 +168,7 @@ file_scope void verify_header_unlocked(allocation_header *header) {
     //     fill it with DEAD_LAND_FILL. The idea is to make the memory invalid so the user code (hopefully) crashes if
     //     it is still interpreted as a valid object. BUT Here we check if _header_ was freed but for some reason we are
     //     trying to verify it.
-    //   * Alignment should not be 0, should be more than POINTER_SIZE (4 or 8) and should be a power of 2.
+    //   * Alignment should not be 0, should be more than POINTER_SIZE (8 bytes) and should be a power of 2.
     //     If any of these is not true, then the header was definitely corrupted.
     //   * We store a pointer to the memory block at the end of the header, any valid header will have this pointer point after itself.
     //     Otherwise the header was definitely corrupted.
@@ -165,9 +183,9 @@ file_scope void verify_header_unlocked(allocation_header *header) {
         assert(false && "Trying to access freed memory!");
     }
 
-    assert(header->Alignment && "Alignment is zero. Definitely corrupted.");
-    assert(header->Alignment >= POINTER_SIZE && "Alignment smaller than pointer size. Definitely corrupted.");
-    assert(is_pow_of_2(header->Alignment) && "Alignment not a power of 2. Definitely corrupted.");
+    assert(header->Alignment && "Stored alignment is zero. Definitely corrupted.");
+    assert(header->Alignment >= POINTER_SIZE && "Stored alignment smaller than pointer size (8 bytes). Definitely corrupted.");
+    assert(is_pow_of_2(header->Alignment) && "Stored alignment not a power of 2. Definitely corrupted.");
 
     assert(header->DEBUG_Pointer == header + 1 && "Debug pointer doesn't match. They should always match.");
 
@@ -197,8 +215,6 @@ void debug_memory::maybe_verify_heap() {
     // We need to lock here because another thread can free a header while we are reading from it.
     if (AllocationCount % MemoryVerifyHeapFrequency) return;
 
-    assert(!Head || !Head->DEBUG_Previous);
-
     auto *it = Head;
     while (it) {
         verify_header_unlocked(it);
@@ -208,7 +224,7 @@ void debug_memory::maybe_verify_heap() {
 #endif
 
 file_scope void *encode_header(void *p, s64 userSize, u32 align, allocator alloc, u64 flags) {
-    u32 padding = calculate_padding_for_pointer_with_header(p, align, sizeof(allocation_header));
+    u32 padding          = calculate_padding_for_pointer_with_header(p, align, sizeof(allocation_header));
     u32 alignmentPadding = padding - sizeof(allocation_header);
 
     auto *result = (allocation_header *) ((char *) p + alignmentPadding);
@@ -226,9 +242,9 @@ file_scope void *encode_header(void *p, s64 userSize, u32 align, allocator alloc
 #endif
 
     result->Alloc = alloc;
-    result->Size = userSize;
+    result->Size  = userSize;
 
-    result->Alignment = align;
+    result->Alignment        = align;
     result->AlignmentPadding = alignmentPadding;
 
     //
@@ -276,7 +292,7 @@ file_scope void log_file_and_line(source_location loc) {
 
     auto line = loc.Line;
 
-    auto *numberP = number + 19;
+    auto *numberP  = number + 19;
     s64 numberSize = 0;
     {
         while (line) {
@@ -308,13 +324,13 @@ void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options
         id = DEBUG_memory->AllocationCount;
     }
 
-    if (id == 1352) {
+    if (id == 75) {
         s32 k = 42;
     }
 #endif
 
     if (Context.LogAllAllocations && !Context._LoggingAnAllocation) {
-        auto newContext = Context;
+        auto newContext                 = Context;
         newContext._LoggingAnAllocation = true;
 
         PUSH_CONTEXT(newContext) {
@@ -327,7 +343,7 @@ void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options
     alignment = alignment < POINTER_SIZE ? POINTER_SIZE : alignment;
     assert(is_pow_of_2(alignment));
 
-    s64 required = userSize + alignment + sizeof(allocation_header) + (sizeof(allocation_header) % alignment);
+    s64 required = userSize + alignment + sizeof(allocation_header) + sizeof(allocation_header) % alignment;
 #if defined DEBUG_MEMORY
     required += NO_MANS_LAND_SIZE;  // This is for the bytes after the requested block
 #endif
@@ -344,6 +360,8 @@ void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options
     header->FileLine = loc.Line;
 
     if (DEBUG_memory) {
+        thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
+
         DEBUG_memory->add_header(header);
     }
 #endif
@@ -369,7 +387,7 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
 #endif
 
     if (Context.LogAllAllocations && !Context._LoggingAnAllocation) {
-        auto newContext = Context;
+        auto newContext                 = Context;
         newContext._LoggingAnAllocation = true;
 
         PUSH_CONTEXT(newContext) {
@@ -381,7 +399,7 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
 
     // The header stores the size of the requested allocation
     // (so the user code can look at the header and not be confused with garbage)
-    s64 extra = sizeof(allocation_header) + header->Alignment + (sizeof(allocation_header) % header->Alignment);
+    s64 extra = sizeof(allocation_header) + header->Alignment + sizeof(allocation_header) % header->Alignment;
 
     s64 oldUserSize = header->Size;
 
@@ -416,6 +434,8 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
         newHeader->RID = header->RID + 1;
 
         if (DEBUG_memory) {
+            thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
+
             DEBUG_memory->swap_header(header, newHeader);
         }
 
@@ -431,7 +451,7 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
         p = (void *) (newHeader + 1);
     } else {
         // The block was resized sucessfully and it doesn't need moving
-        assert(block == newBlock);  // Sanity
+        assert(block == newBlock); // Sanity
 
 #if defined DEBUG_MEMORY
         ++header->RID;
@@ -467,11 +487,11 @@ void general_free(void *ptr, u64 options) {
 
     auto *header = (allocation_header *) ptr - 1;
 
-    auto alloc = header->Alloc;
+    auto alloc  = header->Alloc;
     void *block = (char *) header - header->AlignmentPadding;
 
-    s64 extra = header->Alignment + sizeof(allocation_header) + (sizeof(allocation_header) % header->Alignment);
-    s64 size = header->Size + extra;
+    s64 extra = header->Alignment + sizeof(allocation_header) + sizeof(allocation_header) % header->Alignment;
+    s64 size  = header->Size + extra;
 
 #if defined DEBUG_MEMORY
     if (DEBUG_memory) {
@@ -485,6 +505,8 @@ void general_free(void *ptr, u64 options) {
     size += NO_MANS_LAND_SIZE;
 
     if (DEBUG_memory) {
+        thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
+
         DEBUG_memory->unlink_header(header);
     }
 
@@ -502,13 +524,9 @@ void free_all(allocator alloc, u64 options) {
         // Remove allocations made with the allocator from the the linked list so we don't corrupt the heap
         auto *h = DEBUG_memory->Head;
         while (h) {
-            if (h->Alloc == alloc) {
-                auto *next = h->DEBUG_Next;
-                DEBUG_memory->unlink_header(h);
-                h = next;
-            } else {
-                h = h->DEBUG_Next;
-            }
+            auto *tmp = h->DEBUG_Next;
+            DEBUG_memory->unlink_header(h);
+            h = tmp;
         }
     }
 #endif

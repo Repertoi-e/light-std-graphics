@@ -10,7 +10,7 @@ void buffer_layout::add(const string &name, gtype type, s64 count, bool normaliz
     count *= get_count_of_gtype(type);
 
     assert(TotalSize <= numeric_info<u32>::max());
-    append(Elements, {name, get_scalar_gtype(type), sizeInBits, normalized, count, (u32) TotalSize});
+    array_append(Elements, {name, get_scalar_gtype(type), sizeInBits, normalized, count, (u32) TotalSize});
 
     if (sizeInBits == 1) sizeInBits = 8;
     TotalSize += (sizeInBits / 8) * count;
@@ -21,9 +21,9 @@ void buffer_layout::add_padding(s64 bytes) { TotalSize += bytes; }
 extern buffer::impl g_D3DBufferImpl;  // Defined in d3d_buffer.cpp
 void buffer::init(graphics *g, buffer_type type, buffer_usage usage, s64 size, const char *data) {
     Graphics = g;
-    Type = type;
-    Usage = usage;
-    Size = size;
+    Type     = type;
+    Usage    = usage;
+    Size     = size;
     if (g->API == graphics_api::Direct3D) {
         Impl = g_D3DBufferImpl;
     } else {

@@ -1,7 +1,8 @@
-#include "../internal/context.h"
-#include "../os.h"
+#include "../common/context.h"
 #include "allocator.h"
 #include "string.h"
+
+import os;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -15,18 +16,27 @@ void *arena_allocator(allocator_mode mode, void *context, s64 size, void *oldMem
 
     switch (mode) {
         case allocator_mode::ADD_POOL: {
-            auto *pool = (allocator_pool *) oldMemory;  // _oldMemory_ is the parameter which should contain the block to be added
-                                                        // the _size_ parameter contains the size of the block
+            auto *pool = (allocator_pool *) oldMemory; // _oldMemory_ is the parameter which should contain the block to be added
+            // the _size_ parameter contains the size of the block
 
             if (!allocator_pool_initialize(pool, size)) return null;
             allocator_pool_add_to_linked_list(&data->Base, pool);
-            return pool;  // Returns null on failure, the added pool otherwise
+            if (pool) {
+                ++data->PoolsCount;
+                return pool;
+            }
+            return null;
         }
         case allocator_mode::REMOVE_POOL: {
             auto *pool = (allocator_pool *) oldMemory;
 
             void *result = allocator_pool_remove_from_linked_list(&data->Base, pool);
-            return result;  // Returns null on failure, the removed pool otherwise
+            if (result) {
+                --data->PoolsCount;
+                assert(data->PoolsCount >= 0);
+                return result;
+            }
+            return null;
         }
         case allocator_mode::ALLOCATE: {
             auto *p = data->Base;
@@ -35,10 +45,10 @@ void *arena_allocator(allocator_mode mode, void *context, s64 size, void *oldMem
                 p = p->Next;
             }
 
-            if (p->Used + size >= p->Size) return null;  // Not enough space
+            if (p->Used + size >= p->Size) return null; // Not enough space
 
             void *usableBlock = p + 1;
-            void *result = (byte *) usableBlock + p->Used;
+            void *result      = (byte *) usableBlock + p->Used;
 
             p->Used += size;
             data->TotalUsed += size;
@@ -65,7 +75,7 @@ void *arena_allocator(allocator_mode mode, void *context, s64 size, void *oldMem
             auto *p = data->Base;
             while (p) {
                 p->Used = 0;
-                p = p->Next;
+                p       = p->Next;
             }
 
             data->TotalUsed = 0;
@@ -80,8 +90,6 @@ void *arena_allocator(allocator_mode mode, void *context, s64 size, void *oldMem
     return null;
 }
 
-void platform_report_warning(string, source_location loc = source_location::current());
-
 void *default_temp_allocator(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
     auto *data = (arena_allocator_data *) context;
 
@@ -91,9 +99,10 @@ void *default_temp_allocator(allocator_mode mode, void *context, s64 size, void 
         // Make sure the starting pool has enough space for the allocation we are about to do
         if (mode == allocator_mode::ALLOCATE) {
             if (startingPoolSize < size) startingPoolSize = ceil_pow_of_2(size * 2);
+        } else if (mode != allocator_mode::ADD_POOL) {
+            // If we called with ADD_POOL, don't add the starting pool.
+            allocator_add_pool({arena_allocator, data}, os_allocate_block(startingPoolSize), startingPoolSize);
         }
-
-        allocator_add_pool({arena_allocator, data}, os_allocate_block(startingPoolSize), startingPoolSize);
     }
 
     auto *result = arena_allocator(mode, context, size, oldMemory, oldSize, options);
@@ -102,7 +111,7 @@ void *default_temp_allocator(allocator_mode mode, void *context, s64 size, void 
         // This is default behaviour which you can override by providing your own custom allocator extension.
         //
         // You can avoid this by freeing all periodically or by manually adding a large enough pool at the beginning of your program.
-        platform_report_warning("Not enough space in temporary allocator; adding a pool");
+        internal::platform_report_warning("Not enough space in temporary allocator; adding a pool");
 
         s64 poolSize = 8_KiB;
         if (poolSize < size) poolSize = ceil_pow_of_2(size * 2);

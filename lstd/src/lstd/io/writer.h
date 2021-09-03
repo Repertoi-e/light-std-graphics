@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../internal/common.h"
+#include "../common/common.h"
 #include "../memory/string.h"
 
 LSTD_BEGIN_NAMESPACE
@@ -9,11 +9,16 @@ LSTD_BEGIN_NAMESPACE
 // Subclasses of this stuct override the write/flush methods depending on the output (console, files, buffers, etc.)
 // Types are written with the _write_ overloads.
 struct writer {
-    writer() {}
-    virtual ~writer() {}
+    writer() {
+    }
+
+    virtual ~writer() {
+    }
 
     virtual void write(const byte *data, s64 count) = 0;
-    virtual void flush() {}
+
+    virtual void flush() {
+    }
 };
 
 inline void write(writer *w, const byte *data, s64 size) { w->write(data, size); }

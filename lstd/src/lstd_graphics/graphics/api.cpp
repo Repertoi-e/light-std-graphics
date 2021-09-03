@@ -20,7 +20,7 @@ void graphics::init(graphics_api api) {
     Impl.Init(this);
 
     auto predicate = [](auto x) { return !x.Window; };
-    if (find(TargetWindows, &predicate) == -1) append(TargetWindows);  // Add a null target
+    if (find(TargetWindows, &predicate) == -1) array_append(TargetWindows);  // Add a null target
     set_target_window(null);
 }
 
@@ -30,11 +30,11 @@ void graphics::init(graphics_api api) {
 
 void graphics::set_target_window(window *win) {
     auto predicate = [&](auto x) { return x.Window == win; };
-    s64 index = find(TargetWindows, &predicate);
+    s64 index      = find(TargetWindows, &predicate);
 
     target_window *targetWindow;
     if (index == -1) {
-        targetWindow = append(TargetWindows);
+        targetWindow         = array_append(TargetWindows);
         targetWindow->Window = win;
         if (win) {
             targetWindow->CallbackID = win->Event.connect({this, &graphics::window_event_handler});
@@ -42,8 +42,8 @@ void graphics::set_target_window(window *win) {
 
             event e;
             e.Window = win;
-            e.Type = event::Window_Resized;
-            e.Width = win->get_size().x;
+            e.Type   = event::Window_Resized;
+            e.Width  = win->get_size().x;
             e.Height = win->get_size().y;
             window_event_handler(e);
         }
@@ -125,17 +125,17 @@ void graphics::swap() {
 bool graphics::window_event_handler(const event &e) {
     if (e.Type == event::Window_Closed) {
         auto predicate = [&](auto x) { return x.Window == e.Window; };
-        s64 index = find(TargetWindows, &predicate);
+        s64 index      = find(TargetWindows, &predicate);
         assert(index != -1);
 
         target_window *targetWindow = &TargetWindows[index];
         targetWindow->Window->Event.disconnect(targetWindow->CallbackID);
         Impl.ReleaseTargetWindow(this, targetWindow);
 
-        remove_at_index(TargetWindows, index);
+        array_remove_at(TargetWindows, index);
     } else if (e.Type == event::Window_Resized) {
         auto predicate = [&](auto x) { return x.Window == e.Window; };
-        s64 index = find(TargetWindows, &predicate);
+        s64 index      = find(TargetWindows, &predicate);
         assert(index != -1);
 
         if (!e.Window->is_visible()) return false;

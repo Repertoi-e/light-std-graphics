@@ -1,13 +1,16 @@
-#include "lstd/internal/common.h"
+#include "lstd/common/common.h"
 
 #if OS == WINDOWS
 
-#include "lstd/os.h"
+#define LSTD_JUST_DX
+#include "lstd/common/windows.h"
+#undef LSTD_JUST_DX
+
+#include <d3d11.h>
+
 #include "lstd_graphics/graphics/api.h"
 #include "lstd_graphics/graphics/buffer.h"
 #include "lstd_graphics/graphics/shader.h"
-
-#include <d3d11.h>
 
 LSTD_BEGIN_NAMESPACE
 
@@ -35,8 +38,8 @@ void d3d_buffer_init(buffer *b, const char *data) {
     }
 
     D3D11_SUBRESOURCE_DATA srData;
-    srData.pSysMem = data;
-    srData.SysMemPitch = 0;
+    srData.pSysMem          = data;
+    srData.SysMemPitch      = 0;
     srData.SysMemSlicePitch = 0;
 
     auto *srDataPtr = &srData;
@@ -109,10 +112,10 @@ void d3d_buffer_set_input_layout(buffer *b, const buffer_layout &layout) {
     COM_SAFE_RELEASE(b->D3D.Layout);
 
     auto *desc = allocate_array<D3D11_INPUT_ELEMENT_DESC>(layout.Elements.Count, {.Alloc = Context.TempAlloc});
-    auto *p = desc;
+    auto *p    = desc;
     For(layout.Elements) {
-        const char *name = temp_to_c_string(it.Name);
-        *p++ = {name,
+        const char *name = string_to_c_string_temp(it.Name);
+        *p++             = {name,
                 0,
                 gtype_and_count_to_dxgi_format(it.Type, it.Count, it.Normalized),
                 0,
@@ -148,8 +151,7 @@ void *d3d_buffer_map(buffer *b, buffer_map_access access) {
 
 void d3d_buffer_unmap(buffer *b) { b->Graphics->D3D.DeviceContext->Unmap(b->D3D.Buffer, 0); }
 
-void d3d_buffer_bind(buffer *b, primitive_topology topology, u32 offset, u32 stride, shader_type shaderType,
-                     u32 position) {
+void d3d_buffer_bind(buffer *b, primitive_topology topology, u32 offset, u32 stride, shader_type shaderType, u32 position) {
     if (b->Type == buffer_type::Vertex_Buffer) {
         if (stride == 0) stride = (u32) b->Stride;
 
@@ -197,8 +199,7 @@ void d3d_buffer_release(buffer *b) {
     COM_SAFE_RELEASE(b->D3D.Layout);
 }
 
-buffer::impl g_D3DBufferImpl = {d3d_buffer_init, d3d_buffer_set_input_layout, d3d_buffer_map, d3d_buffer_unmap,
-                                d3d_buffer_bind, d3d_buffer_unbind, d3d_buffer_release};
+buffer::impl g_D3DBufferImpl = {d3d_buffer_init, d3d_buffer_set_input_layout, d3d_buffer_map, d3d_buffer_unmap, d3d_buffer_bind, d3d_buffer_unbind, d3d_buffer_release};
 
 LSTD_END_NAMESPACE
 

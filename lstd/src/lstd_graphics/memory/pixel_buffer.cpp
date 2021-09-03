@@ -35,7 +35,7 @@ pixel_buffer::pixel_buffer(const string &path, bool flipVertically, pixel_format
     defer(free(pathNormalized));
 
     s32 w, h, n;
-    u8 *loaded = stbi_load(temp_to_c_string(pathNormalized), &w, &h, &n, (s32) format);
+    u8 *loaded = stbi_load(string_to_c_string_temp(pathNormalized), &w, &h, &n, (s32) format);
 
     Pixels = loaded;
     Width = w;
