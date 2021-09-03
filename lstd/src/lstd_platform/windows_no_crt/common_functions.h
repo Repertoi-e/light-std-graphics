@@ -20,16 +20,16 @@ char *strncpy(char *destination, const char *source, size_t num);
 const char *strrchr(const char *, int);
 
 int strtol(const char *nptr, char **endptr, int base);
-
-int toupper(int c);
-
-// #define ft_qsort  qsort
-// #define ft_getenv  getenv
+double atof(const char *str);
 
 double fmod(double x, double y);
 
-double atof(const char *str);
 int sscanf(const char *str, const char *fmt, ...);
+void qsort(void *data, size_t items, size_t size, int (*compare)(const void *, const void *));
+
+// #define ft_getenv  getenv
+
+int toupper(int c);
 }
 
 // Float versions of math functions (defined in cephes)

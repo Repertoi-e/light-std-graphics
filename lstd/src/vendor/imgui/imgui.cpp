@@ -1988,7 +1988,7 @@ void ImGuiStorage::BuildSortByKey()
 {
     struct StaticFunc
     {
-        static int IMGUI_CDECL PairCompareByID(const ImGuiStoragePair *lhs, const ImGuiStoragePair *rhs)  // :WEMODIFIEDIMGUI:
+        static int IMGUI_CDECL PairCompareByID(const void *lhs, const void *rhs) 
         {
             // We can't just do a subtraction because qsort uses signed integers and subtracting our ID doesn't play well with that.
             if (((const ImGuiStoragePair*)lhs)->key > ((const ImGuiStoragePair*)rhs)->key) return +1;
@@ -4478,7 +4478,7 @@ void ImGui::Shutdown(ImGuiContext* context)
 }
 
 // FIXME: Add a more explicit sort order in the window structure.
-static int IMGUI_CDECL ChildWindowComparer(ImGuiWindow *const *lhs, ImGuiWindow *const *rhs)  // :WEMODIFIEDIMGUI:
+static int IMGUI_CDECL ChildWindowComparer(const void *lhs, const void *rhs)  
 {
     const ImGuiWindow* const a = *(const ImGuiWindow* const *)lhs;
     const ImGuiWindow* const b = *(const ImGuiWindow* const *)rhs;
@@ -12799,7 +12799,7 @@ static void ImGui::DockContextRemoveNode(ImGuiContext* ctx, ImGuiDockNode* node,
     }
 }
 
-static int IMGUI_CDECL DockNodeComparerDepthMostFirst(ImGuiDockNode* const* lhs, ImGuiDockNode* const* rhs) // :WEMODIFIEDIMGUI:
+static int IMGUI_CDECL DockNodeComparerDepthMostFirst(const void *lhs, const void *rhs) 
 {
     const ImGuiDockNode* a = *(const ImGuiDockNode* const*)lhs;
     const ImGuiDockNode* b = *(const ImGuiDockNode* const*)rhs;
@@ -13957,7 +13957,7 @@ static void ImGui::DockNodeUpdate(ImGuiDockNode* node)
 }
 
 // Compare TabItem nodes given the last known DockOrder (will persist in .ini file as hint), used to sort tabs when multiple tabs are added on the same frame.
-static int IMGUI_CDECL TabItemComparerByDockOrder(const ImGuiTabItem* lhs, const ImGuiTabItem* rhs) // :WEMODIFIEDIMGUI:
+static int IMGUI_CDECL TabItemComparerByDockOrder(const void* lhs, const void* rhs) 
 {
     ImGuiWindow* a = ((const ImGuiTabItem*)lhs)->Window;
     ImGuiWindow* b = ((const ImGuiTabItem*)rhs)->Window;
@@ -16336,7 +16336,7 @@ static void RenderViewportsThumbnails()
     ImGui::Dummy(bb_full.GetSize() * SCALE);
 }
 
-static int IMGUI_CDECL ViewportComparerByFrontMostStampCount(ImGuiViewportP* const *lhs, ImGuiViewportP* const *rhs) // :WEMODIFIEDIMGUI:
+static int IMGUI_CDECL ViewportComparerByFrontMostStampCount(const void *lhs, const void *rhs) 
 {
     const ImGuiViewportP* a = *(const ImGuiViewportP* const *)lhs;
     const ImGuiViewportP* b = *(const ImGuiViewportP* const *)rhs;

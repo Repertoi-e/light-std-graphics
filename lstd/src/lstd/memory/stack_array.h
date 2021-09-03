@@ -2,53 +2,10 @@
 
 #include "../types.h"
 #include "array_like.h"
+#include "qsort.h"
 #include "string_utils.h"
 
 LSTD_BEGIN_NAMESPACE
-
-template <typename T>
-using quick_sort_comparison_func = s32 (*)(const T *, const T *);
-
-template <typename T>
-constexpr T *quick_sort_partition(T *first, T *last, T *pivot, quick_sort_comparison_func<T> func) {
-    --last;
-    swap(*pivot, *last);
-    pivot = last;
-
-    while (true) {
-        while (func(first, pivot) < 0) ++first;
-        --last;
-        while (func(pivot, last) < 0) --last;
-        if (func(first, last) > 0) {
-            swap(*pivot, *first);
-            return first;
-        }
-        swap(*first, *last);
-        ++first;
-    }
-}
-
-template <typename T>
-s32 default_comparison(const T *lhs, const T *rhs) {
-    if (*lhs > *rhs) return 1;
-    if (*lhs < *rhs) return -1;
-    return 0;
-}
-
-template <typename T>
-constexpr void quick_sort(T *first, T *last, quick_sort_comparison_func<T> func = default_comparison<T>) {
-    if (first >= last) return;
-
-    auto *pivot     = first + (last - first) / 2;
-    auto *nextPivot = quick_sort_partition(first, last, pivot, func);
-    quick_sort(first, nextPivot, func);
-    quick_sort(nextPivot + 1, last, func);
-}
-
-template <typename T>
-constexpr void quick_sort(T *first, s64 count, quick_sort_comparison_func<T> func = default_comparison<T>) {
-    quick_sort(first, first + count - 1, func);
-}
 
 template <typename T>
 struct array;
@@ -86,7 +43,7 @@ struct stack_array {
     //
     // Iterators:
     //
-    using iterator = T *;
+    using iterator       = T *;
     using const_iterator = const T *;
 
     constexpr iterator begin() { return Data; }
@@ -114,10 +71,10 @@ struct return_type_helper<void, Types...> : types::common_type<Types...> {
 };
 
 template <class T, s64 N, s64... I>
-constexpr stack_array<types::remove_cv_t<T>, N> to_array_impl(T(&a)[N], integer_sequence<I...>) {
+constexpr stack_array<types::remove_cv_t<T>, N> to_array_impl(T (&a)[N], integer_sequence<I...>) {
     return {{a[I]...}};
 }
-} // namespace internal
+}  // namespace internal
 
 template <typename D = void, class... Types>
 constexpr stack_array<typename internal::return_type_helper<D, Types...>::type, sizeof...(Types)> to_stack_array(Types &&...t) {

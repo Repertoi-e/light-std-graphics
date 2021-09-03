@@ -19,6 +19,7 @@
 #include "lstd/math/vec.h"
 #include "lstd/memory/stack_array.h"
 #include "lstd/memory/string.h"
+#include "lstd_platform/windows_no_crt/common_functions.h"
 
 //
 // Stuff we modified in the source code is marked with :WEMODIFIEDIMGUI:
@@ -49,13 +50,13 @@
 //#define IMGUI_DISABLE_WIN32_DEFAULT_CLIPBOARD_FUNCTIONS  // [Win32] Don't implement default clipboard handler. Won't use and link with OpenClipboard/GetClipboardData/CloseClipboard etc. (user32.lib/.a, kernel32.lib/.a)
 //#define IMGUI_ENABLE_WIN32_DEFAULT_IME_FUNCTIONS          // [Win32] [Default with Visual Studio] Implement default IME handler (require imm32.lib/.a, auto-link for Visual Studio, -limm32 on command-line for MinGW)
 //#define IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS         // [Win32] [Default with non-Visual Studio compilers] Don't implement default IME handler (won't require imm32.lib/.a)
-#define IMGUI_DISABLE_WIN32_FUNCTIONS                     // [Win32] Won't use and link with any Win32 function (clipboard, ime).
+#define IMGUI_DISABLE_WIN32_FUNCTIONS  // [Win32] Won't use and link with any Win32 function (clipboard, ime).
 //#define IMGUI_ENABLE_OSX_DEFAULT_CLIPBOARD_FUNCTIONS      // [OSX] Implement default OSX clipboard handler (need to link with '-framework ApplicationServices', this is why this is not the default).
 #define IMGUI_DISABLE_DEFAULT_FORMAT_FUNCTIONS  // Don't implement ImFormatString/ImFormatStringV so you can implement them yourself (e.g. if you don't want to link with vsnprintf)
 //#define IMGUI_DISABLE_DEFAULT_MATH_FUNCTIONS              // Don't implement ImFabs/ImSqrt/ImPow/ImFmod/ImCos/ImSin/ImAcos/ImAtan2 so you can implement them yourself.
-#define IMGUI_DISABLE_FILE_FUNCTIONS                      // Don't implement ImFileOpen/ImFileClose/ImFileRead/ImFileWrite and ImFileHandle at all (replace them with dummies)
+#define IMGUI_DISABLE_FILE_FUNCTIONS  // Don't implement ImFileOpen/ImFileClose/ImFileRead/ImFileWrite and ImFileHandle at all (replace them with dummies)
 //#define IMGUI_DISABLE_DEFAULT_FILE_FUNCTIONS  // Don't implement ImFileOpen/ImFileClose/ImFileRead/ImFileWrite and ImFileHandle so you can implement them yourself if you don't want to link with fopen/fclose/fread/fwrite. This will also disable the LogToTTY() function.
-#define IMGUI_DISABLE_DEFAULT_ALLOCATORS      // Don't implement default allocators calling malloc()/free() to avoid linking with them. You will need to call ImGui::SetAllocatorFunctions().
+#define IMGUI_DISABLE_DEFAULT_ALLOCATORS  // Don't implement default allocators calling malloc()/free() to avoid linking with them. You will need to call ImGui::SetAllocatorFunctions().
 //#define IMGUI_DISABLE_SSE                                 // Disable use of SSE intrinsics even if available
 
 //---- Use 32-bit for ImWchar (default is 16-bit) to support unicode planes 1-16. (e.g. point beyond 0xFFFF like emoticons, dingbats, symbols, shapes, ancient languages, etc...)
@@ -121,7 +122,3 @@
 //---- Tip: You can add extra functions within the ImGui:: namespace, here or in your own headers files.
 namespace ImGui {
 }  // namespace ImGui
-
-#include "lstd_platform/windows_no_crt/common_functions.h"
-
-#define ImQsort(base, num, size, func) LSTD_NAMESPACE::quick_sort(base, num, func)

@@ -305,7 +305,7 @@ static inline ImGuiID   ImHash(const void* data, int size, ImU32 seed = 0) { ret
 #endif
 
 // Helpers: Sorting
-// #define ImQsort         qsort     :WEMODIFIEDIMGUI: Defined in imconfig.h
+#define ImQsort         qsort
 
 // Helpers: Color Blending
 IMGUI_API ImU32         ImAlphaBlendColors(ImU32 col_a, ImU32 col_b);

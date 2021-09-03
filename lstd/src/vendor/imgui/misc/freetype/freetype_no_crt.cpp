@@ -1,5 +1,7 @@
+//
 // We build freetype without the CRT
 // so we need to provide replacement functions.
+//
 
 #include "lstd/common/context.h"
 #include "lstd_platform/windows_no_crt/common_functions.h"
@@ -32,4 +34,6 @@ const char *ft_strstr(const char *str1, const char *str2) { return strstr(str1, 
 int ft_strncmp(const char *str1, const char *str2, size_t num) { return strncmp(str1, str2, num); }
 char *ft_strncpy(char *destination, const char *source, size_t num) { return strncpy(destination, source, num); }
 const char *ft_strrchr(const char *c, int d) { return strrchr(c, d); }
+
+void ft_qsort(void *data, size_t items, size_t size, int (*compare)(const void *, const void *)) { return qsort(data, items, size, compare); }
 }

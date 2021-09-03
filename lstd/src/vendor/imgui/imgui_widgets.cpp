@@ -1490,7 +1490,7 @@ bool ImGui::SplitterBehavior(const ImRect& bb, ImGuiID id, ImGuiAxis axis, float
     return held;
 }
 
-static int IMGUI_CDECL ShrinkWidthItemComparer(const ImGuiShrinkWidthItem* lhs, const ImGuiShrinkWidthItem* rhs) // :WEMODIFIEDIMGUI:
+static int IMGUI_CDECL ShrinkWidthItemComparer(const void* lhs, const void* rhs) 
 {
     const ImGuiShrinkWidthItem* a = (const ImGuiShrinkWidthItem*)lhs;
     const ImGuiShrinkWidthItem* b = (const ImGuiShrinkWidthItem*)rhs;
@@ -7134,7 +7134,7 @@ static inline int TabItemGetSectionIdx(const ImGuiTabItem* tab)
     return (tab->Flags & ImGuiTabItemFlags_Leading) ? 0 : (tab->Flags & ImGuiTabItemFlags_Trailing) ? 2 : 1;
 }
 
-static int IMGUI_CDECL TabItemComparerBySection(const ImGuiTabItem* lhs, const ImGuiTabItem* rhs) // :WEMODIFIEDIMGUI:
+static int IMGUI_CDECL TabItemComparerBySection(const void* lhs, const void* rhs) 
 {
     const ImGuiTabItem* a = (const ImGuiTabItem*)lhs;
     const ImGuiTabItem* b = (const ImGuiTabItem*)rhs;
@@ -7145,7 +7145,7 @@ static int IMGUI_CDECL TabItemComparerBySection(const ImGuiTabItem* lhs, const I
     return (int)(a->IndexDuringLayout - b->IndexDuringLayout);
 }
 
-static int IMGUI_CDECL TabItemComparerByBeginOrder(const ImGuiTabItem* lhs, const ImGuiTabItem* rhs) // :WEMODIFIEDIMGUI:
+static int IMGUI_CDECL TabItemComparerByBeginOrder(const void* lhs, const void* rhs)
 {
     const ImGuiTabItem* a = (const ImGuiTabItem*)lhs;
     const ImGuiTabItem* b = (const ImGuiTabItem*)rhs;

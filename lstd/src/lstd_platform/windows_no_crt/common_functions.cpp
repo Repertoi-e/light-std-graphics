@@ -236,8 +236,6 @@ char *strncpy(char *dst, const char *src, size_t len) {
     return (dst);
 }
 
-int toupper(int c) { return LSTD_NAMESPACE::to_upper(c); }
-
 static unsigned char charmap(char c) {
     char chr;
 
@@ -298,4 +296,10 @@ double atof(const char *str) {
 int sscanf(const char *str, const char *fmt, ...) {
     return 0;
 }
+
+void qsort(void *data, size_t items, size_t size, int (*compare)(const void *, const void *)) {
+    return LSTD_NAMESPACE::quick_sort(data, (s64) items, (s64) size, compare);
+}
+
+int toupper(int c) { return LSTD_NAMESPACE::to_upper(c); }
 }
