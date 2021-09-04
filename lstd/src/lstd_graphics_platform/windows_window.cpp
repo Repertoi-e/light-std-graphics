@@ -223,9 +223,9 @@ file_scope void do_key_input_event(window *win, u32 key, bool pressed, bool asyn
     event e;
     e.Window = win;
     if (pressed) {
-        e.Type = repeated ? event::Keyboard_Repeated : event::Keyboard_Pressed;
+        e.Type = repeated ? event::Key_Repeated : event::Key_Pressed;
     } else {
-        e.Type = event::Keyboard_Released;
+        e.Type = event::Key_Released;
     }
     e.KeyCode = key;
     (void) win->Event.emit(e);

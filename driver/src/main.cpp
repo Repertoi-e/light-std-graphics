@@ -370,7 +370,7 @@ file_scope bool common_event_callback(const event &e) {
     ImGuiIO &io = ImGui::GetIO();
     auto *bd    = (imgui_our_windows_data *) io.BackendPlatformUserData;
 
-    if (e.Type == event::Keyboard_Pressed) {
+    if (e.Type == event::Key_Pressed) {
         io.KeysDown[e.KeyCode]         = true;
         bd->KeyOwnerWindows[e.KeyCode] = e.Window;
         update_modifiers();
@@ -581,11 +581,11 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
     io.KeyMap[ImGuiKey_End]         = Key_End;
     io.KeyMap[ImGuiKey_Insert]      = Key_Insert;
     io.KeyMap[ImGuiKey_Delete]      = Key_Delete;
-    io.KeyMap[ImGuiKey_Backspace]   = Key_Backspace;
+    io.KeyMap[ImGuiKey_Backspace]   = Key_Delete;
     io.KeyMap[ImGuiKey_Space]       = Key_Space;
-    io.KeyMap[ImGuiKey_Enter]       = Key_Enter;
+    io.KeyMap[ImGuiKey_Enter]       = Key_Return;
     io.KeyMap[ImGuiKey_Escape]      = Key_Escape;
-    io.KeyMap[ImGuiKey_KeyPadEnter] = KeyPad_Enter;
+    io.KeyMap[ImGuiKey_KeyPadEnter] = KP_Enter;
     io.KeyMap[ImGuiKey_A]           = Key_A;
     io.KeyMap[ImGuiKey_C]           = Key_C;
     io.KeyMap[ImGuiKey_V]           = Key_V;
