@@ -206,8 +206,6 @@ window *window::init(const string &title, s32 x, s32 y, s32 width, s32 height, u
     Next        = WindowsList;
     WindowsList = this;
 
-    Size = {width, height};
-
     return this;
 }
 
@@ -266,14 +264,14 @@ file_scope void do_mouse_move(window *win, vec2<s32> pos) {
 //
 // Here are a couple functions which enable us to break from the window resize loop.
 // This allows properly sending events to people while the user is resizing the window
-// allowing for smooth content updates (usually apps implement this with WM_PAINT, 
+// allowing for smooth content updates (usually apps implement this with WM_PAINT,
 // but since we are doing graphics outside the message loop, we can't rely on this).
-// 
-// Things that are not emulated: shaking and snapping. 
+//
+// Things that are not emulated: shaking and snapping.
 // These can be implemented and the author of the original piece of code has implemented them,
 // but we just haven't bothered including them here.
 // @TODO For completeness..
-// 
+//
 // https://sourceforge.net/projects/win32loopl/
 //
 
@@ -970,7 +968,11 @@ void window::set_pos(vec2<s32> pos) {
     SetWindowPos(PlatformData.Win32.hWnd, null, rect.left, rect.top, 0, 0, SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOSIZE);
 }
 
-vec2<s32> window::get_size() { return Size; }
+vec2<s32> window::get_size() {
+    RECT rect;
+    GetClientRect(PlatformData.Win32.hWnd, &rect);
+    return {rect.right, rect.bottom};
+}
 
 void window::set_size(vec2<s32> size) {
     DisplayMode.Width  = size.x;
@@ -1605,8 +1607,6 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             e.Type   = event::Window_Framebuffer_Resized;
             e.Width  = LOWORD(lParam);
             e.Height = HIWORD(lParam);
-
-            win->Size = {e.Width, e.Height};
 
             (void) win->Event.emit(e);
             e.Type = event::Window_Resized;

@@ -102,8 +102,6 @@ struct window {
     // The state of each mouse button if it got changed this frame (true if clicked), use this to check for non-repeat
     stack_array<bool, Mouse_Button_Last + 1> MouseButtonsThisFrame;
 
-    vec2<s32> Size;
-
     // _true_ when the window is closing
     bool IsDestroying = false;
 
