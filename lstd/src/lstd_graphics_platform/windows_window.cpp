@@ -3,7 +3,6 @@
 #if OS == WINDOWS
 
 #include "lstd/common/windows.h"
-
 #include "lstd/fmt/fmt.h"
 #include "lstd_graphics/video/window.h"
 
@@ -207,6 +206,8 @@ window *window::init(const string &title, s32 x, s32 y, s32 width, s32 height, u
     Next        = WindowsList;
     WindowsList = this;
 
+    Size = {width, height};
+
     return this;
 }
 
@@ -262,6 +263,284 @@ file_scope void do_mouse_move(window *win, vec2<s32> pos) {
     (void) win->Event.emit(e);
 }
 
+//
+// Here are a couple functions which enable us to break from the window resize loop.
+// This allows properly sending events to people while the user is resizing the window
+// allowing for smooth content updates (usually apps implement this with WM_PAINT, 
+// but since we are doing graphics outside the message loop, we can't rely on this).
+// 
+// Things that are not emulated: shaking and snapping. 
+// These can be implemented and the author of the original piece of code has implemented them,
+// but we just haven't bothered including them here.
+// @TODO For completeness..
+// 
+// https://sourceforge.net/projects/win32loopl/
+//
+
+/*
+    LooplessSizeMove.c
+    Implements functions for modal-less window resizing and movement in Windows
+
+    Author: Nathaniel J Fries
+
+    The author asserts no copyright, this work is released into the public domain.
+*/
+
+#define LSM_LEFT 0x01
+#define LSM_TOP 0x02
+#define LSM_RIGHT 0x04
+#define LSM_BOTTOM 0x08
+#define LSM_CAPTION 0x00
+#define LSM_NOGRAB 0xF0
+
+struct SIZEMOVEDATA {
+    HWND hWnd;
+    MINMAXINFO minmax;
+    RECT rcWin;
+    RECT rcOrig;
+    POINT ptCapture;
+    LONG grab;
+};
+
+file_scope thread_local SIZEMOVEDATA *sizemove;
+
+void GetMinMaxInfo(HWND hWnd, PMINMAXINFO info) {
+    RECT rc;
+    LONG style    = GetWindowLongW(hWnd, GWL_STYLE);
+    LONG altStyle = ((style & WS_CAPTION) == WS_CAPTION) ? (style & ~WS_BORDER) : (style);
+
+    /* calculate the default values in case WindowProc does not respond */
+    GetClientRect(GetParent(hWnd), &rc);
+    AdjustWindowRectEx(&rc, altStyle, ((style & WS_POPUP) && GetMenu(hWnd)), GetWindowLongW(hWnd, GWL_EXSTYLE));
+    info->ptMaxPosition.x = rc.left;
+    info->ptMaxPosition.y = rc.top;
+    info->ptMaxSize.x     = rc.right - rc.left;
+    info->ptMaxSize.y     = rc.bottom - rc.top;
+    if (style & WS_CAPTION) {
+        info->ptMinTrackSize.x = GetSystemMetrics(SM_CXMINTRACK);
+        info->ptMaxTrackSize.y = GetSystemMetrics(SM_CYMINTRACK);
+    } else {
+        /* why not zero? this is what ReactOS and presumably Wine do,
+        and they're the experts at replicating Windows UI behavior */
+        info->ptMinTrackSize.x = info->ptMaxPosition.x * -2;
+        info->ptMaxTrackSize.y = info->ptMaxPosition.y * -2;
+    }
+    info->ptMaxTrackSize.x = GetSystemMetrics(SM_CXMAXTRACK);
+    info->ptMaxTrackSize.y = GetSystemMetrics(SM_CYMAXTRACK);
+
+    /* ask Window proc to make any changes */
+    SendMessageW(hWnd, WM_GETMINMAXINFO, 0, (LPARAM) info);
+}
+
+LRESULT PrepareSizeMove(HWND hWnd, WPARAM action, DWORD dwPos) {
+    WINDOWINFO winfo;
+    SIZEMOVEDATA *sm;
+    RECT rcClipCursor;
+
+    winfo.cbSize = sizeof(WINDOWINFO);
+    /* most likely not a valid window */
+    if (GetWindowInfo(hWnd, &winfo) == 0)
+        return 0;
+    /* can't move or resize a maximized or invisible window */
+    if (winfo.dwStyle & WS_MAXIMIZE || !IsWindowVisible(hWnd))
+        return 0;
+    /* can't resize a window without the resizing border */
+    if ((action & 0xfff0) == SC_MOVE && !(winfo.dwStyle & WS_SIZEBOX))
+        return 0;
+
+    /*
+      if another window on this thread has capture,
+      it might be using this too...
+      tell it to clean up before setting the tls value
+    */
+    ReleaseCapture();
+
+    sm = (SIZEMOVEDATA *) LocalAlloc(0, sizeof(SIZEMOVEDATA));
+    if (!sm) {
+        /* error */
+        return 1;
+    }
+    sizemove = sm;
+
+    sm->grab = action & 0x000f;
+    sm->hWnd = hWnd;
+    GetMinMaxInfo(hWnd, &sm->minmax);
+    sm->rcWin = winfo.rcWindow;
+    if (winfo.dwStyle & WS_CHILD) {
+        /* map points into the parent's coordinate space */
+        HWND parent = GetParent(hWnd);
+        MapWindowPoints(0, parent, (LPPOINT) &sm->rcWin, 2);
+        GetWindowRect(parent, &rcClipCursor);
+        MapWindowPoints(parent, HWND_DESKTOP, (LPPOINT) &rcClipCursor, 2);
+    } else if (!(winfo.dwExStyle & WS_EX_TOPMOST)) {
+        SystemParametersInfoW(SPI_GETWORKAREA, 0, &rcClipCursor, 0);
+    } else {
+        rcClipCursor.left = rcClipCursor.top = 0;
+        rcClipCursor.right                   = GetSystemMetrics(SM_CXSCREEN);
+        rcClipCursor.bottom                  = GetSystemMetrics(SM_CYSCREEN);
+    }
+    sm->rcOrig = sm->rcWin;
+
+    sm->ptCapture.x = (short) LOWORD(dwPos);
+    sm->ptCapture.y = (short) HIWORD(dwPos);
+    ClipCursor(&rcClipCursor);
+    /* notify WinProc we're beginning, but return instead of looping */
+    SendMessageW(hWnd, WM_ENTERSIZEMOVE, 0, 0);
+    if (GetCapture() != hWnd) {
+        SetCapture(hWnd);
+    }
+    return 0;
+}
+
+#define RECTWIDTH(r) ((r).right - (r).left)
+#define RECTHEIGHT(r) ((r).bottom - (r).top)
+
+bool SizingCheck(const MSG *lpmsg) {
+    POINT pt = lpmsg->pt;
+    int dx = 0, dy = 0;
+    /*
+        Discussion of rev3 changes.
+        There was a bug in previous revisions that would cause
+            the resize state to continue even if the Window lost
+            mouse capture. Windows provides notification of losing
+            mouse capture, but it crashes the program to take capture
+            back while processing that message.
+            So, we choose to yield to this other program and stop resizing.
+            This is probably user32 behavior anyway.
+            Windows also sends this notification in response to calling ReleaseCapture,
+                so all clean-up code has been moved to the handler.
+            This also allowed us to eliminate the function StopSizing.
+	*/
+    if (!sizemove) /* not sizing */
+        return 0;
+    if (sizemove->grab == LSM_NOGRAB) /* not sizing */
+        return 0;
+    if (lpmsg->hwnd != sizemove->hWnd) /* wrong window */
+        return 0;
+    if (lpmsg->message == WM_NCLBUTTONUP || lpmsg->message == WM_LBUTTONUP) {
+        ReleaseCapture();
+        return 1;
+    }
+
+    if (lpmsg->message == WM_KEYDOWN) {
+        switch (lpmsg->wParam) {
+            case VK_RETURN:
+                ReleaseCapture();
+                return 1;
+            case VK_ESCAPE: {
+                SetWindowPos(sizemove->hWnd, 0, sizemove->rcOrig.left, sizemove->rcOrig.top, RECTWIDTH(sizemove->rcOrig), RECTHEIGHT(sizemove->rcOrig), 0);
+                ReleaseCapture();
+                return 1;
+            }
+            case VK_UP:
+                pt.y -= 8;
+                break;
+            case VK_DOWN:
+                pt.y += 8;
+                break;
+            case VK_LEFT:
+                pt.x -= 8;
+                break;
+            case VK_RIGHT:
+                pt.x += 8;
+                break;
+            default:
+                break;
+        }
+    }
+
+    /* used to handle WM_MOUSEMOVE. This was unnecessary code  */
+
+    dx = pt.x - sizemove->ptCapture.x;
+    dy = pt.y - sizemove->ptCapture.y;
+    if (dx || dy) {
+        BOOL changeCursor = (lpmsg->message == WM_KEYDOWN);
+        WPARAM wpHit      = 0;
+
+        if (sizemove->grab == LSM_CAPTION) {
+            OffsetRect(&sizemove->rcWin, dx, dy);
+        } else {
+            /* note on minmax correction
+                if you do not correct the capture pos (set later from `pt`),
+                window will expand massively if user pulls back mouse
+                after failing to shrink when resizing from the
+                bottom or the right borders.
+            */
+            /* when resizing using keys, Windows also moves the cursor */
+            if (sizemove->grab & LSM_LEFT) {
+                int lmax = sizemove->rcWin.right - sizemove->minmax.ptMaxTrackSize.x;
+                int lmin = sizemove->rcWin.right - sizemove->minmax.ptMinTrackSize.x;
+                if (sizemove->rcWin.left + dx < lmax) {
+                    sizemove->rcWin.left = lmax;
+                } else if (sizemove->rcWin.left + dx > lmin) {
+                    sizemove->rcWin.left = lmin;
+                } else {
+                    sizemove->rcWin.left += dx;
+                }
+                pt.x  = sizemove->rcWin.left;
+                wpHit = WMSZ_LEFT;
+            } else if (sizemove->grab & LSM_RIGHT) {
+                int rmax = sizemove->rcWin.left + sizemove->minmax.ptMaxTrackSize.x;
+                int rmin = sizemove->rcWin.left + sizemove->minmax.ptMinTrackSize.x;
+                if (sizemove->rcWin.right + dx > rmax) {
+                    sizemove->rcWin.right = rmax;
+                } else if (sizemove->rcWin.right + dx < rmin) {
+                    sizemove->rcWin.right = rmin;
+                } else {
+                    sizemove->rcWin.right += dx;
+                }
+                pt.x  = sizemove->rcWin.right;
+                wpHit = WMSZ_RIGHT;
+            }
+            if (sizemove->grab & LSM_TOP) {
+                int tmax = sizemove->rcWin.bottom - sizemove->minmax.ptMaxTrackSize.y;
+                int tmin = sizemove->rcWin.bottom - sizemove->minmax.ptMinTrackSize.y;
+                if (sizemove->rcWin.top + dy < tmax) {
+                    sizemove->rcWin.top = tmax;
+                } else if (sizemove->rcWin.top + dy > tmin) {
+                    sizemove->rcWin.top = tmin;
+                } else {
+                    sizemove->rcWin.top += dy;
+                }
+                pt.y = sizemove->rcWin.top;
+                if (wpHit == WMSZ_LEFT) {
+                    wpHit = WMSZ_TOPLEFT;
+                } else if (wpHit == WMSZ_RIGHT) {
+                    wpHit = WMSZ_TOPRIGHT;
+                } else {
+                    wpHit = WMSZ_TOP;
+                }
+            } else if (sizemove->grab & LSM_BOTTOM) {
+                int bmax = sizemove->rcWin.top + sizemove->minmax.ptMaxTrackSize.y;
+                int bmin = sizemove->rcWin.top + sizemove->minmax.ptMinTrackSize.y;
+                if (sizemove->rcWin.bottom + dy > bmax) {
+                    sizemove->rcWin.bottom = bmax;
+                } else if (sizemove->rcWin.bottom + dy < bmin) {
+                    sizemove->rcWin.bottom = bmin;
+                } else {
+                    sizemove->rcWin.bottom += dy;
+                }
+                pt.y = sizemove->rcWin.bottom;
+                if (wpHit == WMSZ_LEFT) {
+                    wpHit = WMSZ_BOTTOMLEFT;
+                } else if (wpHit == WMSZ_RIGHT) {
+                    wpHit = WMSZ_BOTTOMRIGHT;
+                } else {
+                    wpHit = WMSZ_BOTTOM;
+                }
+            }
+        }
+        SendMessageW(sizemove->hWnd, WM_SIZING, wpHit, (LPARAM) &sizemove->rcWin);
+        SetWindowPos(sizemove->hWnd, 0, sizemove->rcWin.left, sizemove->rcWin.top, RECTWIDTH(sizemove->rcWin), RECTHEIGHT(sizemove->rcWin), 0);
+
+        sizemove->ptCapture = pt;
+
+        /* when resizing using keys, Windows also moves the cursor */
+        if (changeCursor) SetCursorPos(pt.x, pt.y);
+    }
+    return 1;
+}
+
 void window::update() {
     MSG message;
     while (PeekMessageW(&message, null, 0, 0, PM_REMOVE) > 0) {
@@ -273,6 +552,7 @@ void window::update() {
             }
         } else {
             TranslateMessage(&message);
+            SizingCheck(&message);
             DispatchMessageW(&message);
         }
     }
@@ -690,11 +970,7 @@ void window::set_pos(vec2<s32> pos) {
     SetWindowPos(PlatformData.Win32.hWnd, null, rect.left, rect.top, 0, 0, SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOSIZE);
 }
 
-vec2<s32> window::get_size() {
-    RECT area;
-    GetClientRect(PlatformData.Win32.hWnd, &area);
-    return {area.right, area.bottom};
-}
+vec2<s32> window::get_size() { return Size; }
 
 void window::set_size(vec2<s32> size) {
     DisplayMode.Width  = size.x;
@@ -961,17 +1237,49 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
     (void) win->Event.emit(e);
 
     switch (message) {
+        case WM_NCLBUTTONDOWN:
+            switch (wParam) {
+                case HTLEFT:
+                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_LEFT, lParam);
+                case HTTOPLEFT:
+                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_LEFT | LSM_TOP, lParam);
+                case HTBOTTOMLEFT:
+                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_LEFT | LSM_BOTTOM, lParam);
+                case HTRIGHT:
+                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_RIGHT, lParam);
+                case HTTOPRIGHT:
+                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_RIGHT | LSM_TOP, lParam);
+                case HTBOTTOMRIGHT:
+                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_RIGHT | LSM_BOTTOM, lParam);
+                case HTTOP:
+                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_TOP, lParam);
+                case HTBOTTOM:
+                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_BOTTOM, lParam);
+                case HTCAPTION:
+                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_MOVE | LSM_CAPTION, lParam);
+                default:
+                    break;
+            }
         case WM_MOUSEACTIVATE:
             if (HIWORD(lParam) == WM_LBUTTONDOWN) {
                 if (LOWORD(lParam) != HTCLIENT) win->PlatformData.Win32.FrameAction = true;
             }
             break;
         case WM_CAPTURECHANGED:
+            /* nothing we can do; stop resizing & do clean-up */
+            if (sizemove && (HWND) lParam != sizemove->hWnd) {
+                SendMessageW(sizemove->hWnd, WM_EXITSIZEMOVE, 0, 0);
+                LocalFree(sizemove);
+                sizemove = null;
+                ClipCursor(NULL);
+            }
+
             // Hack: Disable the cursor once the caption button action has been completed or cancelled
             if (lParam == 0 && win->PlatformData.Win32.FrameAction) {
                 if (win->CursorMode == window::CURSOR_DISABLED) disable_cursor(win);
                 win->PlatformData.Win32.FrameAction = false;
             }
+
             break;
         case WM_SETFOCUS:
             win->Flags |= window::FOCUSED;
@@ -1011,13 +1319,18 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             return 0;
         case WM_SYSCOMMAND:
             switch (wParam & 0xfff0) {
+                case SC_MOVE:
+                case SC_SIZE:
+                    /* begin resize 'loop' */
+                    return PrepareSizeMove(hWnd, wParam, (DWORD) lParam);
                 case SC_SCREENSAVE:
                 case SC_MONITORPOWER: {
                     if (win->Monitor) {
                         // We are running in full screen mode, so disallow screen saver and screen blanking
                         return 0;
-                    } else
+                    } else {
                         break;
+                    }
                 }
                 case SC_KEYMENU:
                     return 0;
@@ -1292,6 +1605,9 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             e.Type   = event::Window_Framebuffer_Resized;
             e.Width  = LOWORD(lParam);
             e.Height = HIWORD(lParam);
+
+            win->Size = {e.Width, e.Height};
+
             (void) win->Event.emit(e);
             e.Type = event::Window_Resized;
             (void) win->Event.emit(e);

@@ -2821,7 +2821,54 @@ typedef struct tagCOMPOSITIONFORM {
 typedef DWORD HIMC;
 typedef DWORD HIMCC;
 
+#define SM_CXMINTRACK 34
+#define SM_CYMINTRACK 35
+#define SM_CXMAXTRACK 59
+#define SM_CYMAXTRACK 60
+
+typedef struct tagWINDOWINFO {
+    DWORD cbSize;
+    RECT rcWindow;
+    RECT rcClient;
+    DWORD dwStyle;
+    DWORD dwExStyle;
+    DWORD dwWindowStatus;
+    UINT cxWindowBorders;
+    UINT cyWindowBorders;
+    ATOM atomWindowType;
+    WORD wCreatorVersion;
+} WINDOWINFO, *PWINDOWINFO, *LPWINDOWINFO;
+
+
+#define VK_RETURN 0x0D
+#define VK_ESCAPE 0X1B
+#define VK_LEFT 0x25
+#define VK_UP 0x26
+#define VK_RIGHT 0x27
+#define VK_DOWN 0x28
+
+#define SPI_GETWORKAREA 0x0030
+#define SM_CXSCREEN 0
+#define SM_CYSCREEN 1
+
 extern "C" {
+BOOL OffsetRect(
+    LPRECT lprc,
+    int dx,
+    int dy);
+
+HLOCAL LocalAlloc(
+    UINT uFlags,
+    SIZE_T uBytes);
+
+int MapWindowPoints(
+    HWND hWndFrom,
+    HWND hWndTo,
+    LPPOINT lpPoints,
+    UINT cPoints);
+
+HWND GetCapture();
+
 BOOL DragQueryPoint(
     HDROP hDrop,
     POINT *ppt);
@@ -2848,6 +2895,20 @@ BOOL ImmSetCompositionWindow(
 BOOL ImmReleaseContext(
     HWND,
     HIMC);
+
+
+HWND GetParent(
+    HWND hWnd);
+
+HMENU GetMenu(
+    HWND hWnd);
+
+BOOL GetWindowInfo(
+    HWND hwnd,
+    PWINDOWINFO pwi);
+
+BOOL IsWindowVisible(
+    HWND hWnd);
 }
 
 #define CFS_FORCE_POSITION 32
