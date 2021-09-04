@@ -11,23 +11,36 @@ void *memset(void *ptr, int value, size_t n);
 char *strcat(char *s1, const char *s2);
 int strcmp(const char *s1, const char *s2);
 char *strcpy(char *dst, const char *src);
-u64 strlen(const char *s);
+size_t strlen(const char *s);
 
-const char *strchr(const char *str, int character);
-const char *strstr(const char *str1, const char *str2);
-int strncmp(const char *str1, const char *str2, size_t num);
-char *strncpy(char *destination, const char *source, size_t num);
-const char *strrchr(const char *, int);
+#if COMPILER == MSVC
+#pragma warning(push)
+#pragma warning(disable : 4273)
+#endif
+void *calloc(size_t num, size_t size);
+void free(void *block);
+void *malloc(size_t size);
+void *realloc(void *b, size_t size);
+#if COMPILER == MSVC
+#pragma warning(pop)
+#endif
+
+const char *strchr(const char *s, int c);
+const char *strstr(const char *s1, const char *s2);
+int strncmp(const char *s1, const char *s2, size_t n);
+char *strncpy(char *dst, const char *src, size_t n);
+const char *strrchr(const char *s, int n);
 
 int strtol(const char *nptr, char **endptr, int base);
 double atof(const char *str);
+double strtod(const char *str, char **endptr);
 
 double fmod(double x, double y);
 
 int sscanf(const char *str, const char *fmt, ...);
-void qsort(void *data, size_t items, size_t size, int (*compare)(const void *, const void *));
+int sprintf(char *str, const char *format, ...);
 
-// #define ft_getenv  getenv
+void qsort(void *data, size_t items, size_t size, int (*compare)(const void *, const void *));
 
 int toupper(int c);
 }

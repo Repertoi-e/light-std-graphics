@@ -1,6 +1,9 @@
+#include "setjmp.h"
+
 #include "common_functions.h"
 
 #include "lstd/memory/string.h"
+#include "vendor/stb/stb_sprintf.h"
 
 //
 // Some implementations of these are taken from:
@@ -33,7 +36,7 @@ void *memmove(void *dest, const void *src, size_t n) { return LSTD_NAMESPACE::co
 // In that case we don't define them, because these are slow anyway. Similar thing happens with some math
 // functions in the Cephes library (search for :WEMODIFIEDCEPHES:)
 #if COMPILER == MSVC and not defined NDEBUG
-u64 strlen(const char *s) {
+size_t strlen(const char *s) {
     int i;
 
     i = 0;
@@ -163,6 +166,16 @@ double fmod(double x, double y) {
 }
 #endif  // End comment about functions being optimized in Release
 
+void *calloc(size_t num, size_t size) {
+    void *r = (void *) LSTD_NAMESPACE::allocate_array<byte>(num * size);
+    memset(r, 0, num * size);
+    return r;
+}
+
+void free(void *block) { LSTD_NAMESPACE::free(block); }
+void *malloc(size_t size) { return (void *) LSTD_NAMESPACE::allocate_array<byte>(size); }
+void *realloc(void *b, size_t size) { return (void *) LSTD_NAMESPACE::reallocate_array<byte>((byte *) b, size); }
+
 char *strcat(char *s1, const char *s2) {
     int i;
     int j;
@@ -236,6 +249,17 @@ char *strncpy(char *dst, const char *src, size_t len) {
     return (dst);
 }
 
+const char *strrchr(const char *s, int c) {
+    size_t len;
+
+    len = strlen((char *) s);
+    while (0 != len && s[len] != (char) c)
+        len--;
+    if (s[len] == (char) c)
+        return ((char *) &s[len]);
+    return (NULL);
+}
+
 static unsigned char charmap(char c) {
     char chr;
 
@@ -293,8 +317,21 @@ double atof(const char *str) {
     return 0.0;
 }
 
+double strtod(const char *str, char **endptr) {
+    return 0.0;
+}
+
 int sscanf(const char *str, const char *fmt, ...) {
     return 0;
+}
+
+int sprintf(char *str, const char *format, ...) {
+    int result;
+    va_list va;
+    va_start(va, format);
+    result = stbsp_vsprintfcb(0, 0, str, format, va);
+    va_end(va);
+    return result;
 }
 
 void qsort(void *data, size_t items, size_t size, int (*compare)(const void *, const void *)) {

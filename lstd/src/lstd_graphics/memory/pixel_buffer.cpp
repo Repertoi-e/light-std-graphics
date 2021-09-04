@@ -16,26 +16,16 @@ pixel_buffer::pixel_buffer(u8 *pixels, u32 width, u32 height, pixel_format forma
 }
 
 pixel_buffer::pixel_buffer(const string &path, bool flipVertically, pixel_format format) {
-    // auto handle = file::handle(path);
-    //
-    // string data;
-    // handle.read_entire_file(&data);
-    //
-    // stbi_set_flip_vertically_on_load(flipVertically);
-    //
-    // // @Speed Killmenowkillmefastkillmenowkillmefast
-    // s32 w, h, n;
-    // u8 *loaded = stbi_load_from_memory((const u8 *) data.Data, (s32) data.ByteLength, &w, &h, &n, (s32) format);
-    // s64 allocated = ((allocation_header *) loaded - 1)->Size;
-    //
-    // loaded = (u8 *) allocator::reallocate_array(loaded, allocated + POINTER_SIZE);
-    // copy_memory(loaded + POINTER_SIZE, loaded, w * h * n);
-
     string pathNormalized = path_normalize(path);
     defer(free(pathNormalized));
 
+    auto [content, success] = LSTD_NAMESPACE::path_read_entire_file(pathNormalized);
+    if (!success) return;
+
+    // stbi_set_flip_vertically_on_load(flipVertically);
+
     s32 w, h, n;
-    u8 *loaded = stbi_load(string_to_c_string_temp(pathNormalized), &w, &h, &n, (s32) format);
+    u8 *loaded = stbi_load_from_memory(content.Data, (s32) content.Count, &w, &h, &n, (s32) format);
 
     Pixels = loaded;
     Width = w;

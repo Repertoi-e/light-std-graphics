@@ -3,8 +3,11 @@
 // so we need to provide replacement functions.
 //
 
-#include "lstd/common/context.h"
+#include "lstd/memory/string.h"
 #include "lstd_platform/windows_no_crt/common_functions.h"
+#include "vendor/stb/stb_sprintf.h"
+
+import os;
 
 extern "C" {
 const void *ft_memchr(const void *c, int d, size_t e) { return memchr(c, d, e); }
@@ -28,6 +31,23 @@ void *ft_scalloc(size_t num, size_t size) {
 void ft_sfree(void *block) { LSTD_NAMESPACE::free(block); }
 void *ft_smalloc(size_t size) { return (void *) LSTD_NAMESPACE::allocate_array<byte>(size); }
 void *ft_srealloc(void *b, size_t size) { return (void *) LSTD_NAMESPACE::reallocate_array<byte>((byte *) b, size); }
+
+char *ft_getenv(const char *var) {
+    auto [result, success] = LSTD_NAMESPACE::os_get_env(var, true);  // @Leak
+    if (!success) return null;
+
+    // Double @Leak
+    return LSTD_NAMESPACE::string_to_c_string(result, LSTD_NAMESPACE::internal::platform_get_persistent_allocator());
+}
+
+int ft_sprintf(char *str, const char *format, ...) {
+    int result;
+    va_list va;
+    va_start(va, format);
+    result = stbsp_vsprintfcb(0, 0, str, format, va);
+    va_end(va);
+    return result;
+}
 
 const char *ft_strchr(const char *str, int character) { return strchr(str, character); }
 const char *ft_strstr(const char *str1, const char *str2) { return strstr(str1, str2); }

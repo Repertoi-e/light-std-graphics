@@ -1,8 +1,5 @@
 #include "ast.h"
 
-// @Cleanup
-extern "C" double strtod(const char *str, char **endptr);
-
 [[nodiscard("Leak")]] token_stream tokenize(string s) {
     token_stream stream;
     stream.Expression = s;  // We save the original string in order to assist with error reporting

@@ -583,7 +583,7 @@ typedef unsigned char validate_uint32[sizeof(stbi__uint32) == 4 ? 1 : -1];
 #endif
 
 #ifdef _MSC_VER
-#define STBI_HAS_LROTL
+// #define STBI_HAS_LROTL     // No... no we don't have that.
 #endif
 
 #ifdef STBI_HAS_LROTL

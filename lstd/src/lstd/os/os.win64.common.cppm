@@ -5,6 +5,7 @@ module;
 #include "lstd/memory/delegate.h"
 #include "lstd/memory/string.h"
 #include "lstd/common/windows.h"  // Declarations of Win32 functions
+#include "platform_uninit.h"
 
 //
 // Simple wrapper around dynamic libraries and getting addresses of procedures.
@@ -333,8 +334,14 @@ void platform_uninit_state() {
 export {
     void exit(s32 exitCode) {
         // :PlatformExitTermination
+
+        // We can't call this from a DLL because of ExitProcess.
+        // Search for :PlatformExitTermination to see the other place we call this set of functions.
         exit_call_scheduled_functions();
+        win64_monitor_uninit();
+        win64_window_uninit();
         internal::platform_uninit_state();
+
         ExitProcess(exitCode);
     }
 
@@ -406,6 +413,7 @@ export {
 
     //
     // @TODO: Cache environment variables when running the program in order to avoid allocating.
+    // Store them null-terminated in the cache, to avoid callers which expect C style strings having to convert.
     //
     [[nodiscard("Leak")]] os_get_env_result os_get_env(const string &name, bool silent) {
         auto *name16 = utf8_to_utf16(name, PERSISTENT);

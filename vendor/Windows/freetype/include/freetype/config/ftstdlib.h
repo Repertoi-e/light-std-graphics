@@ -16,7 +16,8 @@
  *
  */
 
-/**************************************************************************
+
+  /**************************************************************************
    *
    * This file is used to group all `#includes` to the ANSI~C library that
    * FreeType normally requires.  It also defines macros to rename the
@@ -26,14 +27,17 @@
    *
    */
 
+
 #ifndef FTSTDLIB_H_
 #define FTSTDLIB_H_
 
+
 #include <stddef.h>
 
-#define ft_ptrdiff_t ptrdiff_t
+#define ft_ptrdiff_t  ptrdiff_t
 
-/**************************************************************************
+
+  /**************************************************************************
    *
    *                          integer limits
    *
@@ -51,22 +55,25 @@
    *
    */
 
+
 #include <limits.h>
 
-#define FT_CHAR_BIT CHAR_BIT
-#define FT_USHORT_MAX USHRT_MAX
-#define FT_INT_MAX INT_MAX
-#define FT_INT_MIN INT_MIN
-#define FT_UINT_MAX UINT_MAX
-#define FT_LONG_MIN LONG_MIN
-#define FT_LONG_MAX LONG_MAX
-#define FT_ULONG_MAX ULONG_MAX
+#define FT_CHAR_BIT    CHAR_BIT
+#define FT_USHORT_MAX  USHRT_MAX
+#define FT_INT_MAX     INT_MAX
+#define FT_INT_MIN     INT_MIN
+#define FT_UINT_MAX    UINT_MAX
+#define FT_LONG_MIN    LONG_MIN
+#define FT_LONG_MAX    LONG_MAX
+#define FT_ULONG_MAX   ULONG_MAX
 
-/**************************************************************************
+
+  /**************************************************************************
    *
    *                character and string processing
    *
    */
+
 
 // #include <string.h>
 
@@ -84,14 +91,16 @@
 // #define ft_strrchr  strrchr
 // #define ft_strstr   strstr
 
-/**************************************************************************
+
+  /**************************************************************************
    *
    *                          file handling
    *
    */
 
+
 // #include <stdio.h>
-//
+// 
 // #define FT_FILE     FILE
 // #define ft_fclose   fclose
 // #define ft_fopen    fopen
@@ -100,56 +109,72 @@
 // #define ft_ftell    ftell
 // #define ft_sprintf  sprintf
 
-/**************************************************************************
+
+  /**************************************************************************
    *
    *                            sorting
    *
    */
 
+
 // #include <stdlib.h>
-//
+// 
 // #define ft_qsort  qsort
 
-/**************************************************************************
+
+  /**************************************************************************
    *
    *                       memory allocation
    *
    */
+
 
 // #define ft_scalloc   calloc
 // #define ft_sfree     free
 // #define ft_smalloc   malloc
 // #define ft_srealloc  realloc
 
-/**************************************************************************
+
+  /**************************************************************************
    *
    *                         miscellaneous
    *
    */
 
+
 // #define ft_strtol  strtol
 // #define ft_getenv  getenv
 
-/**************************************************************************
+
+  /**************************************************************************
    *
    *                        execution control
    *
    */
 
-#include <setjmp.h>
+//
+// We modified freetype to use SEH instead of setjmp/longjmp because the latter functions are heavily 
+// architecture dependent and we practically must rely on the standard library for them.
+//
+// #include <setjmp.h>
+// 
+// #define ft_jmp_buf     jmp_buf  /* note: this cannot be a typedef since  */
+//                                 /*       `jmp_buf` is defined as a macro */
+//                                 /*       on certain platforms            */
+// 
+// #define ft_longjmp     longjmp
+// 
+// #undef setjmp
+// #define setjmp        __intrinsic_setjmpex
+// #define ft_setjmp( b ) setjmp( *(ft_jmp_buf*) &(b) ) /* same thing here */
 
-#define ft_jmp_buf jmp_buf /* note: this cannot be a typedef since  */
-                           /*       `jmp_buf` is defined as a macro */
-                           /*       on certain platforms            */
-
-#define ft_longjmp longjmp
-#define ft_setjmp(b) setjmp(*(ft_jmp_buf *) &(b)) /* same thing here */
-
-/* The following is only used for debugging purposes, i.e., if   */
-/* `FT_DEBUG_LEVEL_ERROR` or `FT_DEBUG_LEVEL_TRACE` are defined. */
+  /* The following is only used for debugging purposes, i.e., if   */
+  /* `FT_DEBUG_LEVEL_ERROR` or `FT_DEBUG_LEVEL_TRACE` are defined. */
 
 #include <stdarg.h>
 
+
 #endif /* FTSTDLIB_H_ */
+
 
 /* END */

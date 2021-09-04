@@ -36,66 +36,6 @@ extern "C" bool lstd_init_global_stub() { return true; }
 
 LSTD_BEGIN_NAMESPACE
 
-void win64_crash_handler_init();
-
-#undef LSTD_NO_CRT
-
-// If we are building with NO CRT we call these functions in our entry point - main_no_crt.
-// If we are linking with the CRT then we need to inject these callbacks, so the CRT calls them and initializes the state properly.
-#if not defined LSTD_NO_CRT
-// How it works is described in this awesome article:
-// https://www.codeguru.com/cpp/misc/misc/applicationcontrol/article.php/c6945/Running-Code-Before-and-After-Main.htm#page-2
-#if COMPILER == MSVC
-
-void win64_monitor_init();
-void win64_window_init();
-
-file_scope s32 c_init() {
-    // :PlatformStateInit
-    internal::platform_init_context();
-    internal::platform_init_global_state();
-    win64_crash_handler_init();
-
-    win64_monitor_init();
-    win64_window_init();
-
-    return 0;
-}
-
-file_scope s32 tls_init() {
-    internal::platform_init_context();
-    return 0;
-}
-
-void win64_monitor_uninit();
-void win64_window_uninit();
-
-file_scope s32 pre_termination() {
-    // :PlatformExitTermination
-    exit_call_scheduled_functions();
-
-    win64_monitor_uninit();
-    win64_window_uninit();
-
-    internal::platform_uninit_state();
-    return 0;
-}
-
-typedef s32 cb(void);
-#pragma data_seg(".CRT$XIU")
-static cb *lstd_cinit[] = {c_init};
-
-#pragma data_seg(".CRT$XDU")
-static cb *lstd_tlsinit[] = {tls_init};
-
-#pragma data_seg(".CRT$XPU")
-static cb *lstd_preterm[] = {pre_termination};
-
-#else
-#error @TODO: See how this works on other compilers!
-#endif
-#endif
-
 guid guid_new() {
     GUID g;
     CoCreateGuid(&g);

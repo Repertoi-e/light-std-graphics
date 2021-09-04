@@ -1,5 +1,6 @@
-#include "lstd/common/namespace.h"
 #include "lstd/common/debug_break.h"
+#include "lstd/common/namespace.h"
+#include "lstd/common/windows.h"  // For definitions
 
 import os;
 
@@ -20,6 +21,19 @@ extern "C" int main_stub(int argc, char *argv[]) {
 }
 
 DECLARE_ALTERNATE_NAME_DATA(main, main_stub)
+
+// Dummy if no DllMain was provided.
+extern "C" BOOL WINAPI DllMain_stub(HINSTANCE const instance, DWORD const reason, LPVOID const reserved) { return 1; }
+DECLARE_ALTERNATE_NAME_DATA(DllMain, DllMain_stub)
+
+typedef BOOL(WINAPI *__scrt_dllmain_type)(HINSTANCE, DWORD, LPVOID);
+
+// The client may define a _pRawDllMain.  This function gets called for attach
+// notifications before any other function is called, and gets called for detach
+// notifications after any other function is called.  If no _pRawDllMain is
+// defined, it is aliased to the no-op _pDefaultRawDllMain.
+extern "C" extern __scrt_dllmain_type const _pDefaultRawDllMain = nullptr;
+DECLARE_ALTERNATE_NAME_DATA(_pRawDllMain, _pDefaultRawDllMain)
 
 extern "C" int __cdecl _purecall() {
     debug_break();
