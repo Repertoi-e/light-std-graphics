@@ -1,9 +1,12 @@
-#include "setjmp.h"
-
 #include "common_functions.h"
 
 #include "lstd/memory/string.h"
+#include "setjmp.h"
 #include "vendor/stb/stb_sprintf.h"
+
+#if defined LSTD_NAMESPACE
+using namespace LSTD_NAMESPACE;
+#endif
 
 //
 // Some implementations of these are taken from:
@@ -26,11 +29,11 @@ extern "C" {
 // Declare these as functions, not intrinsics. We have our optimized versions.
 // See comment below.
 #pragma function(memset)
-void *memset(void *ptr, int value, size_t n) { return LSTD_NAMESPACE::fill_memory(ptr, value, n); }
+void *memset(void *ptr, int value, size_t n) { return fill_memory(ptr, value, n); }
 #pragma function(memcpy)
-void *memcpy(void *dest, const void *src, size_t n) { return LSTD_NAMESPACE::copy_memory(dest, src, n); }
+void *memcpy(void *dest, const void *src, size_t n) { return copy_memory(dest, src, n); }
 #pragma function(memmove)
-void *memmove(void *dest, const void *src, size_t n) { return LSTD_NAMESPACE::copy_memory(dest, src, n); }
+void *memmove(void *dest, const void *src, size_t n) { return copy_memory(dest, src, n); }
 
 // If we are building with MSVC in Release, the compiler optimizes the following functions as instrinsics.
 // In that case we don't define them, because these are slow anyway. Similar thing happens with some math
@@ -108,7 +111,7 @@ double fmod(double x, double y) {
     /* float load/store to inner loops ruining performance and code size */
     u64 uxi = ux.i;
 
-    if (uy.i << 1 == 0 || LSTD_NAMESPACE::is_nan(y) || ex == 0x7ff)
+    if (uy.i << 1 == 0 || is_nan(y) || ex == 0x7ff)
         return (x * y) / (x * y);
     if (uxi << 1 <= uy.i << 1) {
         if (uxi << 1 == uy.i << 1)
@@ -167,14 +170,18 @@ double fmod(double x, double y) {
 #endif  // End comment about functions being optimized in Release
 
 void *calloc(size_t num, size_t size) {
-    void *r = (void *) LSTD_NAMESPACE::allocate_array<byte>(num * size);
+    void *r = (void *) allocate_array<byte>(num * size);
     memset(r, 0, num * size);
     return r;
 }
 
+// No need to define this global function if the library was built without a namespace
+#if defined LSTD_NAMESPACE
 void free(void *block) { LSTD_NAMESPACE::free(block); }
-void *malloc(size_t size) { return (void *) LSTD_NAMESPACE::allocate_array<byte>(size); }
-void *realloc(void *b, size_t size) { return (void *) LSTD_NAMESPACE::reallocate_array<byte>((byte *) b, size); }
+#endif
+
+void *malloc(size_t size) { return (void *) allocate_array<byte>(size); }
+void *realloc(void *b, size_t size) { return (void *) reallocate_array<byte>((byte *) b, size); }
 
 char *strcat(char *s1, const char *s2) {
     int i;
@@ -263,7 +270,7 @@ const char *strrchr(const char *s, int c) {
 static unsigned char charmap(char c) {
     char chr;
 
-    chr = toupper(c);
+    chr = to_upper(c);
     if (chr >= '0' && chr <= '9')
         return (chr - '0');
     if (chr >= 'A' && chr <= 'Z')
@@ -296,7 +303,7 @@ int strtol(const char *nptr, char **endptr, int base) {
         return (0);
     neg    = 0;
     result = 0;
-    while (LSTD_NAMESPACE::is_space(*nptr))
+    while (is_space(*nptr))
         nptr++;
     if (*nptr == '-' || *nptr == '+')
         if (*nptr++ == '-')
@@ -313,16 +320,469 @@ int strtol(const char *nptr, char **endptr, int base) {
     return (result + (result * -2 * neg));
 }
 
-double atof(const char *str) {
-    return 0.0;
+/*
+ * strtod and atof implementation from minlibc. https://github.com/GaloisInc/minlibc
+ * Here is a copy of the license: 
+ * 
+ * Copyright (c) 2014 Galois Inc.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions 
+ * are met:
+ * 
+ *   * Redistributions of source code must retain the above copyright 
+ *     notice, this list of conditions and the following disclaimer.
+ * 
+ *   * Redistributions in binary form must reproduce the above copyright 
+ *     notice, this list of conditions and the following disclaimer in 
+ *     the documentation and/or other materials provided with the 
+ *     distribution.
+ * 
+ *   * Neither the name of Galois, Inc. nor the names of its contributors 
+ *     may be used to endorse or promote products derived from this 
+ *     software without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+ * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+ * OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+double strtod(const char *s, char **endptr) {
+    // This function stolen from either Rolf Neugebauer or Andrew Tolmach.
+    // Probably Rolf.
+    const char *begin = s;
+
+    double a = 0.0;
+    int e    = 0;
+    int c;
+    while ((c = *s++) != '\0' && is_digit(c)) {
+        a = a * 10.0 + (c - '0');
+    }
+    if (c == '.') {
+        while ((c = *s++) != '\0' && is_digit(c)) {
+            a = a * 10.0 + (c - '0');
+            e = e - 1;
+        }
+    }
+    if (c == 'e' || c == 'E') {
+        int sign = 1;
+        int i    = 0;
+        c        = *s++;
+        if (c == '+')
+            c = *s++;
+        else if (c == '-') {
+            c    = *s++;
+            sign = -1;
+        }
+        while (is_digit(c)) {
+            i = i * 10 + (c - '0');
+            c = *s++;
+        }
+        e += i * sign;
+    }
+    while (e > 0) {
+        a *= 10.0;
+        e--;
+    }
+    while (e < 0) {
+        a *= 0.1;
+        e++;
+    }
+
+    if (endptr) {
+        if (s != begin) {
+            *endptr = (char *) (s - 1);
+        } else {
+            // If we couldn't parse anything...
+            *endptr = (char *) s;
+        }
+    }
+
+    return a;
 }
 
-double strtod(const char *str, char **endptr) {
-    return 0.0;
+double atof(const char *s) {
+    return strtod(s, null);
+}
+
+
+//
+// The following is an implementation of sscanf by Rolf Neugebauer.
+// Here is the license:
+
+/*
+ ****************************************************************************
+ * (C) 2003 - Rolf Neugebauer - Intel Research Cambridge
+ ****************************************************************************
+ *
+ *        File: printf.c
+ *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
+ *     Changes: Grzegorz Milos (gm281@cam.ac.uk) 
+ *
+ *        Date: Aug 2003, Aug 2005
+ *
+ * Environment: Xen Minimal OS
+ * Description: Library functions for printing
+ *              (Linux port, mainly lib/vsprintf.c)
+ *
+ ****************************************************************************
+ */
+
+/*
+ * Copyright (C) 1991, 1992  Linus Torvalds
+ */
+
+/* vsprintf.c -- Lars Wirzenius & Linus Torvalds. */
+/*
+ * Wirzenius wrote this portably, Torvalds fucked it up :-)
+ */
+
+/*
+ * Fri Jul 13 2001 Crutcher Dunnavant <crutcher+kernel@datastacks.com>
+ * - changed to provide snprintf and vsnprintf functions
+ * So Feb  1 16:51:32 CET 2004 Juergen Quade <quade@hsnr.de>
+ * - scnprintf and vscnprintf
+ *
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+//
+
+
+/**
+ * simple_strtoul - convert a string to an unsigned long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
+unsigned long simple_strtoul(const char *cp, char **endp, unsigned int base) {
+    unsigned long result = 0, value;
+
+    if (!base) {
+        base = 10;
+        if (*cp == '0') {
+            base = 8;
+            cp++;
+            if ((*cp == 'x') && is_hex_digit(cp[1])) {
+                cp++;
+                base = 16;
+            }
+        }
+    }
+    while (is_hex_digit(*cp) &&
+           (value = is_digit(*cp) ? *cp - '0' : to_upper(*cp) - 'A' + 10) < base) {
+        result = result * base + value;
+        cp++;
+    }
+    if (endp)
+        *endp = (char *) cp;
+    return result;
+}
+
+/**
+ * simple_strtol - convert a string to a signed long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
+long simple_strtol(const char *cp, char **endp, unsigned int base) {
+    if (*cp == '-')
+        return -simple_strtoul(cp + 1, endp, base);
+    return simple_strtoul(cp, endp, base);
+}
+
+/**
+ * simple_strtoull - convert a string to an unsigned long long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
+unsigned long long simple_strtoull(const char *cp, char **endp, unsigned int base) {
+    unsigned long long result = 0, value;
+
+    if (!base) {
+        base = 10;
+        if (*cp == '0') {
+            base = 8;
+            cp++;
+            if ((*cp == 'x') && is_hex_digit(cp[1])) {
+                cp++;
+                base = 16;
+            }
+        }
+    }
+    while (is_hex_digit(*cp) && (value = is_digit(*cp) ? *cp - '0' : (is_lower(*cp) ? to_upper(*cp) : *cp) - 'A' + 10) < base) {
+        result = result * base + value;
+        cp++;
+    }
+    if (endp)
+        *endp = (char *) cp;
+    return result;
+}
+
+/**
+ * simple_strtoll - convert a string to a signed long long
+ * @cp: The start of the string
+ * @endp: A pointer to the end of the parsed string will be placed here
+ * @base: The number base to use
+ */
+long long simple_strtoll(const char *cp, char **endp, unsigned int base) {
+    if (*cp == '-')
+        return -simple_strtoull(cp + 1, endp, base);
+    return simple_strtoull(cp, endp, base);
+}
+
+static int skip_atoi(const char **s) {
+    int i = 0;
+
+    while (is_digit(**s))
+        i = i * 10 + *((*s)++) - '0';
+    return i;
+}
+
+#define ZEROPAD 1  /* pad with zero */
+#define SIGN 2     /* unsigned/signed long */
+#define PLUS 4     /* show plus */
+#define SPACE 8    /* space if plus */
+#define LEFT 16    /* left justified */
+#define SPECIAL 32 /* 0x */
+#define LARGE 64   /* use 'ABCDEF' instead of 'abcdef' */
+
+/**
+ * vsscanf - Unformat a buffer into a list of arguments
+ * @buf:	input buffer
+ * @fmt:	format of buffer
+ * @args:	arguments
+ */
+int vsscanf(const char *buf, const char *fmt, va_list args) {
+    const char *str = buf;
+    char *next;
+    char digit;
+    int num = 0;
+    int qualifier;
+    int base;
+    int field_width;
+    int is_sign = 0;
+
+    while (*fmt && *str) {
+        /* skip any white space in format */
+        /* white space in format matchs any amount of
+		 * white space, including none, in the input.
+		 */
+        if (is_space(*fmt)) {
+            while (is_space(*fmt))
+                ++fmt;
+            while (is_space(*str))
+                ++str;
+        }
+
+        /* anything that is not a conversion must match exactly */
+        if (*fmt != '%' && *fmt) {
+            if (*fmt++ != *str++)
+                break;
+            continue;
+        }
+
+        if (!*fmt)
+            break;
+        ++fmt;
+
+        /* skip this conversion.
+		 * advance both strings to next white space
+		 */
+        if (*fmt == '*') {
+            while (!is_space(*fmt) && *fmt)
+                fmt++;
+            while (!is_space(*str) && *str)
+                str++;
+            continue;
+        }
+
+        /* get field width */
+        field_width = -1;
+        if (is_digit(*fmt))
+            field_width = skip_atoi(&fmt);
+
+        /* get conversion qualifier */
+        qualifier = -1;
+        if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' ||
+            *fmt == 'Z' || *fmt == 'z') {
+            qualifier = *fmt++;
+            if (qualifier == *fmt) [[unlikely]] {
+                if (qualifier == 'h') {
+                    qualifier = 'H';
+                    fmt++;
+                } else if (qualifier == 'l') {
+                    qualifier = 'L';
+                    fmt++;
+                }
+            }
+        }
+        base    = 10;
+        is_sign = 0;
+
+        if (!*fmt || !*str)
+            break;
+
+        switch (*fmt++) {
+            case 'c': {
+                char *s = (char *) va_arg(args, char *);
+                if (field_width == -1)
+                    field_width = 1;
+                do {
+                    *s++ = *str++;
+                } while (--field_width > 0 && *str);
+                num++;
+            }
+                continue;
+            case 's': {
+                char *s = (char *) va_arg(args, char *);
+                if (field_width == -1)
+                    field_width = S32_MAX;
+                /* first, skip leading white space in buffer */
+                while (is_space(*str))
+                    str++;
+
+                /* now copy until next white space */
+                while (*str && !is_space(*str) && field_width--) {
+                    *s++ = *str++;
+                }
+                *s = '\0';
+                num++;
+            }
+                continue;
+            case 'n':
+                /* return number of characters read so far */
+                {
+                    int *i = (int *) va_arg(args, int *);
+                    *i     = str - buf;
+                }
+                continue;
+            case 'o':
+                base = 8;
+                break;
+            case 'x':
+            case 'X':
+                base = 16;
+                break;
+            case 'i':
+                base = 0;
+            case 'd':
+                is_sign = 1;
+            case 'u':
+                break;
+            case '%':
+                /* looking for '%' in str */
+                if (*str++ != '%')
+                    return num;
+                continue;
+            default:
+                /* invalid format; stop here */
+                return num;
+        }
+
+        /* have some sort of integer conversion.
+		 * first, skip white space in buffer.
+		 */
+        while (is_space(*str))
+            str++;
+
+        digit = *str;
+        if (is_sign && digit == '-')
+            digit = *(str + 1);
+
+        if (!digit || (base == 16 && !is_hex_digit(digit)) || (base == 10 && !is_digit(digit)) || (base == 8 && (!is_digit(digit) || digit > '7')) || (base == 0 && !is_digit(digit)))
+            break;
+
+        switch (qualifier) {
+            case 'H': /* that's 'hh' in format */
+                if (is_sign) {
+                    signed char *s = (signed char *) va_arg(args, signed char *);
+                    *s             = (signed char) simple_strtol(str, &next, base);
+                } else {
+                    unsigned char *s = (unsigned char *) va_arg(args, unsigned char *);
+                    *s               = (unsigned char) simple_strtoul(str, &next, base);
+                }
+                break;
+            case 'h':
+                if (is_sign) {
+                    short *s = (short *) va_arg(args, short *);
+                    *s       = (short) simple_strtol(str, &next, base);
+                } else {
+                    unsigned short *s = (unsigned short *) va_arg(args, unsigned short *);
+                    *s                = (unsigned short) simple_strtoul(str, &next, base);
+                }
+                break;
+            case 'l':
+                if (is_sign) {
+                    long *l = (long *) va_arg(args, long *);
+                    *l      = simple_strtol(str, &next, base);
+                } else {
+                    unsigned long *l = (unsigned long *) va_arg(args, unsigned long *);
+                    *l               = simple_strtoul(str, &next, base);
+                }
+                break;
+            case 'L':
+                if (is_sign) {
+                    long long *l = (long long *) va_arg(args, long long *);
+                    *l           = simple_strtoll(str, &next, base);
+                } else {
+                    unsigned long long *l = (unsigned long long *) va_arg(args, unsigned long long *);
+                    *l                    = simple_strtoull(str, &next, base);
+                }
+                break;
+            case 'Z':
+            case 'z': {
+                size_t *s = (size_t *) va_arg(args, size_t *);
+                *s        = (size_t) simple_strtoul(str, &next, base);
+            } break;
+            default:
+                if (is_sign) {
+                    int *i = (int *) va_arg(args, int *);
+                    *i     = (int) simple_strtol(str, &next, base);
+                } else {
+                    unsigned int *i = (unsigned int *) va_arg(args, unsigned int *);
+                    *i              = (unsigned int) simple_strtoul(str, &next, base);
+                }
+                break;
+        }
+        num++;
+
+        if (!next)
+            break;
+        str = next;
+    }
+    return num;
 }
 
 int sscanf(const char *str, const char *fmt, ...) {
-    return 0;
+    va_list args;
+    int i;
+
+    va_start(args, fmt);
+    i = vsscanf(str, fmt, args);
+    va_end(args);
+    return i;
 }
 
 int sprintf(char *str, const char *format, ...) {
@@ -335,8 +795,8 @@ int sprintf(char *str, const char *format, ...) {
 }
 
 void qsort(void *data, size_t items, size_t size, int (*compare)(const void *, const void *)) {
-    return LSTD_NAMESPACE::quick_sort(data, (s64) items, (s64) size, compare);
+    return quick_sort(data, (s64) items, (s64) size, compare);
 }
 
-int toupper(int c) { return LSTD_NAMESPACE::to_upper(c); }
+int toupper(int c) { return to_upper(c); }
 }
