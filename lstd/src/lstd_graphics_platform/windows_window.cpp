@@ -876,22 +876,22 @@ file_scope void update_window_style(window *win) {
     SetWindowPos(win->PlatformData.Win32.hWnd, HWND_TOP, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOZORDER);
 }
 
-void set_bit(u32 *number, u32 bit, s32 enabled) {
-    *number ^= (-enabled ^ *number) & BIT(bit);
+file_scope u32 set_bit(u32 number, u32 mask, bool enabled) {
+    return number & ~mask | mask & (enabled ? 0xFFFFFFFF : 0);
 }
 
 void window::set_borderless(bool enabled) {
-    set_bit(&Flags, (u32) window::BORDERLESS, enabled);
+    Flags = set_bit(Flags, window::BORDERLESS, enabled);
     if (!Monitor) update_window_style(this);
 }
 
 void window::set_resizable(bool enabled) {
-    set_bit(&Flags, (u32) window::RESIZABLE, enabled);
+    Flags = set_bit(Flags, window::RESIZABLE, enabled);
     if (!Monitor) update_window_style(this);
 }
 
 void window::set_always_on_top(bool enabled) {
-    set_bit(&Flags, (u32) window::ALWAYS_ON_TOP, enabled);
+    Flags = set_bit(Flags, window::ALWAYS_ON_TOP, enabled);
     if (!Monitor) {
         HWND after = enabled ? HWND_TOPMOST : HWND_NOTOPMOST;
         SetWindowPos(PlatformData.Win32.hWnd, after, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
@@ -1307,8 +1307,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             return 0;
         }
         case WM_SHOWWINDOW:
-            set_bit(&win->Flags, (u32) window::SHOWN, (bool) wParam);
-            set_bit(&win->Flags, (u32) window::HIDDEN, (bool) !wParam);
+            win->Flags = set_bit(win->Flags, window::SHOWN, (bool) wParam);
+            win->Flags = set_bit(win->Flags, window::HIDDEN, (bool) !wParam);
             break;
         case WM_MOVE:
             if (DisabledCursorWindow == win) update_clip_rect(win);

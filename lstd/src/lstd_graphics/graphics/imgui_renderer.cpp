@@ -10,7 +10,8 @@ void imgui_renderer::init(graphics *g) {
     Graphics = g;
 
     ImGuiIO &io = ImGui::GetIO();
-    io.BackendRendererName = "lstd";
+    io.BackendRendererName = "imgui_impl_lstd_graphics";
+    io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
     io.BackendFlags |= ImGuiBackendFlags_RendererHasViewports;
 
     ImGuiPlatformIO &platformIO = ImGui::GetPlatformIO();

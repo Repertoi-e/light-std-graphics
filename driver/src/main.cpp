@@ -84,7 +84,7 @@ file_scope bool check_for_dll_change() {
 }
 
 void init_imgui_for_our_windows(window *mainWindow);
-void imgui_for_our_windows_new_frame(window *mainWindow);
+void imgui_for_our_windows_new_frame();
 
 // @TODO: Provide a library construct for parsing arguments automatically
 file_scope void parse_arguments() {
@@ -231,7 +231,7 @@ s32 main() {
     newContext.Alloc = PersistentAlloc;
     OVERRIDE_CONTEXT(newContext);
 
-    m->Alloc = PersistentAlloc;
+    m->Alloc     = PersistentAlloc;
     m->TempAlloc = Context.TempAlloc;
 
     parse_arguments();
@@ -309,7 +309,7 @@ s32 main() {
         window::update();
         if (m->MainWindow->IsDestroying) break;
 
-        imgui_for_our_windows_new_frame(m->MainWindow);
+        imgui_for_our_windows_new_frame();
         ImGui::NewFrame();
         if (UpdateAndRender) UpdateAndRender(Memory, Graphics);
         ImGui::Render();
@@ -328,36 +328,71 @@ s32 main() {
     }
 }
 
-static cursor MouseCursors[ImGuiMouseCursor_COUNT] = {
-    cursor(OS_ARROW), cursor(OS_IBEAM), cursor(OS_RESIZE_ALL), cursor(OS_RESIZE_NS), cursor(OS_RESIZE_WE), cursor(OS_RESIZE_NESW), cursor(OS_RESIZE_NWSE), cursor(OS_HAND)};
+struct imgui_our_windows_data {
+    window *Window      = null;
+    window *MouseWindow = null;
 
-file_scope bool MouseButtons[Mouse_Button_Last + 1]{};
+    s64 Time = 0;
+
+    bool MouseJustPressed[Mouse_Button_Last + 1]{};
+    window *KeyOwnerWindows[Key_Last + 1]{};
+
+    bool InstalledCallbacks = false;
+    bool WantUpdateMonitors = false;
+};
+
+struct imgui_our_windows_viewport_data {
+    window *Window                 = null;
+    bool WindowOwned               = false;
+    s32 IgnoreWindowPosEventFrame  = -1;
+    s32 IgnoreWindowSizeEventFrame = -1;
+};
+
+// This can be global
+file_scope cursor MouseCursors[ImGuiMouseCursor_COUNT] = {
+    cursor(OS_ARROW), cursor(OS_IBEAM), cursor(OS_RESIZE_ALL), cursor(OS_RESIZE_NS), cursor(OS_RESIZE_WE), cursor(OS_RESIZE_NESW), cursor(OS_RESIZE_NWSE), cursor(OS_HAND)};
 
 file_scope void update_modifiers() {
     ImGuiIO &io = ImGui::GetIO();
+
+    // Modifiers are not reliable across systems
     io.KeyCtrl  = io.KeysDown[Key_LeftControl] || io.KeysDown[Key_RightControl];
     io.KeyShift = io.KeysDown[Key_LeftShift] || io.KeysDown[Key_RightShift];
     io.KeyAlt   = io.KeysDown[Key_LeftAlt] || io.KeysDown[Key_RightAlt];
+#if PLATFORM == WINDOWS
+    io.KeySuper = false;
+#else
     io.KeySuper = io.KeysDown[Key_LeftGUI] || io.KeysDown[Key_RightGUI];
+#endif
 }
 
 file_scope bool common_event_callback(const event &e) {
     ImGuiIO &io = ImGui::GetIO();
+    auto *bd    = (imgui_our_windows_data *) io.BackendPlatformUserData;
+
     if (e.Type == event::Keyboard_Pressed) {
-        io.KeysDown[e.KeyCode] = true;
+        io.KeysDown[e.KeyCode]         = true;
+        bd->KeyOwnerWindows[e.KeyCode] = e.Window;
         update_modifiers();
     } else if (e.Type == event::Keyboard_Released) {
-        io.KeysDown[e.KeyCode] = false;
+        io.KeysDown[e.KeyCode]         = false;
+        bd->KeyOwnerWindows[e.KeyCode] = null;
         update_modifiers();
     } else if (e.Type == event::Code_Point_Typed) {
-        ImGuiIO &io = ImGui::GetIO();
         io.AddInputCharacter(e.CP);
     } else if (e.Type == event::Mouse_Button_Pressed) {
-        MouseButtons[e.Button] = true;
+        bd->MouseJustPressed[e.Button] = true;
     } else if (e.Type == event::Mouse_Wheel_Scrolled) {
         io.MouseWheelH += e.ScrollX;
         io.MouseWheel += e.ScrollY;
+    } else if (e.Type == event::Window_Focused) {
+        io.AddFocusEvent(e.Focused);
+    } else if (e.Type == event::Mouse_Entered_Window) {
+        bd->MouseWindow = e.Window;
+    } else if (e.Type == event::Mouse_Left_Window) {
+        bd->MouseWindow = null;
     }
+
     return false;
 }
 
@@ -384,9 +419,13 @@ file_scope void imgui_set_ime_pos(ImGuiViewport *viewport, ImVec2 pos) {
 #endif
 
 file_scope void imgui_update_monitors() {
+    auto *bd = (imgui_our_windows_data *) ImGui::GetIO().BackendPlatformUserData;
+
     ImGuiPlatformIO &platformIO = ImGui::GetPlatformIO();
 
     platformIO.Monitors.resize(0);
+
+    os_poll_monitors();
     For(os_get_monitors()) {
         vec2<s32> pos    = os_get_monitor_pos(it);
         auto displayMode = os_get_current_display_mode(it);
@@ -404,6 +443,8 @@ file_scope void imgui_update_monitors() {
 
         platformIO.Monitors.push_back(monitor);
     }
+
+    bd->WantUpdateMonitors = false;
 }
 
 // Slightly modified version of "Photoshop" theme by @Derydoca (https://github.com/ocornut/imgui/issues/707)
@@ -475,12 +516,24 @@ file_scope void imgui_init_photoshop_style() {
 }
 
 file_scope void init_imgui_for_our_windows(window *mainWindow) {
-    os_poll_monitors();  // @Cleanup: In the ideal case we shouldn't need this.
+    // os_poll_monitors();  // @Cleanup: In the ideal case we shouldn't need this.
 
     ImGui::CreateContext();
 
     ImGuiIO &io = ImGui::GetIO();
     io.Fonts    = allocate<ImFontAtlas>();
+
+    auto *bd = allocate<imgui_our_windows_data>();
+
+    io.BackendPlatformUserData = (void *) bd;
+    io.BackendPlatformName     = "imgui_impl_lstd_graphics";
+    io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;       // We can honor GetMouseCursor() values (optional)
+    io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos;        // We can honor io.WantSetMousePos requests (optional, rarely used)
+    io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports;  // We can create multi-viewports on the Platform side (optional)
+    io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport;
+
+    bd->Window             = mainWindow;
+    bd->WantUpdateMonitors = true;
 
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -501,17 +554,12 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
     ImGui::StyleColorsDark();
     imgui_init_photoshop_style();
 
-    io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
-    io.BackendFlags |= ImGuiBackendFlags_HasSetMousePos;
-    io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports;
-    io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport;
-    io.BackendPlatformName = "lstd";
-
     io.SetClipboardTextFn = [](auto, const char *text) { os_set_clipboard_content(string(text)); };
     io.GetClipboardTextFn = [](auto) {
         static array<char> buffer;
 
         // ImGui expects a null-terminated string.
+        // @TODO @Speed Make os_get_clipboard_content() ensure it is null terminated to avoid allocating. Similar to os_get_env.
 
         auto content = os_get_clipboard_content();
         array_reserve(buffer, content.Count + 1);
@@ -545,16 +593,24 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
     io.KeyMap[ImGuiKey_Y]           = Key_Y;
     io.KeyMap[ImGuiKey_Z]           = Key_Z;
 
+    bd->InstalledCallbacks = true;
     mainWindow->Event.connect(common_event_callback);
 
-    ImGuiViewport *mainViewport  = ImGui::GetMainViewport();
-    mainViewport->PlatformHandle = (void *) mainWindow;
+    auto *vd        = allocate<imgui_our_windows_viewport_data>();
+    vd->Window      = bd->Window;  // == mainWindow
+    vd->WindowOwned = false;
+
+    ImGuiViewport *mainViewport    = ImGui::GetMainViewport();
+    mainViewport->PlatformHandle   = (void *) bd->Window;  // == mainWindow
+    mainViewport->PlatformUserData = vd;
 #if OS == WINDOWS
     mainViewport->PlatformHandleRaw = mainWindow->PlatformData.Win32.hWnd;
 #endif
 
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        ImGuiPlatformIO &platformIO      = ImGui::GetPlatformIO();
+        ImGuiPlatformIO &platformIO = ImGui::GetPlatformIO();
+
+        // Create platform window
         platformIO.Platform_CreateWindow = [](auto *viewport) {
             u32 flags = window::RESIZABLE | window::VSYNC | window::MOUSE_PASS_THROUGH;
             // @TODO: Window size render target stuff is wrong when we have borders (comment the line below)
@@ -564,8 +620,15 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
             auto width  = (s32) viewport->Size.x;
             auto height = (s32) viewport->Size.y;
 
-            auto *win                  = allocate<window>()->init("", window::DONT_CARE, window::DONT_CARE, width, height, flags);
-            viewport->PlatformUserData = (void *) true;
+            auto *win = allocate<window>()->init("", window::DONT_CARE, window::DONT_CARE, width, height, flags);
+
+            auto *bd = (imgui_our_windows_data *) ImGui::GetIO().BackendPlatformUserData;
+            auto *vd = allocate<imgui_our_windows_viewport_data>();
+
+            vd->Window      = win;
+            vd->WindowOwned = true;
+
+            viewport->PlatformUserData = vd;
             viewport->PlatformHandle   = (void *) win;
 #if OS == WINDOWS
             viewport->PlatformHandleRaw = win->PlatformData.Win32.hWnd;
@@ -589,8 +652,25 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
         };
 
         platformIO.Platform_DestroyWindow = [](auto *viewport) {
-            if (viewport->PlatformUserData == (void *) true) {
-                free((window *) viewport->PlatformHandle);
+            auto *bd = (imgui_our_windows_data *) ImGui::GetIO().BackendPlatformUserData;
+            auto *vd = (imgui_our_windows_viewport_data *) viewport->PlatformUserData;
+
+            if (vd) {
+                if (vd->WindowOwned) {
+                    // Release any keys that were pressed in the window being destroyed and are still held down,
+                    // because we will not receive any release events after window is destroyed.
+                    For(range(Key_Last + 1)) {
+                        if (bd->KeyOwnerWindows[it] == vd->Window) {
+                            event e;
+                            e.Type    = event::Keyboard_Released;
+                            e.KeyCode = (u32) it;
+
+                            common_event_callback(e);
+                        }
+                    }
+                }
+                free(vd->Window);
+                free(vd);
             }
             viewport->PlatformHandle = viewport->PlatformUserData = null;
         };
@@ -653,62 +733,62 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
         platformIO.Platform_SetImeInputPos = imgui_set_ime_pos;
 #endif
 
-        imgui_update_monitors();
         g_MonitorEvent.connect(delegate<void(const monitor_event &)>([](auto e) {
-            imgui_update_monitors();
+            auto *bd               = (imgui_our_windows_data *) ImGui::GetIO().BackendPlatformUserData;
+            bd->WantUpdateMonitors = true;
         }));
     }
 }
 
-file_scope void imgui_for_our_windows_new_frame(window *mainWindow) {
+file_scope u32 set_bit(u32 number, u32 mask, bool enabled) {
+    return number & ~mask | mask & (enabled ? 0xFFFFFFFF : 0);
+}
+
+file_scope void imgui_for_our_windows_new_frame() {
+    auto *bd = (imgui_our_windows_data *) ImGui::GetIO().BackendPlatformUserData;
+
     ImGuiIO &io = ImGui::GetIO();
     assert(io.Fonts->IsBuilt());
 
-    vec2<s32> windowSize       = mainWindow->get_size();
-    vec2<s32> frameBufferSize  = mainWindow->get_framebuffer_size();
-    io.DisplaySize             = ImVec2((f32) windowSize.x, (f32) windowSize.y);
-    io.DisplayFramebufferScale = ImVec2((f32) frameBufferSize.x / windowSize.x, (f32) frameBufferSize.y / windowSize.y);
+    auto *mainWindow = bd->Window;
 
-    // Setup time step
-    static time_t lastTime = 0;
+    vec2<s32> windowSize = mainWindow->get_size();
+    s32 w = windowSize.x, h = windowSize.y;
+
+    vec2<s32> frameBufferSize = mainWindow->get_framebuffer_size();
+    io.DisplaySize            = ImVec2((f32) w, (f32) h);
+    if (w > 0 && h > 0) io.DisplayFramebufferScale = ImVec2((f32) frameBufferSize.x / w, (f32) frameBufferSize.y / h);
+
+    if (bd->WantUpdateMonitors) imgui_update_monitors();
 
     time_t now   = os_get_time();
-    io.DeltaTime = lastTime > 0 ? (f32) os_time_to_seconds(now - lastTime) : (1.0f / 60.0f);
-    lastTime     = now;
+    io.DeltaTime = bd->Time > 0 ? (f32) os_time_to_seconds(now - bd->Time) : (1.0f / 60.0f);
+    bd->Time     = now;
 
-    io.MouseDown[0] = MouseButtons[Mouse_Button_Left] || mainWindow->MouseButtons[Mouse_Button_Left];
-    io.MouseDown[1] = MouseButtons[Mouse_Button_Right] || mainWindow->MouseButtons[Mouse_Button_Right];
-    io.MouseDown[2] = MouseButtons[Mouse_Button_Middle] || mainWindow->MouseButtons[Mouse_Button_Middle];
-    io.MouseDown[3] = MouseButtons[Mouse_Button_X1] || mainWindow->MouseButtons[Mouse_Button_X1];
-    io.MouseDown[4] = MouseButtons[Mouse_Button_X2] || mainWindow->MouseButtons[Mouse_Button_X2];
-    zero_memory(MouseButtons, sizeof(MouseButtons));
+    ImVec2 mousePosPrev     = io.MousePos;
+    io.MousePos             = ImVec2(-FLT_MAX, -FLT_MAX);
+    io.MouseHoveredViewport = 0;
 
-    ImGuiMouseCursor imgui_cursor = ImGui::GetMouseCursor();
-    ImVec2 mousePosBackup         = io.MousePos;
-    io.MousePos                   = ImVec2(-FLT_MAX, -FLT_MAX);
-    io.MouseHoveredViewport       = 0;
+    // Update mouse buttons
+    // (if a mouse press event came, always pass it as "mouse held this frame", so we don't miss click-release events that are shorter than 1 frame)
+    io.MouseDown[0] = bd->MouseJustPressed[Mouse_Button_Left] || mainWindow->MouseButtons[Mouse_Button_Left];
+    io.MouseDown[1] = bd->MouseJustPressed[Mouse_Button_Right] || mainWindow->MouseButtons[Mouse_Button_Right];
+    io.MouseDown[2] = bd->MouseJustPressed[Mouse_Button_Middle] || mainWindow->MouseButtons[Mouse_Button_Middle];
+    io.MouseDown[3] = bd->MouseJustPressed[Mouse_Button_X1] || mainWindow->MouseButtons[Mouse_Button_X1];
+    io.MouseDown[4] = bd->MouseJustPressed[Mouse_Button_X2] || mainWindow->MouseButtons[Mouse_Button_X2];
+
+    zero_memory(bd->MouseJustPressed, sizeof(bd->MouseJustPressed));
 
     ImGuiPlatformIO &platformIO = ImGui::GetPlatformIO();
 
     For(platformIO.Viewports) {
         window *win = (window *) it->PlatformHandle;
-        if (win->Flags & window::FOCUSED) {
-            if (io.WantSetMousePos) {
-                win->set_cursor_pos((s32) (mousePosBackup.x - it->Pos.x), (s32) (mousePosBackup.y - it->Pos.y));
-            } else {
-                vec2<s32> mouse = win->get_cursor_pos();
-                if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-                    // Multi-viewport mode: mouse position in OS absolute coordinates (io.MousePos is (0,0) when the
-                    // mouse is on the upper-left of the primary monitor)
-                    vec2<s32> windowPos = win->get_pos();
-                    io.MousePos         = ImVec2((f32) (mouse.x + windowPos.x), (f32) (mouse.y + windowPos.y));
-                } else {
-                    // Single viewport mode: mouse position in client window coordinates (io.MousePos is (0,0) when
-                    // the mouse is on the upper-left corner of the app window)
-                    io.MousePos = ImVec2((f32) mouse.x, (f32) mouse.y);
-                }
-            }
 
+        bool focused        = win->Flags & window::FOCUSED;
+        window *mouseWindow = (bd->MouseWindow == win || focused) ? win : null;
+
+        // Update mouse buttons
+        if (focused) {
             io.MouseDown[0] = win->MouseButtons[Mouse_Button_Left];
             io.MouseDown[1] = win->MouseButtons[Mouse_Button_Right];
             io.MouseDown[2] = win->MouseButtons[Mouse_Button_Middle];
@@ -716,23 +796,43 @@ file_scope void imgui_for_our_windows_new_frame(window *mainWindow) {
             io.MouseDown[4] = win->MouseButtons[Mouse_Button_X2];
         }
 
-        bool mousePassThrough = it->Flags & ImGuiViewportFlags_NoInputs;
+        // Set OS mouse position from Dear ImGui if requested (rarely used, only when ImGuiConfigFlags_NavEnableSetMousePos is enabled by user)
+        // (When multi-viewports are enabled, all Dear ImGui positions are same as OS positions)
+        if (io.WantSetMousePos && focused) {
+            win->set_cursor_pos((s32) (mousePosPrev.x - it->Pos.x), (s32) (mousePosPrev.y - it->Pos.y));
+        }
 
-        if (win->Flags & window::MOUSE_PASS_THROUGH && !mousePassThrough) win->Flags ^= window::MOUSE_PASS_THROUGH;
-        if (win->is_hovered() && !mousePassThrough) io.MouseHoveredViewport = it->ID;
+        // Set Dear ImGui mouse position from OS position
+        if (mouseWindow) {
+            auto mousePos = win->get_cursor_pos();
+
+            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+                // Multi-viewport mode: mouse position in OS absolute coordinates (io.MousePos is (0,0) when the mouse is on the upper-left of the primary monitor)
+                auto winPos = win->get_pos();
+                io.MousePos = ImVec2((f32) (mousePos.x + winPos.x), (f32) (mousePos.y + winPos.y));
+            } else {
+                // Single viewport mode: mouse position in client window coordinates (io.MousePos is (0,0) when the mouse is on the upper-left corner of the app window)
+                io.MousePos = ImVec2((f32) mousePos.x, (f32) mousePos.y);
+            }
+        }
+
+        bool windowNoInput = it->Flags & ImGuiViewportFlags_NoInputs;
+        win->Flags         = set_bit(win->Flags, window::MOUSE_PASS_THROUGH, windowNoInput);
+        if (win->is_hovered() && !windowNoInput) io.MouseHoveredViewport = it->ID;
     }
 
     if ((io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange) || mainWindow->CursorMode == window::CURSOR_DISABLED)
         return;
 
+    ImGuiMouseCursor imguiCursor = ImGui::GetMouseCursor();
     For(platformIO.Viewports) {
         window *win = (window *) it->PlatformHandle;
-        if (imgui_cursor == ImGuiMouseCursor_None || io.MouseDrawCursor) {
+        if (imguiCursor == ImGuiMouseCursor_None || io.MouseDrawCursor) {
             // Hide OS mouse cursor if imgui is drawing it or if it wants no cursor
             win->set_cursor_mode(window::CURSOR_HIDDEN);
         } else {
             // Show OS mouse cursor
-            win->set_cursor(&MouseCursors[imgui_cursor]);
+            win->set_cursor(&MouseCursors[imguiCursor]);
             win->set_cursor_mode(window::CURSOR_NORMAL);
         }
     }
