@@ -26,19 +26,24 @@ using namespace LSTD_NAMESPACE;
 
 extern "C" {
 
-// Declare these as functions, not intrinsics. We have our optimized versions.
-// See comment below.
+// If we are building with MSVC in Release, the compiler optimizes the following functions as instrinsics.
+#if COMPILER == MSVC and (defined DEBUG_OPTIMIZED or defined RELEASE)
 #pragma function(memset)
-void *memset(void *ptr, int value, size_t n) { return fill_memory(ptr, value, n); }
 #pragma function(memcpy)
-void *memcpy(void *dest, const void *src, size_t n) { return copy_memory(dest, src, n); }
 #pragma function(memmove)
+
+#pragma function(strlen)
+#pragma function(strcmp)
+#pragma function(memcmp)
+#pragma function(strcpy)
+#pragma function(memchr)
+#pragma function(strcat)
+#endif
+
+void *memset(void *ptr, int value, size_t n) { return fill_memory(ptr, value, n); }
+void *memcpy(void *dest, const void *src, size_t n) { return copy_memory(dest, src, n); }
 void *memmove(void *dest, const void *src, size_t n) { return copy_memory(dest, src, n); }
 
-// If we are building with MSVC in Release, the compiler optimizes the following functions as instrinsics.
-// In that case we don't define them, because these are slow anyway. Similar thing happens with some math
-// functions in the Cephes library (search for :WEMODIFIEDCEPHES:)
-#if COMPILER == MSVC and !defined RELEASE && !defined DEBUG_OPTIMIZED
 size_t strlen(const char *s) {
     int i;
 
@@ -95,6 +100,23 @@ const void *memchr(const void *s, int c, size_t n) {
         i++;
     }
     return (NULL);
+}
+
+char *strcat(char *s1, const char *s2) {
+    int i;
+    int j;
+
+    i = 0;
+    j = 0;
+    while (s1[i] != '\0') {
+        i++;
+    }
+    while (s2[j] != '\0') {
+        s1[i + j] = s2[j];
+        j++;
+    }
+    s1[i + j] = '\0';
+    return (s1);
 }
 
 double fmod(double x, double y) {
@@ -166,24 +188,6 @@ double fmod(double x, double y) {
     uxi |= (u64) sx << 63;
     ux.i = uxi;
     return ux.f;
-}
-#endif  // End comment about functions being optimized in Release
-
-char *strcat(char *s1, const char *s2) {
-    int i;
-    int j;
-
-    i = 0;
-    j = 0;
-    while (s1[i] != '\0') {
-        i++;
-    }
-    while (s2[j] != '\0') {
-        s1[i + j] = s2[j];
-        j++;
-    }
-    s1[i + j] = '\0';
-    return (s1);
 }
 
 const char *strstr(const char *haystack, const char *needle) {
@@ -399,7 +403,6 @@ double atof(const char *s) {
     return strtod(s, null);
 }
 
-
 //
 // The following is an implementation of sscanf by Rolf Neugebauer.
 // Here is the license:
@@ -454,7 +457,6 @@ double atof(const char *s) {
  */
 //
 
-
 /**
  * simple_strtoul - convert a string to an unsigned long
  * @cp: The start of the string
@@ -493,8 +495,8 @@ unsigned long simple_strtoul(const char *cp, char **endp, unsigned int base) {
  */
 long simple_strtol(const char *cp, char **endp, unsigned int base) {
     if (*cp == '-')
-        return -simple_strtoul(cp + 1, endp, base);
-    return simple_strtoul(cp, endp, base);
+        return -((long) simple_strtoul(cp + 1, endp, base));
+    return (long) simple_strtoul(cp, endp, base);
 }
 
 /**
@@ -534,8 +536,8 @@ unsigned long long simple_strtoull(const char *cp, char **endp, unsigned int bas
  */
 long long simple_strtoll(const char *cp, char **endp, unsigned int base) {
     if (*cp == '-')
-        return -simple_strtoull(cp + 1, endp, base);
-    return simple_strtoull(cp, endp, base);
+        return -((long long) simple_strtoull(cp + 1, endp, base));
+    return (long long) simple_strtoull(cp, endp, base);
 }
 
 static int skip_atoi(const char **s) {
@@ -661,7 +663,7 @@ int vsscanf(const char *buf, const char *fmt, va_list args) {
                 /* return number of characters read so far */
                 {
                     int *i = (int *) va_arg(args, int *);
-                    *i     = str - buf;
+                    *i     = (int) (str - buf);
                 }
                 continue;
             case 'o':
@@ -785,4 +787,15 @@ void qsort(void *data, size_t items, size_t size, int (*compare)(const void *, c
 }
 
 int toupper(int c) { return to_upper(c); }
+
+float fmodf(float x, float y) { return (float) fmod((double) x, (double) y); }
+float powf(float x, float y) { return (float) pow((double) x, (double) y); }
+float logf(float x) { return (float) log((double) x); }
+float fabsf(float x) { return (float) abs((double) x); }
+float sqrtf(float x) { return (float) sqrt((double) x); }
+float cosf(float x) { return (float) cos((double) x); }
+float sinf(float x) { return (float) sin((double) x); }
+float acosf(float x) { return (float) acos((double) x); }
+float atan2f(float x, float y) { return (float) atan2((double) x, (double) y); }
+float ceilf(float x) { return (float) ceil((double) x); }
 }

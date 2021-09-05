@@ -363,7 +363,9 @@ extern double NAN;
 extern double NEGZERO;
 #endif
 
-#if INTRINSIC
+#if COMPILER == MSVC
+#pragma function(pow)
+#endif
 
 double pow(x, y)
 double x, y; {
@@ -728,5 +730,3 @@ double x; {
     t = ldexp(t, -4);
     return t;
 }
-
-#endif  // INTRINSIC

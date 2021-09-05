@@ -67,7 +67,7 @@ function common_settings()
 	    entrypoint "main_no_crt_dll"
     filter { "system:windows", "kind:ConsoleApp or WindowedApp" }
 	    entrypoint "main_no_crt"
-
+ 
     -- Setup configurations and optimization level
     filter "configurations:Debug"
         defines "DEBUG"
@@ -78,10 +78,11 @@ function common_settings()
         optimize "On"
         symbols "On"
         buildoptions { "/FS" }
+        floatingpoint "Strict" -- Otherwise MSVC generates internal undocumented intrinsics which we can't provide .. shame
     filter "configurations:Release"
         defines { "RELEASE", "NDEBUG" } 
         optimize "Full"
-        floatingpoint "Fast"
+        floatingpoint "Strict"
     filter {}
 end
 

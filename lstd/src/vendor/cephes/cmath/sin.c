@@ -213,7 +213,11 @@ extern double NAN;
 extern double INFINITY;
 #endif
 
-#if INTRINSIC
+#if COMPILER == MSVC
+#pragma function(sin)
+#pragma function(cos)
+#endif
+
 
 double sin(x)
 double x; {
@@ -346,8 +350,6 @@ double x; {
 
     return y;
 }
-
-#endif  // INTRINSIC
 
 
 /* Degrees, minutes, seconds to radians: */

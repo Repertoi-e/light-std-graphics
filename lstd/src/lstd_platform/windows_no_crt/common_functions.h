@@ -31,16 +31,15 @@ int sprintf(char *str, const char *format, ...);
 void qsort(void *data, size_t items, size_t size, int (*compare)(const void *, const void *));
 
 int toupper(int c);
-}
 
-// Float versions of math functions (defined in cephes)
-inline float fmodf(float x, float y) { return (float) fmod((double) x, (double) y); }
-inline float powf(float x, float y) { return (float) pow((double) x, (double) y); }
-inline float logf(float x) { return (float) log((double) x); }
-inline float fabsf(float x) { return (float) LSTD_NAMESPACE::abs((double) x); }
-inline float sqrtf(float x) { return (float) sqrt((double) x); }
-inline float cosf(float x) { return (float) cos((double) x); }
-inline float sinf(float x) { return (float) sin((double) x); }
-inline float acosf(float x) { return (float) acos((double) x); }
-inline float atan2f(float x, float y) { return (float) atan2((double) x, (double) y); }
-inline float ceilf(float x) { return (float) ceil((double) x); }
+float fmodf(float x, float y);
+float powf(float x, float y);
+float logf(float x);
+float fabsf(float x);
+float sqrtf(float x);
+float cosf(float x);
+float sinf(float x);
+float acosf(float x);
+float atan2f(float x, float y);
+float ceilf(float x);
+}
