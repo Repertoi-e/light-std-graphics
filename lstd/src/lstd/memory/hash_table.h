@@ -48,8 +48,8 @@ struct key_value_pair {
 // the size of the allocation request.
 template <typename K_, typename V_, bool BlockAlloc = true>
 struct hash_table {
-    using K = K_;
-    using V = V_;
+    using K                           = K_;
+    using V                           = V_;
     static constexpr bool BLOCK_ALLOC = BlockAlloc;
 
     static constexpr s64 MINIMUM_SIZE     = 32;
@@ -70,9 +70,6 @@ struct hash_table {
 
     hash_table() {
     }
-
-    // We don't use destructors for freeing memory anymore.
-    // ~has_table() { free(); }
 
     //
     // Iterator:
@@ -112,7 +109,7 @@ struct hash_table {
             return {Parent->Keys + Index, Parent->Values + Index};
         }
 
-    private:
+       private:
         void skip_empty_slots() {
             for (; Index < Parent->Allocated; ++Index) {
                 if (Parent->Hashes[Index] < FIRST_VALID_HASH) continue;
@@ -121,7 +118,7 @@ struct hash_table {
         }
     };
 
-    using iterator = iterator_<false>;
+    using iterator       = iterator_<false>;
     using const_iterator = iterator_<true>;
 
     iterator begin() { return iterator(this); }
@@ -185,15 +182,15 @@ void reserve(T &table, s64 target, u32 alignment = 0) {
 
             s64 sizeInBytes = target * (sizeof(u64) + sizeof(K) + sizeof(V)) + padding1 + padding2;
 
-            byte *block  = allocate_array<byte>(sizeInBytes, {.Alignment = alignment});
+            byte *block  = malloc<byte>({.Count = sizeInBytes, .Alignment = alignment});
             table.Hashes = (u64 *) block;
             table.Keys   = (K *) (block + target * sizeof(u64) + padding1);
             table.Values = (V *) (block + target * (sizeof(u64) + sizeof(K)) + padding2);
             zero_memory(table.Hashes, target * sizeof(u64));
         } else {
-            table.Hashes = allocate_array<u64>(target, {.Alignment = alignment});
-            table.Keys   = allocate_array<K>(target, {.Alignment = alignment});
-            table.Values = allocate_array<V>(target, {.Alignment = alignment});
+            table.Hashes = malloc<u64>({.Count = target, .Alignment = alignment});
+            table.Keys   = malloc<K>({.Count = target, .Alignment = alignment});
+            table.Values = malloc<V>({.Count = target, .Alignment = alignment});
             zero_memory(table.Hashes, target * sizeof(u64));
         }
     };
@@ -246,7 +243,7 @@ void free(T &table) {
     table.Hashes = null;
     table.Keys   = null;
     table.Values = null;
-    table.Count  = table.SlotsFilled = table.Allocated = 0;
+    table.Count = table.SlotsFilled = table.Allocated = 0;
 }
 
 // Don't free the hash table, just destroy contents and reset count
@@ -255,16 +252,8 @@ void reset(T &table) {
     // PODs may have destructors, although the C++ standard's definition forbids them to have non-trivial ones.
     if (table.Allocated) {
         // @TODO: Factor this into uninitialize_block() function and use it in free() as well
-        auto *p   = table.Hashes, *end = table.Hashes + table.Allocated;
-        s64 index = 0;
-        while (p != end) {
-            if (*p) {
-                table.Keys[index].~key_t();
-                table.Values[index].~value_t();
-                *p = 0;
-            }
-            ++index, ++p;
-        }
+        auto *p = table.Hashes, *end = table.Hashes + table.Allocated;
+        zero_memory(table.Hashes, table.Allocated * sizeof(u64));
     }
     table.Count = table.SlotsFilled = 0;
 }
@@ -305,7 +294,7 @@ key_value_pair<T> find(const T &table, const key_t<T> &key) {
 template <any_hash_table T>
 key_value_pair<T> add_prehashed(T &table, u64 hash, const key_t<T> &key, const value_t<T> &value) {
     // The + 1 here handles the case when the hash table size is 1 and you add the first item.
-    if ((table.SlotsFilled + 1) * 2 >= table.Allocated) reserve(table, table.SlotsFilled); // Make sure the hash table is never more than 50% full
+    if ((table.SlotsFilled + 1) * 2 >= table.Allocated) reserve(table, table.SlotsFilled);  // Make sure the hash table is never more than 50% full
 
     assert(table.SlotsFilled < table.Allocated);
 
@@ -321,8 +310,8 @@ key_value_pair<T> add_prehashed(T &table, u64 hash, const key_t<T> &key, const v
     ++table.SlotsFilled;
 
     table.Hashes[index] = hash;
-    new(table.Keys + index) key_t<T>(key);
-    new(table.Values + index) value_t<T>(value);
+    new (table.Keys + index) key_t<T>(key);
+    new (table.Values + index) value_t<T>(value);
     return {table.Keys + index, table.Values + index};
 }
 

@@ -657,7 +657,7 @@ void window::release() {
 string window::get_title() {
     s32 length = GetWindowTextLengthW(PlatformData.Win32.hWnd) + 1;
 
-    auto *titleUtf16 = allocate_array<utf16>(length, {.Alloc = internal::platform_get_temporary_allocator()});
+    auto *titleUtf16 = malloc<utf16>({.Count = length, .Alloc = internal::platform_get_temporary_allocator()});
     defer(free(titleUtf16));
 
     GetWindowTextW(PlatformData.Win32.hWnd, titleUtf16, length);
@@ -668,7 +668,7 @@ string window::get_title() {
 void window::set_title(const string &title) {
     // title.Length * 2 because one unicode character might take 2 wide chars.
     // This is just an approximation, not all space will be used!
-    auto *titleUtf16 = allocate_array<utf16>(title.Length * 2 + 1, {.Alloc = internal::platform_get_temporary_allocator()});
+    auto *titleUtf16 = malloc<utf16>({.Count = title.Length * 2 + 1, .Alloc = internal::platform_get_temporary_allocator()});
     utf8_to_utf16(title.Data, title.Length, titleUtf16);
 
     SetWindowTextW(PlatformData.Win32.hWnd, titleUtf16);
@@ -1496,7 +1496,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             u32 size = 0;
             GetRawInputData(ri, RID_INPUT, null, &size, sizeof(RAWINPUTHEADER));
 
-            auto *rawInput = allocate_array<RAWINPUT>(size / sizeof(RAWINPUT), {.Alloc = internal::platform_get_temporary_allocator()});
+            auto *rawInput = malloc<RAWINPUT>({.Count = size / sizeof(RAWINPUT), .Alloc = internal::platform_get_temporary_allocator()});
             if (GetRawInputData(ri, RID_INPUT, rawInput, &size, sizeof(RAWINPUTHEADER)) == (u32) -1) {
                 print(">>> {}:{} Failed to retrieve raw input data.\n", __FILE__, __LINE__);
                 break;
@@ -1759,7 +1759,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             For(range(count)) {
                 u32 length = DragQueryFileW(drop, (u32) it, null, 0);
 
-                utf16 *buffer = allocate_array<utf16>(length + 1, {.Alloc = internal::platform_get_temporary_allocator()});
+                utf16 *buffer = malloc<utf16>({.Count = length + 1, .Alloc = internal::platform_get_temporary_allocator()});
                 DragQueryFileW(drop, (u32) it, buffer, length + 1);
 
                 array_append(paths, internal::platform_utf16_to_utf8(buffer, internal::platform_get_persistent_allocator()));

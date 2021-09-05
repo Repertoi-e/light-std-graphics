@@ -189,7 +189,7 @@ void pop_op(array<token> &ops, array<ast *> &operands) {
 
         // We couldn't collapse... create a new ast node.
         if (!toPush) {
-            auto *unop = allocate<ast_op>();
+            auto *unop = malloc<ast_op>();
             unop->Left = t0;
             unop->Op = op;
 
@@ -255,7 +255,7 @@ void pop_op(array<token> &ops, array<ast *> &operands) {
 
         // We couldn't collapse... create a new ast node.
         if (!toPush) {
-            auto *binop = allocate<ast_op>();
+            auto *binop = malloc<ast_op>();
             binop->Left = t0;
             binop->Right = t1;
             binop->Op = op;
@@ -279,7 +279,7 @@ void parse_e(token_stream &stream, array<token> &ops, array<ast *> &operands);
 void parse_p(token_stream &stream, array<token> &ops, array<ast *> &operands) {
     auto next = peek(stream);
     if (is_v(next)) {
-        auto *v = allocate<ast_term>();
+        auto *v = malloc<ast_term>();
         if (next.Type == token::VARIABLE) {
             v->Coeff = 1;
             add(v->Letters, next.Str[0], 1);

@@ -184,7 +184,7 @@ void init_global_vars() {
 #if defined DEBUG_MEMORY
     // @Cleanup
     if (lstd_init_global()) {
-        DEBUG_memory = allocate<debug_memory>({.Alloc = PERSISTENT});  // @Leak This is ok
+        DEBUG_memory = malloc<debug_memory>({.Alloc = PERSISTENT});  // @Leak This is ok
         new (DEBUG_memory) debug_memory;
         DEBUG_memory->Mutex.init();
     } else {
@@ -225,7 +225,7 @@ constexpr u32 ERROR_INSUFFICIENT_BUFFER = 122;
 
 void get_module_name() {
     // Get the module name
-    utf16 *buffer = allocate_array<utf16>(MAX_PATH, {.Alloc = PERSISTENT});
+    utf16 *buffer = malloc<utf16>({.Count = MAX_PATH, .Alloc = PERSISTENT});
     defer(free(buffer));
 
     s64 reserved = MAX_PATH;
@@ -236,7 +236,7 @@ void get_module_name() {
             if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
                 reserved *= 2;
                 free(buffer);
-                buffer = allocate_array<utf16>(reserved, {.Alloc = PERSISTENT});
+                buffer = malloc<utf16>({.Count = reserved, .Alloc = PERSISTENT});
                 continue;
             }
         }
@@ -280,7 +280,7 @@ export namespace internal {
 void platform_init_context() {
     context newContext = {};
     newContext.ThreadID = thread::id((u64) GetCurrentThreadId());
-    newContext.TempAlloc = {default_temp_allocator, (void *) &__TempAllocData};
+    newContext.TempAlloc = {default_temp_allocator, (void *) &TempAllocData};
     newContext.Log = &cout;
     OVERRIDE_CONTEXT(newContext);
 }
@@ -350,16 +350,21 @@ export {
     }
 
     void exit_schedule(const delegate<void()> &function) {
-        thread::scoped_lock _(&S->ExitScheduleMutex);
+        S->ExitScheduleMutex.lock();
 
         PUSH_ALLOC(PERSISTENT) {
             array_append(S->ExitFunctions, function);
         }
+
+        S->ExitScheduleMutex.unlock();
     }
 
     void exit_call_scheduled_functions() {
-        thread::scoped_lock _(&S->ExitScheduleMutex);
+        S->ExitScheduleMutex.lock();
+
         For(S->ExitFunctions) it();
+
+        S->ExitScheduleMutex.unlock();
     }
 
     array<delegate<void()>> *exit_get_scheduled_functions() {
@@ -383,13 +388,14 @@ export {
     string os_get_working_dir() {
         DWORD required = GetCurrentDirectoryW(0, null);
 
-        auto *dir16 = allocate_array<utf16>(required + 1, {.Alloc = TEMP});
+        auto *dir16 = malloc<utf16>({.Count = required + 1, .Alloc = TEMP});
         if (!GetCurrentDirectoryW(required + 1, dir16)) {
             windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "GetCurrentDirectory");
             return "";
         }
 
-        thread::scoped_lock _(&S->WorkingDirMutex);
+        S->WorkingDirMutex.lock();
+        defer(S->WorkingDirMutex.unlock());
 
         string workingDir = utf16_to_utf8(dir16);
         PUSH_ALLOC(PERSISTENT) {
@@ -403,7 +409,9 @@ export {
 
         WIN_CHECKBOOL(SetCurrentDirectoryW(utf8_to_utf16(dir)));
 
-        thread::scoped_lock _(&S->WorkingDirMutex);
+        S->WorkingDirMutex.lock();
+        defer(S->WorkingDirMutex.unlock());
+
         PUSH_ALLOC(PERSISTENT) {
             clone(&S->WorkingDir, dir);
         }
@@ -421,7 +429,7 @@ export {
 
         DWORD bufferSize = 65535;  // Limit according to http://msdn.microsoft.com/en-us/library/ms683188.aspx
 
-        auto *buffer = allocate_array<utf16>(bufferSize, {.Alloc = TEMP});
+        auto *buffer = malloc<utf16>({.Count = bufferSize, .Alloc = TEMP});
         auto r = GetEnvironmentVariableW(name16, buffer, bufferSize);
 
         if (r == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
@@ -433,7 +441,7 @@ export {
 
         // 65535 may be the limit but let's not take risks
         if (r > bufferSize) {
-            buffer = allocate_array<utf16>(r, {.Alloc = TEMP});
+            buffer = malloc<utf16>({.Count = r, .Alloc = TEMP});
             GetEnvironmentVariableW(name16, buffer, r);
             bufferSize = r;
 
@@ -518,9 +526,7 @@ export {
     }
 
     void console_writer::write(const byte *data, s64 size) {
-        thread::mutex *mutex = null;
-        if (LockMutex) mutex = &S->CoutMutex;
-        thread::scoped_lock _(mutex);
+        if (LockMutex) S->CoutMutex.lock();
 
         if (size > Available) {
             flush();
@@ -530,12 +536,12 @@ export {
 
         Current += size;
         Available -= size;
+
+        if (LockMutex) S->CoutMutex.unlock();
     }
 
     void console_writer::flush() {
-        thread::mutex *mutex = null;
-        if (LockMutex) mutex = &S->CoutMutex;
-        thread::scoped_lock _(mutex);
+        if (LockMutex) S->CoutMutex.lock();
 
         if (!Buffer) {
             if (OutputType == console_writer::COUT) {
@@ -554,6 +560,8 @@ export {
 
         Current = Buffer;
         Available = S->CONSOLE_BUFFER_SIZE;
+
+        if (LockMutex) S->CoutMutex.unlock();
     }
 }
 

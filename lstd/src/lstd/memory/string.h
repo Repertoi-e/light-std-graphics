@@ -131,12 +131,18 @@ struct string : array<utf8> {
     };
 
     // The non-const version allows to modify the character by simply =.
+    // This may allocate because UTF-8 code points are not a const amount of bytes.
+    //
+    // We support Python-like negative indices.
     code_point_ref operator[](s64 index) { return code_point_ref(this, translate_index(index, Length)); }
     constexpr utf32 operator[](s64 index) const { return decode_cp(get_cp_at_index(Data, translate_index(index, Length))); }
 
     // Substring operator:
-    // constexpr string operator()(s64 begin, s64 end) const;
-
+    //
+    // e.g. call like this: string[{2, -1}]     
+    //      to get everything from the second to the last character (without the last).
+    // 
+    // We support Python-like negative indices.
     struct substring_indices {
         s64 b, e;
     };

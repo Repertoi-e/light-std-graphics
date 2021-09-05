@@ -169,20 +169,6 @@ double fmod(double x, double y) {
 }
 #endif  // End comment about functions being optimized in Release
 
-void *calloc(size_t num, size_t size) {
-    void *r = (void *) allocate_array<byte>(num * size);
-    memset(r, 0, num * size);
-    return r;
-}
-
-// No need to define this global function if the library was built without a namespace
-#if defined LSTD_NAMESPACE
-void free(void *block) { LSTD_NAMESPACE::free(block); }
-#endif
-
-void *malloc(size_t size) { return (void *) allocate_array<byte>(size); }
-void *realloc(void *b, size_t size) { return (void *) reallocate_array<byte>((byte *) b, size); }
-
 char *strcat(char *s1, const char *s2) {
     int i;
     int j;
@@ -270,7 +256,7 @@ const char *strrchr(const char *s, int c) {
 static unsigned char charmap(char c) {
     char chr;
 
-    chr = to_upper(c);
+    chr = (char) to_upper(c);
     if (chr >= '0' && chr <= '9')
         return (chr - '0');
     if (chr >= 'A' && chr <= 'Z')

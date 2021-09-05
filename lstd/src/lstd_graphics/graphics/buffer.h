@@ -95,9 +95,6 @@ struct buffer : non_copyable, non_movable {
 
     buffer() = default;
 
-    // We no longer use destructors for deallocation.
-    // ~buffer() { release(); }
-
     void init(graphics *g, buffer_type type, buffer_usage usage, s64 size, const char *data = null);
 
     void set_input_layout(const buffer_layout &layout);

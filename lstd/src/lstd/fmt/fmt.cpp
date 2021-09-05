@@ -5,6 +5,10 @@ LSTD_BEGIN_NAMESPACE
 void fmt_default_parse_error_handler(const string &message, const string &formatString, s64 position) {
     // An error during formatting occured.
     // If you are running a debugger it has now hit a breakpoint.
+    //
+    // You can replace this error handler in the Context.
+    // e.g. a less invasive one :D
+    //
 
     // Make escape characters appear as they would in a string literal
     string str = formatString;

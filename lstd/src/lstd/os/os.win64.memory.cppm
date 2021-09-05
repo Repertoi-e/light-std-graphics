@@ -124,7 +124,8 @@ void platform_report_error(string message, source_location loc = source_location
 void *win64_temp_alloc(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
     auto *data = (arena_allocator_data *) context;
 
-    thread::scoped_lock _(&S->TempAllocMutex);
+    S->TempAllocMutex.lock();
+    defer(S->TempAllocMutex.unlock());
 
     auto *result = arena_allocator(mode, context, size, oldMemory, oldSize, options);
     if (mode == allocator_mode::ALLOCATE) {
@@ -161,7 +162,8 @@ void create_temp_storage_block(s64 size) {
 void *win64_persistent_alloc(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
     auto *data = (tlsf_allocator_data *) context;
 
-    thread::scoped_lock _(&S->PersistentAllocMutex);
+    S->PersistentAllocMutex.lock();
+    defer(S->PersistentAllocMutex.unlock());
 
     auto *result = tlsf_allocator(mode, context, size, oldMemory, oldSize, options);
     if (mode == allocator_mode::ALLOCATE) {
@@ -207,7 +209,7 @@ utf16 *platform_utf8_to_utf16(const string &str, allocator alloc = {}) {
     PUSH_ALLOC(alloc) {
         // src.Length * 2 because one unicode character might take 2 wide chars.
         // This is just an approximation, not all space will be used!
-        result = allocate_array<utf16>(str.Length * 2 + 1);
+        result = malloc<utf16>({.Count = str.Length * 2 + 1});
     }
 
     utf8_to_utf16(str.Data, str.Length, result);

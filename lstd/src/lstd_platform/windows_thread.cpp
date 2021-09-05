@@ -189,7 +189,7 @@ void thread::init_and_launch(const delegate<void(void *)> &function, void *userD
     // Passed to the thread wrapper, which will eventually free it
     // @TODO @Speed @Memory Fragmentation! We should have a dedicated pool allocator for thread_start_info 
     // because threads could be created/destroyed very often.
-    auto *ti       = allocate<thread_start_info>({.Alloc = internal::platform_get_persistent_allocator()});
+    auto *ti       = malloc<thread_start_info>({.Alloc = internal::platform_get_persistent_allocator()});
     ti->Function   = function;
     ti->UserData   = userData;
     ti->ThreadPtr  = this;

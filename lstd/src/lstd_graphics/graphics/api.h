@@ -83,7 +83,6 @@ struct graphics : non_copyable, non_movable {
     graphics_api API = graphics_api::None;
 
     graphics() = default;
-    ~graphics() { release(); }
 
     struct impl {
         void (*Init)(graphics *g) = null;

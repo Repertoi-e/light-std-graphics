@@ -28,8 +28,6 @@ struct string_builder {
 
     string_builder() {
     }
-
-    // ~string_builder() { free(); }
 };
 
 // Don't free the buffers, just reset cursor

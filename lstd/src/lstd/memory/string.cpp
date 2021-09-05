@@ -29,7 +29,7 @@ string::string(utf32 codePoint, s64 repeat) {
 // Allocates a buffer, copies the string's contents and also appends a zero terminator.
 // The caller is responsible for freeing.
 [[nodiscard("Leak")]] utf8 *string_to_c_string(const string &s, allocator alloc) {
-    utf8 *result = allocate_array<utf8>(s.Count + 1, {.Alloc = alloc});
+    utf8 *result = malloc<utf8>({.Count = s.Count + 1, .Alloc = alloc});
     copy_memory(result, s.Data, s.Count);
     result[s.Count] = '\0';
     return result;

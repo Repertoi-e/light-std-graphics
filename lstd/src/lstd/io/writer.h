@@ -12,9 +12,6 @@ struct writer {
     writer() {
     }
 
-    virtual ~writer() {
-    }
-
     virtual void write(const byte *data, s64 count) = 0;
 
     virtual void flush() {

@@ -1220,7 +1220,7 @@ void* tlsf_resize(tlsf_t tlsf, void* ptr, u64 size)
 	control_t* control = tlsf_cast(control_t*, tlsf);
 	void* p = 0;
 	
-	// :WEMODIFIED: We handle these edges cases in the reallocate_array function.
+	// :WEMODIFIED: We handle these edges cases in the realloc() function.
 	/* Zero-size requests are treated as free. */
 	// if (ptr && size == 0)
 	// {
@@ -1248,7 +1248,7 @@ void* tlsf_resize(tlsf_t tlsf, void* ptr, u64 size)
 		* ...
 		** Because in our memory model, we require allocators to implement a
 		** resize function which fails if there is not enough space and returns null.
-		** The reallocate_array function handles allocating a new block and all that jazz.
+		** The realloc() function handles allocating a new block and all that jazz.
 		*/
 		if (adjust > cursize && (!block_is_free(next) || adjust > combined))
 		{

@@ -19,9 +19,6 @@ struct stack_dynamic_buffer : non_copyable, non_movable, non_assignable {
     stack_dynamic_buffer() {
     }
 
-    // We no longer use destructors for deallocation.
-    // ~stack_dynamic_buffer() { free(); }
-
     //
     // Iterator:
     //
@@ -70,10 +67,10 @@ void reserve(T &buffer, s64 targetCount) {
     targetCount = max<s64>(ceil_pow_of_2(targetCount + buffer.Count + 1), 8);
 
     if (buffer.Allocated) {
-        buffer.Data = reallocate_array(buffer.Data, targetCount);
+        buffer.Data = realloc(buffer.Data, {.NewCount = targetCount});
     } else {
         auto *oldData = buffer.Data;
-        buffer.Data   = allocate_array<byte>(targetCount);
+        buffer.Data   = malloc<byte>({.Count = targetCount});
         if (buffer.Count) copy_memory(buffer.Data, oldData, buffer.Count);
     }
     buffer.Allocated = targetCount;

@@ -6,17 +6,17 @@ LSTD_BEGIN_NAMESPACE
 
 template <typename T_, s64 ElementsPerBucket = 128>
 struct bucket_array {
-    using T = T_;
+    using T                                  = T_;
     constexpr static s64 ELEMENTS_PER_BUCKET = ElementsPerBucket;
 
     struct bucket {
-        T *Elements  = null;
-        s64 Count    = 0, Allocated = 0;
+        T *Elements = null;
+        s64 Count = 0, Allocated = 0;
         bucket *Next = null;
     };
 
     bucket BaseBucket;
-    bucket *BucketHead = null; // null means BaseBucket
+    bucket *BucketHead = null;  // null means BaseBucket
 
     bucket_array() {
     }
@@ -35,7 +35,7 @@ concept is_bucket_array = is_bucket_array_helper<T>::value;
 
 template <is_bucket_array T>
 void free(T &arr) {
-    auto *b = arr.BucketHead->Next; // The first bucket is on the stack
+    auto *b = arr.BucketHead->Next;  // The first bucket is on the stack
     while (b) {
         auto *toFree = b;
         b            = b->Next;
@@ -76,9 +76,9 @@ auto *append(T &arr, const typename T::T &element, allocator alloc = {}) {
         b    = b->Next;
     }
 
-    b            = last->Next = allocate<typename T::bucket>({.Alloc = alloc});
-    b->Elements  = allocate_array<typename T::T>(T::ELEMENTS_PER_BUCKET, {.Alloc = alloc});
-    b->Allocated = T::ELEMENTS_PER_BUCKET;
+    b = last->Next = malloc<typename T::bucket>({.Alloc = alloc});
+    b->Elements    = malloc<typename T::T>({.Count = T::ELEMENTS_PER_BUCKET, .Alloc = alloc});
+    b->Allocated   = T::ELEMENTS_PER_BUCKET;
     clone(b->Elements, element);
     b->Count = 1;
     return b->Elements;
@@ -91,7 +91,7 @@ auto *find_or_create(const T &arr, const U &toMatch, const delegate<U(typename T
     T *result = find(arr, [&](T *element) { return map(element) == toMatch; });
     if (result) return result;
 
-    result = allocate<T>({.Alloc = alloc});
+    result = malloc<T>({.Alloc = alloc});
     append(arr, *result);
     return result;
 }

@@ -30,6 +30,8 @@ struct id {
 // memory areas for several threads. The mutex can be recursive (i.e. a
 // program doesn't deadlock if the thread that owns a mutex object calls lock()
 // on that object).
+//
+// Scoped lock can be done with a defer statement.
 struct mutex : non_assignable {
     union {
         struct alignas(64) {
@@ -44,9 +46,6 @@ struct mutex : non_assignable {
 
     // @POSIX pthread_mutex_destroy(&mHandle);
     void release();
-
-    // We no longer use destructors for releasing handles/memory etc.
-    // ~mutex();
 
     // Block the calling thread until a lock on the mutex can
     // be obtained. The mutex remains locked until unlock() is called.
@@ -81,47 +80,6 @@ struct mutex : non_assignable {
 // @Pedantic We want to make sure the user doesn't clone things that don't make sense.
 inline mutex *clone(mutex *dest, const mutex &src) {
     assert(false && "We don't deep copy mutexes");
-    return null;
-}
-
-//
-// @Cleanup: We don't need this with defer.
-// 
-// Scoped lock.
-// The constructor locks the mutex, and the destructor unlocks the mutex, so
-// the mutex will automatically be unlocked when the lock guard goes out of
-// scope. Example usage:
-//
-//      mutex m;
-//      s32 counter;
-//
-//      void increment()
-//      {
-//        scoped_lock<mutex> guard(&m);
-//        ++counter;
-//      }
-template <typename T>
-struct scoped_lock : non_assignable {
-    using mutex_t = T;
-
-    mutex_t *Mutex = null;
-
-    explicit scoped_lock(mutex_t *mutex) {
-        if (mutex) {
-            Mutex = mutex;
-            Mutex->lock();
-        }
-    }
-
-    ~scoped_lock() {
-        if (Mutex) Mutex->unlock();
-    }
-};
-
-// @Pedantic We want to make sure the user doesn't clone things that don't make sense.
-template <typename T>
-scoped_lock<T> *clone(scoped_lock<T> *dest, const scoped_lock<T> &src) {
-    assert(false && "We don't deep copy scoped locks");
     return null;
 }
 
@@ -164,9 +122,6 @@ public:
     //
     // @POSIX pthread_cond_init(&mHandle, NULL);
     void init();
-
-    // We no longer use destructors for releasing handles/memory etc.
-    // ~condition_variable();
 
     // @POSIX pthread_cond_destroy(&mHandle);
     void release();

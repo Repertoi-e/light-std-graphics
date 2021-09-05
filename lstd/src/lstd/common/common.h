@@ -109,6 +109,9 @@ struct Defer_Dummy {};
 template <typename F>
 struct Deferrer {
     F Func;
+
+    // We don't call destructors in free() (take a look at context.h), but they still work.
+    // In this case to rely on them to implement defer. This gets called on a stack variable anyway.
     ~Deferrer() { Func(); }
 };
 template <typename F>
@@ -190,7 +193,6 @@ constexpr auto enumerate_impl(T &&in) {
 struct non_copyable {
    protected:
     non_copyable() {}
-    ~non_copyable() {}
 
    private:
     non_copyable(const non_copyable &) = delete;
@@ -200,7 +202,6 @@ struct non_copyable {
 struct non_movable {
    protected:
     non_movable() {}
-    ~non_movable() {}
 
    private:
     non_movable(non_movable &&) = delete;
@@ -273,7 +274,7 @@ struct range {
 };
 
 // @Volatile: README.md
-// Type policy:
+// :TypePolicy:
 //
 // Aim of this policy:
 // - Dramatically reduce complexity and code size (both library AND user side!) UNLESS that comes at a run-time cost
@@ -319,18 +320,18 @@ struct range {
 //            // _string_ includes constexpr methods but also methods which cannot be constexpr and allocate memory.
 //            // It's like a mixed type between std::string_view and std::string from the STL, but with way better design and API.
 //            // When a string needs to allocate memory it requests a buffer and copies the old contents of the string.
-//            path.append("output.txt");
+//            string_append(path, "output.txt");
 //
 //            // This doesn't allocate memory but it points to the buffer in _path_.
 //            // The substring is valid as long as the original string is valid.
 //            string pathWithoutDot = path[{2, -1}];
 //
-//            // Doesn't release the string here, but instead runs at scope exit.
+//            // Doesn't free the string here, but instead runs at scope exit.
 //            // It runs exactly like a destructor, but it's explicit and not hidden.
 //            // This style of programming makes you write code which doesn't allocate
 //            // strings superfluously and doesn't rely on C++ compiler optimization
 //            // (like "copy elision" when returning strings from functions).
-//            defer(path.release());
+//            defer(free(path));
 //
 //     String methods which allocate memory copy the contents of the old pointer if the string is still a view (hasn't yet allocated memory).
 //
@@ -519,27 +520,27 @@ constexpr u64 rotate_right_64(u64 x, u32 bits) { return (x >> bits) | (x << (64 
 #define U32_HAS_ZERO_BYTE(v) (((v) -0x01010101UL) & ~(v) &0x80808080UL)
 
 // Uses 5 operations when n is constant:
-#define U32_HAS_BYTE(x, n) (U32_HAS_ZERO_BYTE((x) ^ (~0UL / 255 * (u8)(n))))
+#define U32_HAS_BYTE(x, n) (U32_HAS_ZERO_BYTE((x) ^ (~0UL / 255 * (u8) (n))))
 
 // Uses 4 operations when n is constant:
-#define U32_HAS_BYTE_LESS_THAN(x, n) (((x) - ~0UL / 255 * (u8)(n)) & ~(x) & ~0UL / 255 * 128)
+#define U32_HAS_BYTE_LESS_THAN(x, n) (((x) - ~0UL / 255 * (u8) (n)) & ~(x) & ~0UL / 255 * 128)
 
 // Uses 7 operations when n is constant:
 #define U32_COUNT_BYTES_LESS_THAN(x, n) (((~0UL / 255 * (127 + (n)) - ((x) & ~0UL / 255 * 127)) & ~(x) & ~0UL / 255 * 128) / 128 % 255)
 
 // Uses 3 operations when n is constant:
-#define U32_HAS_BYTE_GREATER_THAN(x, n) (((x) + ~0UL / 255 * (127 - (u8)(n)) | (x)) & ~0UL / 255 * 128)
+#define U32_HAS_BYTE_GREATER_THAN(x, n) (((x) + ~0UL / 255 * (127 - (u8) (n)) | (x)) & ~0UL / 255 * 128)
 
 // Uses 6 operations when n is constant:
-#define U32_COUNT_BYTES_GREATER_THAN(x, n) (((((x) & ~0UL / 255 * 127) + ~0UL / 255 * (127 - (u8)(n)) | (x)) & ~0UL / 255 * 128) / 128 % 255)
+#define U32_COUNT_BYTES_GREATER_THAN(x, n) (((((x) & ~0UL / 255 * 127) + ~0UL / 255 * (127 - (u8) (n)) | (x)) & ~0UL / 255 * 128) / 128 % 255)
 
 // Uses 7 operations when n is constant.
 // Sometimes it reports false positives. Use U32_HAS_BYTE_BETWEEN for an exact answer.
 // Use this as a fast pretest:
-#define U32_LIKELY_HAS_BYTE_BETWEEN(x, m, n) ((((x) - ~0UL / 255 * (u8)(n)) & ~(x) & ((x) & ~0UL / 255 * 127) + ~0UL / 255 * (127 - (u8)(m))) & ~0UL / 255 * 128)
+#define U32_LIKELY_HAS_BYTE_BETWEEN(x, m, n) ((((x) - ~0UL / 255 * (u8) (n)) & ~(x) & ((x) & ~0UL / 255 * 127) + ~0UL / 255 * (127 - (u8) (m))) & ~0UL / 255 * 128)
 
 // Uses 8 operations when n is constant:
-#define U32_HAS_BYTE_BETWEEN(x, m, n) ((~0UL / 255 * (127 + (u8)(n)) - ((x) & ~0UL / 255 * 127) & ~(x) & ((x) & ~0UL / 255 * 127) + ~0UL / 255 * (127 - (u8)(m))) & ~0UL / 255 * 128)
+#define U32_HAS_BYTE_BETWEEN(x, m, n) ((~0UL / 255 * (127 + (u8) (n)) - ((x) & ~0UL / 255 * 127) & ~(x) & ((x) & ~0UL / 255 * 127) + ~0UL / 255 * (127 - (u8) (m))) & ~0UL / 255 * 128)
 
 // Uses 10 operations when n is constant:
 #define U32_COUNT_BYTES_BETWEEN(x, m, n) (U32_HAS_BYTE_BETWEEN(x, m, n) / 128 % 255)
@@ -572,7 +573,7 @@ always_inline u32 count_digits_base_2(types::is_unsigned_integral auto n) {
     s32 integerLog2 = msb(n | 1);  // log_2(n) == msb(n) (@Speed Not the fastest way)
                                    // We also | 1 (if n is 0, we treat is as 1)
 
-    return (u32)(integerLog2 + 1);  // Number of bits in 'n' is [log_2(n)] + 1
+    return (u32) (integerLog2 + 1);  // Number of bits in 'n' is [log_2(n)] + 1
 }
 
 // Returns the number of decimal digits in n. Leading zeros are not counted

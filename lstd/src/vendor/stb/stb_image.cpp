@@ -3,10 +3,9 @@
 
 #define STBI_ASSERT assert
 
-#define STBI_MALLOC(size) (void *) LSTD_NAMESPACE::allocate_array<char>(size)
-#define STBI_REALLOC(ptr, newSize) (ptr ? (void *) LSTD_NAMESPACE::reallocate_array(ptr, newSize) : (void *) LSTD_NAMESPACE::allocate_array<char>(newSize))
-
-#define STBI_FREE(ptr) LSTD_NAMESPACE::free(ptr)
+#define STBI_MALLOC(size) malloc(size)
+#define STBI_REALLOC(ptr, newSize) realloc(ptr, newSize) 
+#define STBI_FREE(ptr) free(ptr)
 
 #define STBI_WINDOWS_UTF8
 #define STBI_NO_STDIO 

@@ -143,9 +143,6 @@ struct signal<R(Args ...), Collector> : public non_copyable {
         if (cb) array_append(Callbacks, cb);
     }
 
-    // We no longer use destructors for deallocation.
-    // ~signal() { release(); }
-
     void release() {
         free(Callbacks);
         free(ToRemove);

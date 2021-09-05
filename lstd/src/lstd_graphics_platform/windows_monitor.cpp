@@ -142,7 +142,7 @@ file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *di
         heightMM = (s32) (dm.dmPelsHeight * 25.4f / GetDeviceCaps(dc, LOGPIXELSY));
     }
 
-    auto *mon     = allocate<monitor>({.Alloc = internal::platform_get_persistent_allocator()});
+    auto *mon     = malloc<monitor>({.Alloc = internal::platform_get_persistent_allocator()});
     mon->WidthMM  = widthMM;
     mon->HeightMM = heightMM;
 

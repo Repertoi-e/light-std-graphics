@@ -189,11 +189,6 @@ void WINAPI __dyn_tls_init(PVOID, DWORD dwReason, LPVOID) noexcept // terminate 
      */
     __tls_guard = true;
 
-    // Each new thread must get an initalized context.
-    // When we are linking with the CRT, we inject a callback into a linker table.
-    // See e.g. windows_common.cpp
-    LSTD_NAMESPACE::internal::platform_init_context();
-
     /* prefast assumes we are overflowing __xd_a */
 #pragma warning(push)
 #pragma warning(disable : 26000)
@@ -202,6 +197,28 @@ void WINAPI __dyn_tls_init(PVOID, DWORD dwReason, LPVOID) noexcept // terminate 
             (*pfunc)();
     }
 #pragma warning(pop)
+
+    // :ThreadsContext:
+    //
+    // We don't guarantee a valid context for threads.
+    // 
+    // LSTD_NAMESPACE::internal::platform_init_context();
+    //
+    // The reason for this decision: we can't know the parent of the thread
+    // so we can't know which Context to copy. 
+    // 
+    // If you use lstd's API for creating a thread then we CAN know, 
+    // so in that case we provide a valid Context. However if you create 
+    // a thread with the raw OS API, then there is no way (as far as I know) 
+    // to get the parent thread. In that case we let it be zero filled
+    // and let the user copy the Context manually.
+    // 
+    // If in DEBUG then we fill it with a special value to catch bugs more
+    // easily when reading values from the invalid context.
+    //
+#if defined DEBUG_MEMORY
+    LSTD_NAMESPACE::fill_memory(&Context, DEAD_LAND_FILL, sizeof(Context))
+#endif
 }
 
 /*

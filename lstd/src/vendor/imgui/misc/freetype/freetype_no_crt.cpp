@@ -22,15 +22,10 @@ u64 ft_strlen(const char *str) { return strlen(str); }
 
 int ft_strtol(const char *nptr, char **endptr, int base) { return strtol(nptr, endptr, base); }
 
-void *ft_scalloc(size_t num, size_t size) {
-    void *r = (void *) LSTD_NAMESPACE::allocate_array<byte>(num * size);
-    ft_memset(r, 0, num * size);
-    return r;
-}
-
-void ft_sfree(void *block) { LSTD_NAMESPACE::free(block); }
-void *ft_smalloc(size_t size) { return (void *) LSTD_NAMESPACE::allocate_array<byte>(size); }
-void *ft_srealloc(void *b, size_t size) { return (void *) LSTD_NAMESPACE::reallocate_array<byte>((byte *) b, size); }
+void *ft_scalloc(size_t num, size_t size) { return calloc(num, size); }
+void *ft_smalloc(size_t size) { return malloc(size); }
+void *ft_srealloc(void *b, size_t size) { return realloc(b, size); }
+void ft_sfree(void *block) { free(block); }
 
 char *ft_getenv(const char *var) {
     auto [result, success] = LSTD_NAMESPACE::os_get_env(var, true);  // @Leak

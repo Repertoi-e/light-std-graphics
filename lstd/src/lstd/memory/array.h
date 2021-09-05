@@ -112,14 +112,6 @@ concept is_array = is_array_helper<T>::value;
 template <typename T>
 T *copy_elements(T *dst, const T *src, s64 n) { return (T *) copy_memory(dst, src, n * sizeof(T)); }
 
-// Calls destructor for an element.
-template <typename T>
-void destroy_at(T *at) {
-    if constexpr (!types::is_scalar<T>) {
-        at->~T();
-    }
-}
-
 // Makes sure the array has reserved enough space for at least _n_ new elements.
 // This may reserve way more than required. The reserve amount is equal to the next power of two bigger than (_n_ + Count), starting at 8.
 //
@@ -132,28 +124,18 @@ void array_reserve(is_array auto &arr, s64 n) {
     s64 target = max(ceil_pow_of_2(n + arr.Count + 1), 8);
 
     if (arr.Allocated) {
-        arr.Data = reallocate_array(arr.Data, target);
+        arr.Data = realloc(arr.Data, {.NewCount = target});
     } else {
         auto *oldView = arr.Data;
-        arr.Data      = allocate_array<types::remove_pointer_t<decltype(arr.Data)>>(target);
+        arr.Data      = malloc<types::remove_pointer_t<decltype(arr.Data)>>({.Count = target});
         if (arr.Count) copy_elements(arr.Data, oldView, arr.Count);
     }
     arr.Allocated = target;
 }
 
-// Call destructor on each element if the buffer is allocated.
 // Don't free the buffer, just move Count to 0
-void array_reset(is_array auto &arr) {
-    if (arr.Allocated) {
-        while (arr.Count) {
-            destroy_at(arr.Data + arr.Count - 1);
-            --arr.Count;
-        }
-    }
-    arr.Count = 0;
-}
+void array_reset(is_array auto &arr) { arr.Count = 0; }
 
-// Call destructor on each element if the buffer is allocated.
 // Free any memory and reset Count.
 void free(is_array auto &arr) {
     array_reset(arr);
@@ -165,12 +147,10 @@ void free(is_array auto &arr) {
 // Checks if there is enough reserved space for _n_ elements
 constexpr bool array_has_space_for(const is_array auto &arr, s64 n) { return arr.Count + n <= arr.Allocated; }
 
-// Sets the _index_'th element in the array (also calls the destructor on the old one)
+// Sets the _index_'th element in the array 
 template <is_array T>
 void array_set(T &arr, s64 index, const array_data_t<T> &element) {
     auto i = translate_index(index, arr.Count);
-    destroy_at(arr.Data + i);
-
     arr.Data[i] = element;
 }
 
@@ -227,7 +207,6 @@ void array_remove_at(array<T> &arr, s64 index) {
     s64 offset = translate_index(index, arr.Count);
 
     auto *where = arr.Data + offset;
-    destroy_at(where);
     copy_elements(where, where + 1, arr.Count - offset - 1);
     --arr.Count;
 }
@@ -263,7 +242,6 @@ void array_remove_unordered(is_array auto &arr, s64 index) {
     s64 offset = translate_index(index, arr.Count);
 
     auto *where = arr.Data + offset;
-    destroy_at(where);
     copy_elements(where, arr.Data + arr.Count - 1, 1);
     --arr.Count;
 }
@@ -279,8 +257,6 @@ void array_remove_range(is_array auto &arr, s64 begin, s64 end) {
 
     auto where    = arr.Data + targetBegin;
     auto whereEnd = arr.Data + targetEnd;
-
-    for (auto *d = where; d != whereEnd; ++d) destroy_at(d);
 
     s64 elementCount = whereEnd - where;
     copy_elements(where, whereEnd, arr.Count - targetBegin - elementCount);
@@ -327,11 +303,6 @@ void array_replace_all(T &arr, const T &arr2, const T &arr3) {
         array_reserve(arr, abs(diff));
 
         auto *data = arr.Data + i;
-
-        // Call the destructor on the old elements
-        For(range(arr2.Count)) {
-            destroy_at(data + it);
-        }
 
         // Make space for the new elements
         if (diff) {

@@ -241,7 +241,7 @@ s32 main() {
     string windowTitle = "Calculator";
 
     auto windowFlags = window::SHOWN | window::RESIZABLE | window::VSYNC | window::FOCUS_ON_SHOW | window::CLOSE_ON_ALT_F4;
-    m->MainWindow    = allocate<window>()->init(windowTitle, window::DONT_CARE, window::DONT_CARE, WindowWidth, WindowHeight, windowFlags);
+    m->MainWindow    = malloc<window>()->init(windowTitle, window::DONT_CARE, window::DONT_CARE, WindowWidth, WindowHeight, windowFlags);
 
     auto icon = pixel_buffer("data/calc.png", false, pixel_format::RGBA);
     array<pixel_buffer> icons;
@@ -261,7 +261,7 @@ s32 main() {
         auto **found = find(Memory->States, identifier).Value;
         if (!found) {
             // We allocate with alignment 16 because we use SIMD types
-            void *result = allocate_array<char>(size, {.Alignment = 16});
+            void *result = malloc<char>({.Count = size, .Alignment = 16});
             add(Memory->States, identifier, result);
             *created = true;
             return result;
@@ -280,8 +280,8 @@ s32 main() {
     g->set_blend(true);
     g->set_depth_testing(false);
 
-    ImGui::SetAllocatorFunctions([](size_t size, void *) { return (void *) allocate_array<char>(size, {.Alloc = PersistentAlloc}); },
-                                 [](void *ptr, void *) { ::lstd::free(ptr); });  // Without the namespace this selects the CRT free for some bizarre reason...
+    ImGui::SetAllocatorFunctions([](size_t size, void *) { return (void *) malloc<char>({.Count = (s64) size, .Alloc = PersistentAlloc}); },
+                                 [](void *ptr, void *) { free(ptr); });
 
     init_imgui_for_our_windows(m->MainWindow);
     m->ImGuiContext = ImGui::GetCurrentContext();
@@ -374,7 +374,7 @@ file_scope bool common_event_callback(const event &e) {
         io.KeysDown[e.KeyCode]         = true;
         bd->KeyOwnerWindows[e.KeyCode] = e.Window;
         update_modifiers();
-    } else if (e.Type == event::Keyboard_Released) {
+    } else if (e.Type == event::Key_Released) {
         io.KeysDown[e.KeyCode]         = false;
         bd->KeyOwnerWindows[e.KeyCode] = null;
         update_modifiers();
@@ -521,9 +521,9 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
     ImGui::CreateContext();
 
     ImGuiIO &io = ImGui::GetIO();
-    io.Fonts    = allocate<ImFontAtlas>();
+    io.Fonts    = malloc<ImFontAtlas>();
 
-    auto *bd = allocate<imgui_our_windows_data>();
+    auto *bd = malloc<imgui_our_windows_data>();
 
     io.BackendPlatformUserData = (void *) bd;
     io.BackendPlatformName     = "imgui_impl_lstd_graphics";
@@ -580,7 +580,7 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
     io.KeyMap[ImGuiKey_Home]        = Key_Home;
     io.KeyMap[ImGuiKey_End]         = Key_End;
     io.KeyMap[ImGuiKey_Insert]      = Key_Insert;
-    io.KeyMap[ImGuiKey_Delete]      = Key_Delete;
+    io.KeyMap[ImGuiKey_Delete]      = Key_DeleteForward;
     io.KeyMap[ImGuiKey_Backspace]   = Key_Delete;
     io.KeyMap[ImGuiKey_Space]       = Key_Space;
     io.KeyMap[ImGuiKey_Enter]       = Key_Return;
@@ -596,7 +596,7 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
     bd->InstalledCallbacks = true;
     mainWindow->Event.connect(common_event_callback);
 
-    auto *vd        = allocate<imgui_our_windows_viewport_data>();
+    auto *vd        = malloc<imgui_our_windows_viewport_data>();
     vd->Window      = bd->Window;  // == mainWindow
     vd->WindowOwned = false;
 
@@ -620,10 +620,10 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
             auto width  = (s32) viewport->Size.x;
             auto height = (s32) viewport->Size.y;
 
-            auto *win = allocate<window>()->init("", window::DONT_CARE, window::DONT_CARE, width, height, flags);
+            auto *win = malloc<window>()->init("", window::DONT_CARE, window::DONT_CARE, width, height, flags);
 
             auto *bd = (imgui_our_windows_data *) ImGui::GetIO().BackendPlatformUserData;
-            auto *vd = allocate<imgui_our_windows_viewport_data>();
+            auto *vd = malloc<imgui_our_windows_viewport_data>();
 
             vd->Window      = win;
             vd->WindowOwned = true;
@@ -662,7 +662,7 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
                     For(range(Key_Last + 1)) {
                         if (bd->KeyOwnerWindows[it] == vd->Window) {
                             event e;
-                            e.Type    = event::Keyboard_Released;
+                            e.Type    = event::Key_Released;
                             e.KeyCode = (u32) it;
 
                             common_event_callback(e);

@@ -60,9 +60,6 @@ struct texture_2D : asset {
 
     texture_2D() = default;
 
-    // We no longer use destructors for deallocation.
-    // ~texture_2D() { release(); }
-
     void init(graphics *g, s32 width, s32 height, texture_filter filter = texture_filter::Linear,
               texture_wrap wrap = texture_wrap::Clamp);
     void init_as_render_target(graphics *g, s32 width, s32 height, texture_filter filter = texture_filter::Linear,

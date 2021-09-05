@@ -126,7 +126,6 @@ struct window {
     window *Next = null;
 
     window() = default;
-    ~window() { release(); }
 
     // You can use _DONT_CARE_ or _CENTERED_ for _x_ and _y_.
     // Returns _this_.

@@ -44,7 +44,7 @@ void pixel_buffer::release() {
 pixel_buffer *clone(pixel_buffer *dest, pixel_buffer src) {
     *dest = src;
     s64 size = src.Width * src.Height * src.BPP;
-    dest->Pixels = allocate_array<u8>(size);
+    dest->Pixels = malloc<u8>({.Count = size});
     copy_memory(dest->Pixels, src.Pixels, size);
     return dest;
 }

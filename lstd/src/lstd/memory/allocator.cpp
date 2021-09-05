@@ -28,7 +28,7 @@ void debug_memory::unlink_header(allocation_header *h) {
         Head = null;
     } else if (Head == h) {
         h->DEBUG_Next->DEBUG_Previous = h->DEBUG_Previous;
-        Head = h->DEBUG_Next;
+        Head                          = h->DEBUG_Next;
     } else {
         h->DEBUG_Previous->DEBUG_Next = h->DEBUG_Next;
         if (h->DEBUG_Next) {
@@ -42,7 +42,7 @@ void debug_memory::unlink_header(allocation_header *h) {
 void debug_memory::add_header(allocation_header *h) {
     h->DEBUG_Next = Head;
     if (Head) {
-        h->DEBUG_Previous = Head->DEBUG_Previous;
+        h->DEBUG_Previous    = Head->DEBUG_Previous;
         Head->DEBUG_Previous = h;
     } else {
         h->DEBUG_Previous = h;
@@ -56,18 +56,18 @@ void debug_memory::swap_header(allocation_header *o, allocation_header *n) {
     assert(n);
 
     if (Head == o) {
-        Head = n;
+        Head          = n;
         n->DEBUG_Next = o->DEBUG_Next;
 
         if (!o->DEBUG_Next) {
             n->DEBUG_Previous = n;
         } else {
-            n->DEBUG_Previous = o->DEBUG_Previous;
+            n->DEBUG_Previous             = o->DEBUG_Previous;
             n->DEBUG_Next->DEBUG_Previous = n;
         }
     } else {
-        n->DEBUG_Next = o->DEBUG_Next;
-        n->DEBUG_Previous = o->DEBUG_Previous;
+        n->DEBUG_Next                 = o->DEBUG_Next;
+        n->DEBUG_Previous             = o->DEBUG_Previous;
         n->DEBUG_Previous->DEBUG_Next = n;
         if (!o->DEBUG_Next) {
             Head->DEBUG_Previous = n;
@@ -87,7 +87,7 @@ void debug_memory::swap_header(allocation_header *o, allocation_header *n) {
 //
 constexpr string get_short_file_name(const string &str) {
     char srcData[] = {'s', 'r', 'c', OS_PATH_SEPARATOR, '\0'};
-    string src = srcData;
+    string src     = srcData;
 
     s64 findResult = find_substring_reverse(str, src);
     if (findResult == -1) {
@@ -124,13 +124,13 @@ void debug_memory::report_leaks() {
     }
 
     // @Cleanup @Platform @TODO @Memory Don't use the platform allocator. In the future we should have a seperate allocator for debug info.
-    leaks = allocate_array<allocation_header *>(leaksCount, {.Alloc = internal::platform_get_persistent_allocator()});
+    leaks = malloc<allocation_header *>({.Count = leaksCount, .Alloc = internal::platform_get_persistent_allocator()});
     defer(free(leaks));
 
     leaksID = ((allocation_header *) leaks - 1)->ID;
 
     {
-        auto *p = leaks;
+        auto *p  = leaks;
         auto *it = Head;
         while (it) {
             if (!it->MarkedAsLeak && it->ID != leaksID) *p++ = it;
@@ -230,7 +230,7 @@ file_scope void *encode_header(void *p, s64 userSize, u32 align, allocator alloc
     auto *result = (allocation_header *) ((char *) p + alignmentPadding);
 
 #if defined DEBUG_MEMORY
-    result->DEBUG_Next = null;
+    result->DEBUG_Next     = null;
     result->DEBUG_Previous = null;
 
     if (DEBUG_memory) {
@@ -305,6 +305,9 @@ file_scope void log_file_and_line(source_location loc) {
 }
 
 void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options, source_location loc) {
+    if (!alloc) alloc = Context.Alloc;
+    assert(alloc && "Context allocator was null. The programmer should set it before calling allocate functions.");
+
     options |= Context.AllocOptions;
 
     if (alignment == 0) {
@@ -430,7 +433,7 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
         copy_memory(newPointer, ptr, header->Size);
 
 #if defined DEBUG_MEMORY
-        newHeader->ID = id;
+        newHeader->ID  = id;
         newHeader->RID = header->RID + 1;
 
         if (DEBUG_memory) {
@@ -451,7 +454,7 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
         p = (void *) (newHeader + 1);
     } else {
         // The block was resized sucessfully and it doesn't need moving
-        assert(block == newBlock); // Sanity
+        assert(block == newBlock);  // Sanity
 
 #if defined DEBUG_MEMORY
         ++header->RID;
@@ -539,20 +542,40 @@ void free_all(allocator alloc, u64 options) {
 
 LSTD_END_NAMESPACE
 
-using LSTD_NAMESPACE::general_allocate;
-using LSTD_NAMESPACE::general_free;
-using LSTD_NAMESPACE::source_location;
+#if defined LSTD_NAMESPACE
+using namespace LSTD_NAMESPACE;
+#endif
 
-#define C LSTD_NAMESPACE::Context
+extern "C" {
 
-[[nodiscard]] void *operator new(size_t size) { return general_allocate(C.Alloc, size, 0, 0); }
-[[nodiscard]] void *operator new[](size_t size) { return general_allocate(C.Alloc, size, 0, 0); }
+void *malloc(size_t size) { return (void *) malloc<byte>({.Count = (s64) size}); }
 
-[[nodiscard]] void *operator new(size_t size, align_val_t alignment) { return general_allocate(C.Alloc, size, (u32) alignment, 0); }
-[[nodiscard]] void *operator new[](size_t size, align_val_t alignment) { return general_allocate(C.Alloc, size, (u32) alignment, 0); }
+void *calloc(size_t num, size_t size) {
+    void *block = malloc(num * size);
+    zero_memory(block, num * size);
+    return block;
+}
 
-void operator delete(void *ptr) noexcept { general_free(ptr); }
-void operator delete[](void *ptr) noexcept { general_free(ptr); }
+void *realloc(void *block, size_t newSize) {
+    if (!block) {
+        return malloc(newSize);
+    }
+    return (void *) realloc((byte *) block, {.NewCount = (s64) newSize});
+}
+
+// No need to define this global function if the library was built without a namespace
+void free(void *block) { free((byte *) block); }
+}
+
+#if defined LSTD_NAMESPACE
+using namespace LSTD_NAMESPACE;
+#endif
+
+[[nodiscard]] void *operator new(size_t size) { return general_allocate(Context.Alloc, size, 0, 0); }
+[[nodiscard]] void *operator new[](size_t size) { return general_allocate(Context.Alloc, size, 0, 0); }
+
+[[nodiscard]] void *operator new(size_t size, align_val_t alignment) { return general_allocate(Context.Alloc, size, (u32) alignment, 0); }
+[[nodiscard]] void *operator new[](size_t size, align_val_t alignment) { return general_allocate(Context.Alloc, size, (u32) alignment, 0); }
 
 void operator delete(void *ptr, align_val_t alignment) noexcept { general_free(ptr); }
 void operator delete[](void *ptr, align_val_t alignment) noexcept { general_free(ptr); }

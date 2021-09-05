@@ -29,9 +29,6 @@ struct pixel_buffer {
     // The _Format_ member is set at _Unknown_ if the load failed.
     pixel_buffer(const string &path, bool flipVertically = false, pixel_format format = pixel_format::Unknown);
 
-    // We don't use destructors for freeing memory anymore.
-    // ~pixel_buffer() { release(); }
-
     void release();
 };
 
