@@ -157,7 +157,7 @@ LSTD_END_NAMESPACE
 
 namespace std {
 
-#if not defined LSTD_DONT_DEFINE_STD
+#if !defined LSTD_DONT_DEFINE_STD
 template <size_t I, typename T>
 struct tuple_element;
 

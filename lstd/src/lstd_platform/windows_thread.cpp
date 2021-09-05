@@ -5,7 +5,7 @@
 #include "lstd/common/context.h"
 #include "lstd/common/windows.h" // Declarations of Win32 functions
 
-#if not defined LSTD_NO_CRT
+#if !defined LSTD_NO_CRT
 #include <process.h>
 #endif
 

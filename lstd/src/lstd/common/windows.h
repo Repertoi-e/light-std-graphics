@@ -7,7 +7,7 @@
 #include "../common/common.h"
 
 // @Hack... dumb windows headers
-#if not defined LSTD_JUST_DX
+#if !defined LSTD_JUST_DX
 #include "windows_api.h"
 #endif
 
@@ -34,7 +34,7 @@ LSTD_END_NAMESPACE
 
 // DX_CHECK is used for checking directx calls. The difference from WIN_CHECKHR is that
 // in Release configuration, the macro expands to just the call (no error checking).
-#if not defined NDEBUG
+#if !defined NDEBUG
 #define DX_CHECK(call) WIN_CHECKHR(call)
 #else
 #define DX_CHECK(call) call

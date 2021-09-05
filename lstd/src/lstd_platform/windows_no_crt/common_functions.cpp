@@ -38,7 +38,7 @@ void *memmove(void *dest, const void *src, size_t n) { return copy_memory(dest, 
 // If we are building with MSVC in Release, the compiler optimizes the following functions as instrinsics.
 // In that case we don't define them, because these are slow anyway. Similar thing happens with some math
 // functions in the Cephes library (search for :WEMODIFIEDCEPHES:)
-#if COMPILER == MSVC and not defined NDEBUG
+#if COMPILER == MSVC and !defined RELEASE && !defined DEBUG_OPTIMIZED
 size_t strlen(const char *s) {
     int i;
 

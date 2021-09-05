@@ -20,7 +20,7 @@ LSTD_BEGIN_NAMESPACE
 
 #define FORCE_NO_DEBUG_MEMORY
 
-#if not defined NDEBUG
+#if !defined NDEBUG
 #if !defined DEBUG_MEMORY && !defined FORCE_NO_DEBUG_MEMORY
 #define DEBUG_MEMORY 1
 #endif
@@ -862,7 +862,7 @@ void free(void *ptr);
 
 using align_val_t = size_t;
 
-#if not defined LSTD_DONT_DEFINE_STD
+#if !defined LSTD_DONT_DEFINE_STD
 [[nodiscard]] void *operator new(size_t size);
 [[nodiscard]] void *operator new[](size_t size);
 

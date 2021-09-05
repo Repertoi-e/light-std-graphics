@@ -123,7 +123,7 @@ Deferrer<F> operator*(Defer_Dummy, F func) {
 
 #undef assert
 
-#if not defined NDEBUG
+#if !defined NDEBUG
 #define assert(condition) (!!(condition)) ? (void) 0 : debug_break()
 #else
 #define assert(condition) ((void) 0)

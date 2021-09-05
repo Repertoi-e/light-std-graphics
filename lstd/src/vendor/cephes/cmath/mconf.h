@@ -199,7 +199,7 @@ extern int merror;
 
 // :WEMODIFIEDCEPHES: When building with MSVC in Release, some math functions are optimized away with intrinsics.
 // In that case we don't define them in the Cephes library.
-#if defined _MSC_VER && !defined NDEBUG
+#if defined _MSC_VER && !defined RELEASE && !defined DEBUG_OPTIMIZED
 #define INTRINSIC 1
 #else
 #define INTRINSIC 0

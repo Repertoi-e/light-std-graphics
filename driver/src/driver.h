@@ -10,7 +10,7 @@ using namespace lstd;  // The library is in it's own namespace for the sake of n
 
 // DRIVER_API is used to export functions from the game dll
 #if OS == WINDOWS
-#if not defined BUILDING_DRIVER
+#if !defined BUILDING_DRIVER
 #define DRIVER_API extern "C" __declspec(dllexport)
 #else
 #define DRIVER_API __declspec(dllimport)

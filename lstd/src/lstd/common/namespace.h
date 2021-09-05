@@ -8,7 +8,7 @@
 // * If you want to build this library without a namespace, define LSTD_NO_NAMESPACE.
 //
 
-#if not defined LSTD_NAMESPACE and not defined LSTD_NO_NAMESPACE
+#if !defined LSTD_NAMESPACE and !defined LSTD_NO_NAMESPACE
 #define LSTD_NAMESPACE lstd
 #endif
 

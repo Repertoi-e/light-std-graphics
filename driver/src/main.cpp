@@ -1,6 +1,6 @@
 #include "driver.h"
 
-#if not defined BUILDING_DRIVER
+#if !defined BUILDING_DRIVER
 #error Error
 #endif
 
