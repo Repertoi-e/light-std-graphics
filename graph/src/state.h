@@ -100,7 +100,7 @@ inline graph_state *GraphState = null;
 inline bool point_in_rect(v2 p, v2 min, v2 max) { return p.x > min.x && p.y > min.y && p.x < max.x && p.y < max.y; }
 
 inline bool mouse_in_viewport() {
-    v2 vpPos = GraphState->ViewportPos - (v2) Memory->MainWindow->get_pos();
+    v2 vpPos = GraphState->ViewportPos - (v2) Memory->MainWindow.get_pos();
     v2 vpSize = GraphState->ViewportSize;
     return point_in_rect(GraphState->LastMouse, vpPos, vpPos + vpSize);
 }

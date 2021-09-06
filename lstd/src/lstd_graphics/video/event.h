@@ -3,21 +3,16 @@
 #include "lstd/math/vec.h"
 #include "lstd/memory/array.h"
 #include "lstd/memory/string.h"
+#include "window_def.h"
 
 LSTD_BEGIN_NAMESPACE
 
-// These values are BIT(x) because we sometimes use them as flags
 enum : u32 {
-    Mouse_Button_1 = BIT(0),
-    Mouse_Button_2 = BIT(1),
-    Mouse_Button_3 = BIT(2),
-    Mouse_Button_4 = BIT(3),
-    Mouse_Button_5 = BIT(4),
-    Mouse_Button_Left = Mouse_Button_1,
-    Mouse_Button_Right = Mouse_Button_2,
-    Mouse_Button_Middle = Mouse_Button_3,
-    Mouse_Button_X1 = Mouse_Button_4,
-    Mouse_Button_X2 = Mouse_Button_5,
+    Mouse_Button_Left   = 0,
+    Mouse_Button_Right  = 1,
+    Mouse_Button_Middle = 2,
+    Mouse_Button_X1     = 3,
+    Mouse_Button_X2     = 4,
 
     Mouse_Button_Last = Mouse_Button_X2
 };
@@ -204,15 +199,13 @@ extern u32 g_KeycodeNativeToHid[256];
 }  // namespace internal
 
 enum : u32 {
-    Modifier_Shift = BIT(0),
-    Modifier_Control = BIT(1),
-    Modifier_Alt = BIT(2),
-    Modifier_Super = BIT(3),
+    Modifier_Shift    = BIT(0),
+    Modifier_Control  = BIT(1),
+    Modifier_Alt      = BIT(2),
+    Modifier_Super    = BIT(3),
     Modifier_CapsLock = BIT(4),
-    Modifier_NumLock = BIT(5)
+    Modifier_NumLock  = BIT(5)
 };
-
-struct window;
 
 // @TODO: Specialize this for fmt::formatter
 struct event {
@@ -220,17 +213,17 @@ struct event {
         //
         // Mouse events:
         //
-        Mouse_Button_Pressed = 0,   // Sets _Button_ and _DoubleClicked_
+        Mouse_Button_Pressed  = 0,  // Sets _Button_ and _DoubleClicked_
         Mouse_Button_Released = 1,  // Sets _Button_
-        Mouse_Wheel_Scrolled = 2,   // Sets _ScrollX_ and _ScrollY_
-        Mouse_Moved = 3,            // Sets _X_, _Y, _DX_ and _DY_
-        Mouse_Entered_Window = 4,   // Doesn't set anything
-        Mouse_Left_Window = 5,      // Doesn't set anything
+        Mouse_Wheel_Scrolled  = 2,  // Sets _ScrollX_ and _ScrollY_
+        Mouse_Moved           = 3,  // Sets _X_, _Y, _DX_ and _DY_
+        Mouse_Entered_Window  = 4,  // Doesn't set anything
+        Mouse_Left_Window     = 5,  // Doesn't set anything
 
         //
         // Keyboard events:
         //
-        Key_Pressed = 6,   // Sets _KeyCode_
+        Key_Pressed  = 6,  // Sets _KeyCode_
         Key_Released = 7,  // Sets _KeyCode_
         Key_Repeated = 8,  // Sets _KeyCode_
 
@@ -239,27 +232,27 @@ struct event {
         //
         // Window events:
         //
-        Window_Closed = 10,     // Doesn't set anything
+        Window_Closed    = 10,  // Doesn't set anything
         Window_Minimized = 11,  // Sets _Minimized_ (true if the window was minimized, false if restored)
         Window_Maximized = 12,  // Sets _Maximized_ (true if the window was maximized, false if restored)
-        Window_Focused = 13,    // Sets _Focused_ (true if the window gained focus, false if lost)
+        Window_Focused   = 13,  // Sets _Focused_ (true if the window gained focus, false if lost)
 
-        Window_Moved = 14,    // Sets _X_ and _Y_
+        Window_Moved   = 14,  // Sets _X_ and _Y_
         Window_Resized = 15,  // Sets _Width_ and _Height_
 
         // May not map 1:1 with Window_Resized (e.g. Retina display on Mac)
         Window_Framebuffer_Resized = 16,  // Sets _Width_ and _Height_
 
-        Window_Refreshed = 17,              // Doesn't set anything
+        Window_Refreshed             = 17,  // Doesn't set anything
         Window_Content_Scale_Changed = 18,  // Sets _Scale_
-        Window_Files_Dropped = 19,          // Sets _Paths_ (the array contains a list of all files dropped)
+        Window_Files_Dropped         = 19,  // Sets _Paths_ (the array contains a list of all files dropped)
 
         // Use this for any platform specific behaviour that can't be handled just using this library
         // This event is sent for every single platform message (including the ones handled by the events above!)
         Window_Platform_Message_Sent = 20  // Sets _Message_, _Param1_, _Param2_
     };
 
-    window *Window = null;  // This is always set to the window which the event originated from
+    window Window;          // This is always set to the window which the event originated from
     type Type = (type) -1;  // This is always set to the type of event (one of the above)
 
     union {
@@ -297,7 +290,7 @@ struct event {
         };
     };
 
-    // Gets temporarily allocated in the window procedure, the event doesn't own this
+    // Gets temporarily allocated in the window procedure, the event doesn't own this.
     array<string> Paths;  // Only set on Window_Files_Dropped
 };
 

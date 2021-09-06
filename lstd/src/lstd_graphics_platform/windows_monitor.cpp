@@ -121,6 +121,8 @@ void win64_monitor_init() {
     } else {
         SetProcessDPIAware();
     }
+
+    win64_poll_monitors();
 }
 
 file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *display) {
@@ -441,8 +443,8 @@ array<monitor *> os_get_monitors() { return Monitors; }
 
 monitor *os_get_primary_monitor() { return Monitors[0]; }
 
-monitor *os_monitor_from_window(window *win) {
-    HMONITOR hMonitor = MonitorFromWindow(win->PlatformData.Win32.hWnd, MONITOR_DEFAULTTONEAREST);
+monitor *os_monitor_from_window(window win) {
+    HMONITOR hMonitor = MonitorFromWindow((HWND) win.ID, MONITOR_DEFAULTTONEAREST);
 
     monitor *result = null;
     For(Monitors) {

@@ -36,7 +36,7 @@ struct memory {
     // This gets set by the dll, tells the exe to reload.
     bool RequestReloadNextFrame = false;
 
-    window *MainWindow = null;
+    window MainWindow;
 
     // Our target FPS by default is 60. If the PC we are running on doesn't manage to hit that, we need to reduce
     // it. Then the frame delta must change. So we shouldn't hardcode 1/60 spf (e.g. for physics calculations) everywhere

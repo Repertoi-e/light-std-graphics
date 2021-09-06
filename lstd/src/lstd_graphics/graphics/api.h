@@ -3,6 +3,7 @@
 /// Defines the graphics API that can be used to draw stuff on windows.
 /// Implementations of it can be switched dynamically.
 
+#include "../video/window.h"
 #include "lstd/math/rect.h"
 #include "lstd/math/vec.h"
 #include "lstd/memory/array.h"
@@ -22,7 +23,6 @@ struct ID3D11RasterizerState;
 LSTD_BEGIN_NAMESPACE
 
 // @AvoidInclude
-struct window;
 struct event;
 
 struct shader;
@@ -42,16 +42,16 @@ enum class cull : u32 { None = 0,
 struct graphics : non_copyable, non_movable {
 #if OS == WINDOWS
     struct {
-        ID3D11Device *Device = null;
+        ID3D11Device *Device               = null;
         ID3D11DeviceContext *DeviceContext = null;
 
-        ID3D11BlendState *BlendStates[2] = {null, null};
+        ID3D11BlendState *BlendStates[2]               = {null, null};
         ID3D11DepthStencilState *DepthStencilStates[2] = {null, null};
     } D3D{};
 #endif
 
     struct target_window {
-        window *Window = null;
+        window Window;
         s64 CallbackID = -1;
 
         cull CullMode = cull::None;
@@ -64,11 +64,12 @@ struct graphics : non_copyable, non_movable {
             IDXGISwapChain *SwapChain = null;
 
             ID3D11RenderTargetView *BackBuffer = null;
-            ID3D11RenderTargetView *RenderTarget =
-                null;  // Normally set to _BackBuffer_, you may specify a
-                       // different render target (e.g. a framebuffer texture by calling _set_custom_render_target_)
 
-            ID3D11Texture2D *DepthStencilBuffer = null;
+            // Normally set to _BackBuffer_, you may specify a
+            // different render target (e.g. a framebuffer texture by calling _set_custom_render_target_)
+            ID3D11RenderTargetView *RenderTarget = null;
+
+            ID3D11Texture2D *DepthStencilBuffer      = null;
             ID3D11DepthStencilView *DepthStencilView = null;
 
             ID3D11RasterizerState *RasterStates[3] = {null, null};
@@ -87,24 +88,24 @@ struct graphics : non_copyable, non_movable {
     struct impl {
         void (*Init)(graphics *g) = null;
 
-        void (*InitTargetWindow)(graphics *g, target_window *targetWindow) = null;
-        void (*ReleaseTargetWindow)(graphics *g, target_window *targetWindow) = null;
+        void (*InitTargetWindow)(graphics *g, target_window *targetWindow)                           = null;
+        void (*ReleaseTargetWindow)(graphics *g, target_window *targetWindow)                        = null;
         void (*TargetWindowResized)(graphics *g, target_window *targetWindow, s32 width, s32 height) = null;
 
-        void (*SetViewport)(graphics *g, rect viewport) = null;
+        void (*SetViewport)(graphics *g, rect viewport)       = null;
         void (*SetScissorRect)(graphics *g, rect scissorRect) = null;
 
         void (*SetRenderTarget)(graphics *g, texture_2D *target) = null;  // target == null means back buffer
 
-        void (*SetBlend)(graphics *g, bool enabled) = null;
+        void (*SetBlend)(graphics *g, bool enabled)        = null;
         void (*SetDepthTesting)(graphics *g, bool enabled) = null;
-        void (*SetCullMode)(graphics *g, cull mode) = null;
+        void (*SetCullMode)(graphics *g, cull mode)        = null;
 
-        void (*ClearColor)(graphics *g, v4 color) = null;
-        void (*Draw)(graphics *g, u32 vertices, u32 startVertexLocation) = null;
+        void (*ClearColor)(graphics *g, v4 color)                                             = null;
+        void (*Draw)(graphics *g, u32 vertices, u32 startVertexLocation)                      = null;
         void (*DrawIndexed)(graphics *g, u32 indices, u32 startIndex, u32 baseVertexLocation) = null;
-        void (*Swap)(graphics *g) = null;
-        void (*Release)(graphics *g) = null;
+        void (*Swap)(graphics *g)                                                             = null;
+        void (*Release)(graphics *g)                                                          = null;
     } Impl{};
 
     void init(graphics_api api);
@@ -112,7 +113,7 @@ struct graphics : non_copyable, non_movable {
     // Sets the current render context, so you can draw to multiple windows using the same _graphics_ object.
     // If you want to draw to a texture, use _set_custom_render_target_, note that you must still have a valid
     // target window, and that window is associated with the resources which get created.
-    void set_target_window(window *win);
+    void set_target_window(window win);
 
     rect get_viewport();
     void set_viewport(rect viewport);

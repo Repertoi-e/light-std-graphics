@@ -19,7 +19,7 @@ DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
     auto *cam = &GraphState->Camera;
     camera_update(cam);
 
-    if (Memory->MainWindow->is_visible()) {
+    if (Memory->MainWindow.is_visible()) {
         render_ui();
         render_viewport();
     }

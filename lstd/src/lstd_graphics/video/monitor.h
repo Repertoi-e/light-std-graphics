@@ -4,6 +4,7 @@
 #include "lstd/memory/array.h"
 #include "lstd/memory/signal.h"
 #include "lstd/memory/string.h"
+#include "window.h"
 
 LSTD_BEGIN_NAMESPACE
 
@@ -18,13 +19,13 @@ struct display_mode {
     s32 RefreshRate = 0;
 
     s32 compare_lexicographically(const display_mode &other) const {
-        s32 bpp = RedBits + GreenBits + BlueBits;
+        s32 bpp      = RedBits + GreenBits + BlueBits;
         s32 otherBPP = other.RedBits + other.GreenBits + other.BlueBits;
 
         // First sort on color bits per pixel
         if (bpp != otherBPP) return (bpp > otherBPP) - (otherBPP > bpp);
 
-        s32 area = Width * Height;
+        s32 area      = Width * Height;
         s32 otherArea = other.Width * other.Height;
 
         // Then sort on screen area
@@ -57,8 +58,9 @@ struct monitor {
     // Physical dimensions in millimeters
     s32 WidthMM = 0, HeightMM = 0;
 
-    // The window whose video mode is current on this monitor
-    window *Window = null;
+    // The handle to the window whose video mode is current on this monitor.
+    // By default it's an invalid handle.
+    window Window;
 
     array<display_mode> DisplayModes;
     display_mode CurrentMode;
@@ -94,9 +96,9 @@ v2 os_get_monitor_content_scale(monitor *mon);
 void os_poll_monitors();
 
 // Returns a pointer to the monitor which contains the window _win_.
-// 
+//
 // Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
-monitor *os_monitor_from_window(window *win);
+monitor *os_monitor_from_window(window win);
 
 // Returns an array of all available monitors connected to the computer.
 //
@@ -104,7 +106,7 @@ monitor *os_monitor_from_window(window *win);
 array<monitor *> os_get_monitors();
 
 // Returns os_get_monitors()[0]
-// 
+//
 // Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
 monitor *os_get_primary_monitor();
 

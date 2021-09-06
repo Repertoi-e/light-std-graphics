@@ -19,11 +19,9 @@ void camera_reset_constants(camera *cam) {
 }
 
 void camera_update(camera *cam) {
-    // The viewport window may not be in an additional imgui window since
-    // we don't allow moving it, so assuming this is is fine.
-    auto *win = Memory->MainWindow;
+    auto win = Memory->MainWindow;
 
-    vec2<s32> mouse = win->get_cursor_pos();
+    vec2<s32> mouse = win.get_cursor_pos();
     v2 delta = {(f32) mouse.x - GraphState->LastMouse.x, (f32) mouse.y - GraphState->LastMouse.y};
     GraphState->LastMouse = mouse;
 
@@ -36,7 +34,11 @@ void camera_update(camera *cam) {
         f32 zoomFactor = x * x;
 
         f32 keyFactor = 1;
-        if (win->Keys[Key_LeftControl]) {
+        
+        // We use the imgui state so we don't maintain ANOTHER array of keys pressed
+        // and we don't want to listen on events. Our imgui backend also properly handles
+        // multiple windows.
+        if (ImGui::IsKeyPressed(Key_LeftControl)) {
             keyFactor = 3;
         }
         cam->Scale += cam->ZoomSpeed * cam->ScrollY * keyFactor * zoomFactor;
@@ -48,7 +50,7 @@ void camera_update(camera *cam) {
     }
 
     // Start panning if clicking inside the viewport, finish panning when the mouse is released
-    if (win->MouseButtons[Mouse_Button_Left]) {
+    if (ImGui::IsMouseDown(0)) {
         if (mouse_in_viewport()) {
             cam->Panning = true;
         }

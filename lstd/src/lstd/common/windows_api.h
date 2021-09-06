@@ -7,7 +7,7 @@
 // We do this in order to avoid including Windows.h at all.
 // This makes the program compile faster, but that's not the actual reason we do this...
 // In reality Windows.h complains about not having symbols normally found in the CRT!
-// 
+//
 // :AvoidSTDs: We avoid including any files from the C++ standard library.
 // This library should work with or without them.
 //
@@ -46,7 +46,7 @@ using HRESULT = u32;
 // HRESULT_FROM_WIN32(x) used to be a macro, however we now run it as an inline function
 // to prevent double evaluation of 'x'. If you still need the macro, you can use __HRESULT_FROM_WIN32(x)
 //
-#define __HRESULT_FROM_WIN32(x) ((HRESULT)(x) <= 0 ? ((HRESULT)(x)) : ((HRESULT)(((x) &0x0000FFFF) | (FACILITY_WIN32 << 16) | 0x80000000)))
+#define __HRESULT_FROM_WIN32(x) ((HRESULT) (x) <= 0 ? ((HRESULT) (x)) : ((HRESULT) (((x) &0x0000FFFF) | (FACILITY_WIN32 << 16) | 0x80000000)))
 always_inline HRESULT HRESULT_FROM_WIN32(unsigned long x) {
     return (HRESULT) x <= 0 ? (HRESULT) x : (HRESULT) (x & 0x0000FFFF | FACILITY_WIN32 << 16 | 0x80000000);
 }
@@ -57,51 +57,51 @@ always_inline HRESULT HRESULT_FROM_WIN32(unsigned long x) {
 
 #define INVALID_HANDLE_VALUE ((void *) (-1))
 
-using BYTE = u8;
+using BYTE  = u8;
 using PBYTE = u8 *;
 
-using INT8 = s8;
+using INT8  = s8;
 using UINT8 = u8;
 
-using INT16 = s16;
+using INT16  = s16;
 using UINT16 = u16;
 
-using SHORT = s16;
+using SHORT  = s16;
 using USHORT = u16;
 
 using ATOM = u16;
 using WORD = u16;
 
-using DWORD = u32;
-using PDWORD = u32 *;
+using DWORD   = u32;
+using PDWORD  = u32 *;
 using LPDWORD = u32 *;
 
-using DWORD64 = u64;
+using DWORD64  = u64;
 using PDWORD64 = u64 *;
 
 using DWORD_PTR = u64;
 
-using UINT = u32;
+using UINT  = u32;
 using PUINT = UINT *;
 
-using INT64 = s64;
+using INT64  = s64;
 using UINT64 = u64;
 
-using ULONG = u32;
-using ULONG32 = u32;
+using ULONG     = u32;
+using ULONG32   = u32;
 using ULONG_PTR = s64;
 
 using ULONG64 = u64;
 
-using LONGLONG = s64;
+using LONGLONG  = s64;
 using ULONGLONG = u64;
 
-using SIZE_T = s64;
+using SIZE_T  = s64;
 using PSIZE_T = s64 *;
 
 using UINT_PTR = u64;
 
-using LONG = s32;
+using LONG     = s32;
 using LONG_PTR = s64;
 
 using LRESULT = s64;
@@ -109,49 +109,49 @@ using LRESULT = s64;
 using LPARAM = LONG_PTR;
 using WPARAM = UINT_PTR;
 
-using WCHAR = utf16;
-using LPCCH = const utf8 *;
-using LPSTR = const utf8 *;
-using PCSTR = const utf8 *;
-using LPCSTR = const utf8 *;
-using PWSTR = utf16 *;
-using LPWSTR = utf16 *;
+using WCHAR   = utf16;
+using LPCCH   = const utf8 *;
+using LPSTR   = const utf8 *;
+using PCSTR   = const utf8 *;
+using LPCSTR  = const utf8 *;
+using PWSTR   = utf16 *;
+using LPWSTR  = utf16 *;
 using LPCWSTR = const utf16 *;
-using LPCWCH = const utf16 *;
+using LPCWCH  = const utf16 *;
 
-using PVOID = void *;
-using LPVOID = void *;
+using PVOID   = void *;
+using LPVOID  = void *;
 using LPCVOID = const void *;
 
 using VOID = void;
 
 #define CONST const
 
-using CHAR = char;
+using CHAR  = char;
 using PCHAR = char *;
 
-using BOOL = s32;
+using BOOL    = s32;
 using BOOLEAN = byte;
 
 using LPBOOL = BOOL *;
 
-using HANDLE = void *;
-using HWND = HANDLE;
-using HMODULE = HANDLE;
-using HDEVNOTIFY = HANDLE;
-using HLOCAL = HANDLE;
-using HGLOBAL = HANDLE;
-using HMENU = HANDLE;
-using HRGN = HANDLE;
-using HMONITOR = HANDLE;
+using HANDLE                = void *;
+using HWND                  = HANDLE;
+using HMODULE               = HANDLE;
+using HDEVNOTIFY            = HANDLE;
+using HLOCAL                = HANDLE;
+using HGLOBAL               = HANDLE;
+using HMENU                 = HANDLE;
+using HRGN                  = HANDLE;
+using HMONITOR              = HANDLE;
 using DPI_AWARENESS_CONTEXT = HANDLE;
-using HDC = HANDLE;
-using HGDIOBJ = HANDLE;
-using HBITMAP = HANDLE;
-using HRAWINPUT = HANDLE;
-using HDROP = HANDLE;
+using HDC                   = HANDLE;
+using HGDIOBJ               = HANDLE;
+using HBITMAP               = HANDLE;
+using HRAWINPUT             = HANDLE;
+using HDROP                 = HANDLE;
 
-using COLORREF = DWORD;
+using COLORREF   = DWORD;
 using LPCOLORREF = DWORD *;
 
 using FARPROC = void *;
@@ -185,24 +185,24 @@ typedef struct _OSVERSIONINFOEXW {
 #define VER_LESS 4
 #define VER_LESS_EQUAL 5
 
-#define _WIN32_WINNT_NT4 0x0400  // Windows NT 4.0
-#define _WIN32_WINNT_WIN2K 0x0500  // Windows 2000
-#define _WIN32_WINNT_WINXP 0x0501  // Windows XP
-#define _WIN32_WINNT_WS03 0x0502  // Windows Server 2003
-#define _WIN32_WINNT_WIN6 0x0600  // Windows Vista
-#define _WIN32_WINNT_VISTA 0x0600  // Windows Vista
-#define _WIN32_WINNT_WS08 0x0600  // Windows Server 2008
-#define _WIN32_WINNT_LONGHORN 0x0600  // Windows Vista
-#define _WIN32_WINNT_WIN7 0x0601  // Windows 7
-#define _WIN32_WINNT_WIN8 0x0602  // Windows 8
-#define _WIN32_WINNT_WINBLUE 0x0603  // Windows 8.1
+#define _WIN32_WINNT_NT4 0x0400           // Windows NT 4.0
+#define _WIN32_WINNT_WIN2K 0x0500         // Windows 2000
+#define _WIN32_WINNT_WINXP 0x0501         // Windows XP
+#define _WIN32_WINNT_WS03 0x0502          // Windows Server 2003
+#define _WIN32_WINNT_WIN6 0x0600          // Windows Vista
+#define _WIN32_WINNT_VISTA 0x0600         // Windows Vista
+#define _WIN32_WINNT_WS08 0x0600          // Windows Server 2008
+#define _WIN32_WINNT_LONGHORN 0x0600      // Windows Vista
+#define _WIN32_WINNT_WIN7 0x0601          // Windows 7
+#define _WIN32_WINNT_WIN8 0x0602          // Windows 8
+#define _WIN32_WINNT_WINBLUE 0x0603       // Windows 8.1
 #define _WIN32_WINNT_WINTHRESHOLD 0x0A00  // Windows 10
-#define _WIN32_WINNT_WIN10 0x0A00  // Windows 10
+#define _WIN32_WINNT_WIN10 0x0A00         // Windows 10
 
 #define NTSYSAPI __declspec(dllimport)
 
-#define HIBYTE(w) ((BYTE)(((WORD)(w) >> 8) & 0xFF))
-#define LOBYTE(w) ((BYTE)(w))
+#define HIBYTE(w) ((BYTE) (((WORD) (w) >> 8) & 0xFF))
+#define LOBYTE(w) ((BYTE) (w))
 
 #define DRIVERVERSION 0
 #define TECHNOLOGY 2
@@ -251,8 +251,8 @@ typedef struct _BORDERWIDTHS {
 
 using LPCBORDERWIDTHS = const BORDERWIDTHS *;
 
-using RECT = BORDERWIDTHS;
-using LPRECT = LPBORDERWIDTHS;
+using RECT    = BORDERWIDTHS;
+using LPRECT  = LPBORDERWIDTHS;
 using LPCRECT = LPCBORDERWIDTHS;
 
 #define CCHDEVICENAME 32
@@ -330,7 +330,7 @@ typedef struct tagMONITORINFOEXW : tagMONITORINFO {
 #define IMAGEAPI __stdcall
 #define NTAPI __stdcall
 
-typedef BOOL (CALLBACK *MONITORENUMPROC)(HMONITOR, HDC, LPRECT, LPARAM);
+typedef BOOL(CALLBACK *MONITORENUMPROC)(HMONITOR, HDC, LPRECT, LPARAM);
 
 #define DM_BITSPERPEL 0x40000
 #define DM_PELSWIDTH 0x80000
@@ -519,12 +519,12 @@ typedef struct _GUID {
     unsigned char Data4[8];
 } GUID;
 
-typedef LRESULT (CALLBACK *WNDPROC)(HWND, UINT, WPARAM, LPARAM);
+typedef LRESULT(CALLBACK *WNDPROC)(HWND, UINT, WPARAM, LPARAM);
 
-using HBRUSH = HANDLE;
-using HICON = HANDLE;
-using HCURSOR = HICON;
-using HDC = HANDLE;
+using HBRUSH    = HANDLE;
+using HICON     = HANDLE;
+using HCURSOR   = HICON;
+using HDC       = HANDLE;
 using HINSTANCE = HANDLE;
 
 typedef struct tagWNDCLASSEXW {
@@ -602,11 +602,11 @@ using PCONSOLE_SCREEN_BUFFER_INFO = CONSOLE_SCREEN_BUFFER_INFO *;
 #define CS_BYTEALIGNWINDOW 0x2000
 #define CS_GLOBALCLASS 0x4000
 
-using TCHAR = utf16;
-using LPTSTR = TCHAR *;
+using TCHAR   = utf16;
+using LPTSTR  = TCHAR *;
 using LPCTSTR = const TCHAR *;
 
-#define MAKEINTRESOURCE(i) (LPTSTR)((DWORD)((WORD)(i)))
+#define MAKEINTRESOURCE(i) (LPTSTR)((DWORD) ((WORD) (i)))
 
 /*
  * Standard Cursor IDs
@@ -891,16 +891,16 @@ typedef struct _DEV_BROADCAST_HDR {
 #define HTCLOSE 20
 #define HTHELP 21
 
-#define LOWORD(l) ((WORD)(((DWORD_PTR)(l)) & 0xffff))
-#define HIWORD(l) ((WORD)((((DWORD_PTR)(l)) >> 16) & 0xffff))
+#define LOWORD(l) ((WORD) (((DWORD_PTR) (l)) & 0xffff))
+#define HIWORD(l) ((WORD) ((((DWORD_PTR) (l)) >> 16) & 0xffff))
 
 #define HIDWORD(dw, hw) LOWORD(dw) | (hw << 16)
 #define LODWORD(dw, lw) (HIWORD(dw) << 16) | lw
 
-#define POINTSTOPOINT(pt, pts)                         \
-    {                                                  \
-        (pt).x = (LONG)(SHORT) LOWORD(*(LONG *) &pts); \
-        (pt).y = (LONG)(SHORT) HIWORD(*(LONG *) &pts); \
+#define POINTSTOPOINT(pt, pts)                          \
+    {                                                   \
+        (pt).x = (LONG) (SHORT) LOWORD(*(LONG *) &pts); \
+        (pt).y = (LONG) (SHORT) HIWORD(*(LONG *) &pts); \
     }
 
 #define POINTTOPOINTS(pt) (MAKELONG((short) ((pt).x), (short) ((pt).y)))
@@ -957,9 +957,9 @@ typedef struct _DEV_BROADCAST_HDR {
 #define WM_KEYDOWN 0x0100
 #define WM_KEYUP 0x0101
 #define WM_CHAR 0x0102
-#define WM_DEADCHAR 0x0103 /* notimp*/
+#define WM_DEADCHAR 0x0103   /* notimp*/
 #define WM_SYSKEYDOWN 0x0104 /* nyi*/
-#define WM_SYSKEYUP 0x0105 /* nyi*/
+#define WM_SYSKEYUP 0x0105   /* nyi*/
 #define WM_SYSCHAR 0x0106
 #define WM_SYSDEADCHAR 0x0107 /* notimp*/
 #define WM_KEYLAST 0x0108
@@ -995,12 +995,12 @@ typedef struct _DEV_BROADCAST_HDR {
 #define WM_MOUSELAST 0x020A
 #define WM_HOTKEY 0x0312
 
-#define WM_CARET_CREATE 0x03E0 /* Microwindows only*/
+#define WM_CARET_CREATE 0x03E0  /* Microwindows only*/
 #define WM_CARET_DESTROY 0x03E1 /* Microwindows only*/
-#define WM_CARET_BLINK 0x03E2 /* Microwindows only*/
-#define WM_FDINPUT 0x03F0 /* Microwindows only*/
-#define WM_FDOUTPUT 0x03F1 /* Microwindows only*/
-#define WM_FDEXCEPT 0x03F2 /* Microwindows only*/
+#define WM_CARET_BLINK 0x03E2   /* Microwindows only*/
+#define WM_FDINPUT 0x03F0       /* Microwindows only*/
+#define WM_FDOUTPUT 0x03F1      /* Microwindows only*/
+#define WM_FDEXCEPT 0x03F2      /* Microwindows only*/
 #define WM_USER 0x0400
 
 /* Button codes for MW_MOUSEMOVED:
@@ -1510,13 +1510,13 @@ typedef struct _SYMBOL_INFO {
     CHAR Name[1];
 } SYMBOL_INFO, *PSYMBOL_INFO;
 
-typedef BOOL (__stdcall *PREAD_PROCESS_MEMORY_ROUTINE64)(HANDLE hProcess, DWORD64 qwBaseAddress, PVOID lpBuffer, DWORD nSize, LPDWORD lpNumberOfBytesRead);
+typedef BOOL(__stdcall *PREAD_PROCESS_MEMORY_ROUTINE64)(HANDLE hProcess, DWORD64 qwBaseAddress, PVOID lpBuffer, DWORD nSize, LPDWORD lpNumberOfBytesRead);
 
-typedef PVOID (__stdcall *PFUNCTION_TABLE_ACCESS_ROUTINE64)(HANDLE ahProcess, DWORD64 AddrBase);
+typedef PVOID(__stdcall *PFUNCTION_TABLE_ACCESS_ROUTINE64)(HANDLE ahProcess, DWORD64 AddrBase);
 
-typedef DWORD64 (__stdcall *PGET_MODULE_BASE_ROUTINE64)(HANDLE hProcess, DWORD64 Address);
+typedef DWORD64(__stdcall *PGET_MODULE_BASE_ROUTINE64)(HANDLE hProcess, DWORD64 Address);
 
-typedef DWORD64 (__stdcall *PTRANSLATE_ADDRESS_ROUTINE64)(HANDLE hProcess, HANDLE hThread, LPADDRESS64 lpaddr);
+typedef DWORD64(__stdcall *PTRANSLATE_ADDRESS_ROUTINE64)(HANDLE hProcess, HANDLE hThread, LPADDRESS64 lpaddr);
 
 typedef struct _IMAGEHLP_LINEW64 {
     DWORD SizeOfStruct;
@@ -1526,7 +1526,7 @@ typedef struct _IMAGEHLP_LINEW64 {
     DWORD64 Address;
 } IMAGEHLP_LINEW64, *PIMAGEHLP_LINEW64;
 
-typedef LONG (CALLBACK *PTOP_LEVEL_EXCEPTION_FILTER)(LPEXCEPTION_POINTERS);
+typedef LONG(CALLBACK *PTOP_LEVEL_EXCEPTION_FILTER)(LPEXCEPTION_POINTERS);
 typedef PTOP_LEVEL_EXCEPTION_FILTER LPTOP_LEVEL_EXCEPTION_FILTER;
 
 extern "C" {
@@ -1780,7 +1780,7 @@ DWORD FormatMessageW(
     va_list *Arguments);
 }
 
-#define MAKELANGID(p, s) (((DWORD)((WORD)(s)) << 10) | (WORD)(p))
+#define MAKELANGID(p, s) (((DWORD) ((WORD) (s)) << 10) | (WORD) (p))
 
 #define FORMAT_MESSAGE_ALLOCATE_BUFFER 0x00000100
 #define FORMAT_MESSAGE_ARGUMENT_ARRAY 0x00002000
@@ -1793,20 +1793,20 @@ DWORD FormatMessageW(
  * Special identifiers
 */
 
-#define LANG_NEUTRAL 0x00  // Default custom (MUI) locale language
-#define LANG_USER_DEFAULT 0x01  // User default locale language
+#define LANG_NEUTRAL 0x00         // Default custom (MUI) locale language
+#define LANG_USER_DEFAULT 0x01    // User default locale language
 #define LANG_SYSTEM_DEFAULT 0x02  // System default locale language
-#define LANG_INVARIANT 0x7F  // Invariant locale language
+#define LANG_INVARIANT 0x7F       // Invariant locale language
 
-#define SUBLANG_NEUTRAL 0x00  // Neutral sublanguage
-#define SUBLANG_INVARIANT 0x00  // Invariant sublanguage
-#define SUBLANG_DEFAULT 0x01  // User default sublanguage
-#define SUBLANG_SYS_DEFAULT 0x02  // System default sublanguage
-#define SUBLANG_CUSTOM_DEFAULT 0x03  // Default custom sublanguage
+#define SUBLANG_NEUTRAL 0x00             // Neutral sublanguage
+#define SUBLANG_INVARIANT 0x00           // Invariant sublanguage
+#define SUBLANG_DEFAULT 0x01             // User default sublanguage
+#define SUBLANG_SYS_DEFAULT 0x02         // System default sublanguage
+#define SUBLANG_CUSTOM_DEFAULT 0x03      // Default custom sublanguage
 #define SUBLANG_CUSTOM_UNSPECIFIED 0x04  // Unspecified custom sublanguage
-#define SUBLANG_UI_CUSTOM_DEFAULT 0x05  // Default custom MUI sublanguage
+#define SUBLANG_UI_CUSTOM_DEFAULT 0x05   // Default custom MUI sublanguage
 
-typedef VOID (NTAPI *PIMAGE_TLS_CALLBACK)(
+typedef VOID(NTAPI *PIMAGE_TLS_CALLBACK)(
     PVOID DllHandle,
     DWORD Reason,
     PVOID Reserved);
@@ -1818,13 +1818,13 @@ typedef VOID (NTAPI *PIMAGE_TLS_CALLBACK)(
 
 typedef enum _EXCEPTION_DISPOSITION {
     ExceptionContinueExecution = 0,
-    ExceptionContinueSearch = 1,
-    ExceptionNestedException = 2,
-    ExceptionCollidedUnwind = 3
+    ExceptionContinueSearch    = 1,
+    ExceptionNestedException   = 2,
+    ExceptionCollidedUnwind    = 3
 } EXCEPTION_DISPOSITION;
 
-#define IMAGE_DOS_SIGNATURE 0x5A4D  // MZ
-#define IMAGE_OS2_SIGNATURE 0x454E  // NE
+#define IMAGE_DOS_SIGNATURE 0x5A4D     // MZ
+#define IMAGE_OS2_SIGNATURE 0x454E     // NE
 #define IMAGE_OS2_SIGNATURE_LE 0x454C  // LE
 #define IMAGE_NT_SIGNATURE 0x00004550  // PE00
 
@@ -1905,7 +1905,7 @@ typedef struct _IMAGE_SECTION_HEADER {
     DWORD Characteristics;
 } IMAGE_SECTION_HEADER, *PIMAGE_SECTION_HEADER;
 
-#define IMAGE_FIRST_SECTION(ntheader) ((PIMAGE_SECTION_HEADER)((ULONG_PTR) ntheader + offset_of(IMAGE_NT_HEADERS64, OptionalHeader) + ((PIMAGE_NT_HEADERS64)(ntheader))->FileHeader.SizeOfOptionalHeader))
+#define IMAGE_FIRST_SECTION(ntheader) ((PIMAGE_SECTION_HEADER) ((ULONG_PTR) ntheader + offset_of(IMAGE_NT_HEADERS64, OptionalHeader) + ((PIMAGE_NT_HEADERS64) (ntheader))->FileHeader.SizeOfOptionalHeader))
 #define IMAGE_SCN_MEM_WRITE 0x80000000
 
 struct _RTL_CRITICAL_SECTION;
@@ -1937,14 +1937,14 @@ typedef struct _RTL_CRITICAL_SECTION {
 
     LONG LockCount;
     LONG RecursionCount;
-    HANDLE OwningThread; // from the thread's ClientId->UniqueThread
+    HANDLE OwningThread;  // from the thread's ClientId->UniqueThread
     HANDLE LockSemaphore;
-    ULONG_PTR SpinCount; // force size on 64-bit systems when packed
+    ULONG_PTR SpinCount;  // force size on 64-bit systems when packed
 } RTL_CRITICAL_SECTION, *PRTL_CRITICAL_SECTION;
 
 typedef RTL_CRITICAL_SECTION CRITICAL_SECTION;
 using LPCRITICAL_SECTION = CRITICAL_SECTION *;
-using PCRITICAL_SECTION = CRITICAL_SECTION *;
+using PCRITICAL_SECTION  = CRITICAL_SECTION *;
 
 typedef struct _SYSTEM_INFO {
     union {
@@ -1967,7 +1967,7 @@ typedef struct _SYSTEM_INFO {
     WORD wProcessorRevision;
 } SYSTEM_INFO, *LPSYSTEM_INFO;
 
-typedef DWORD (__stdcall *LPTHREAD_START_ROUTINE)(
+typedef DWORD(__stdcall *LPTHREAD_START_ROUTINE)(
     LPVOID lpThreadParameter);
 
 extern "C" {
@@ -2090,7 +2090,7 @@ DWORD WaitForSingleObjectEx(
 
 #define SPI_GETFOREGROUNDLOCKTIMEOUT 0x2000
 #define SPI_SETFOREGROUNDLOCKTIMEOUT 0x2001
-#define UIntToPtr(ui) ((VOID *) (UINT_PTR)((unsigned int) ui))
+#define UIntToPtr(ui) ((VOID *) (UINT_PTR) ((unsigned int) ui))
 
 #define SPIF_SENDCHANGE 2
 
@@ -2110,11 +2110,11 @@ DWORD WaitForSingleObjectEx(
 #endif
 
 #ifndef SUCCEEDED
-#define SUCCEEDED(hr) ((HRESULT)(hr) >= 0)
+#define SUCCEEDED(hr) ((HRESULT) (hr) >= 0)
 #endif
 
 #ifndef FAILED
-#define FAILED(hr) ((HRESULT)(hr) < 0)
+#define FAILED(hr) ((HRESULT) (hr) < 0)
 #endif
 
 typedef struct _DWM_BLURBEHIND {
@@ -2151,6 +2151,12 @@ LONG SetWindowLongW(
     HWND hWnd,
     int nIndex,
     LONG dwNewLong);
+
+
+LONG_PTR SetWindowLongPtrW(
+    HWND hWnd,
+    int nIndex,
+    LONG_PTR dwNewLong);
 
 BOOL SetLayeredWindowAttributes(
     HWND hwnd,
@@ -2201,7 +2207,7 @@ BOOL ChangeWindowMessageFilterEx(
 #define LWA_COLORKEY 0x00000001
 #define LWA_ALPHA 0x00000002
 
-#define RGB(r, g, b) ((COLORREF)(((BYTE)(r) | ((WORD)((BYTE)(g)) << 8)) | (((DWORD)(BYTE)(b)) << 16)))
+#define RGB(r, g, b) ((COLORREF) (((BYTE) (r) | ((WORD) ((BYTE) (g)) << 8)) | (((DWORD) (BYTE) (b)) << 16)))
 
 #define RDW_INVALIDATE 0x0001
 #define RDW_INTERNALPAINT 0x0002
@@ -2839,6 +2845,20 @@ typedef struct tagWINDOWINFO {
     WORD wCreatorVersion;
 } WINDOWINFO, *PWINDOWINFO, *LPWINDOWINFO;
 
+typedef struct tagCREATESTRUCTW {
+    LPVOID lpCreateParams;
+    HINSTANCE hInstance;
+    HMENU hMenu;
+    HWND hwndParent;
+    int cy;
+    int cx;
+    int y;
+    int x;
+    LONG style;
+    LPCWSTR lpszName;
+    LPCWSTR lpszClass;
+    DWORD dwExStyle;
+} CREATESTRUCTW, *LPCREATESTRUCTW;
 
 #define VK_RETURN 0x0D
 #define VK_ESCAPE 0X1B
@@ -2852,6 +2872,10 @@ typedef struct tagWINDOWINFO {
 #define SM_CYSCREEN 1
 
 extern "C" {
+LONG_PTR GetWindowLongPtrW(
+    HWND hWnd,
+    int nIndex);
+
 BOOL OffsetRect(
     LPRECT lprc,
     int dx,
@@ -2895,7 +2919,6 @@ BOOL ImmSetCompositionWindow(
 BOOL ImmReleaseContext(
     HWND,
     HIMC);
-
 
 HWND GetParent(
     HWND hWnd);

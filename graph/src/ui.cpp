@@ -17,10 +17,14 @@ void ui_main() {
 
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("Options")) {
-            if (ImGui::MenuItem("VSync", "", Memory->MainWindow->Flags & window::VSYNC))
-                Memory->MainWindow->Flags ^= window::VSYNC;
-            if (ImGui::MenuItem("Display AST", "", GraphState->DisplayAST))
+            bool vsync = Memory->MainWindow.get_flags() & window::VSYNC;
+            if (ImGui::MenuItem("VSync", "", vsync)) {
+                Memory->MainWindow.set_vsync(!vsync);
+            }
+
+            if (ImGui::MenuItem("Display AST", "", GraphState->DisplayAST)) {
                 GraphState->DisplayAST = !GraphState->DisplayAST;
+            }
 
             if (ImGui::IsItemHovered()) {
                 ImGui::BeginTooltip();

@@ -21,14 +21,14 @@ void graphics::init(graphics_api api) {
 
     auto predicate = [](auto x) { return !x.Window; };
     if (find(TargetWindows, &predicate) == -1) array_append(TargetWindows);  // Add a null target
-    set_target_window(null);
+    set_target_window({});
 }
 
 // Sets the current render context, so you can draw to multiple windows using the same _graphics_ object.
 // If you want to draw to a texture, use _set_custom_render_target_, note that you must still have a valid
 // target window, and that window is associated with the resources which get created.
 
-void graphics::set_target_window(window *win) {
+void graphics::set_target_window(window win) {
     auto predicate = [&](auto x) { return x.Window == win; };
     s64 index      = find(TargetWindows, &predicate);
 
@@ -37,14 +37,14 @@ void graphics::set_target_window(window *win) {
         targetWindow         = array_append(TargetWindows);
         targetWindow->Window = win;
         if (win) {
-            targetWindow->CallbackID = win->Event.connect({this, &graphics::window_event_handler});
+            targetWindow->CallbackID = win.connect_event({this, &graphics::window_event_handler});
             Impl.InitTargetWindow(this, targetWindow);
 
             event e;
             e.Window = win;
             e.Type   = event::Window_Resized;
-            e.Width  = win->get_size().x;
-            e.Height = win->get_size().y;
+            e.Width  = win.get_size().x;
+            e.Height = win.get_size().y;
             window_event_handler(e);
         }
     } else {
@@ -86,7 +86,7 @@ void graphics::set_custom_render_target(texture_2D *target) {
 
     set_cull_mode(CurrentTargetWindow->CullMode);
 
-    vec2<s32> size = CurrentTargetWindow->Window->get_size();
+    vec2<s32> size = CurrentTargetWindow->Window.get_size();
     if (target) size = {target->Width, target->Height};
     set_viewport({0, 0, size.x, size.y});
     set_scissor_rect({0, 0, size.x, size.y});
@@ -104,7 +104,7 @@ void graphics::set_cull_mode(cull mode) {
 
 void graphics::clear_color(v4 color) {
     assert(CurrentTargetWindow->Window);
-    if (!CurrentTargetWindow->Window->is_visible()) return;
+    if (!CurrentTargetWindow->Window.is_visible()) return;
 
     Impl.ClearColor(this, color);
 }
@@ -117,7 +117,7 @@ void graphics::draw_indexed(u32 indices, u32 startIndex, u32 baseVertexLocation)
 
 void graphics::swap() {
     assert(CurrentTargetWindow->Window);
-    if (!CurrentTargetWindow->Window->is_visible()) return;
+    if (!CurrentTargetWindow->Window.is_visible()) return;
 
     Impl.Swap(this);
 }
@@ -129,7 +129,7 @@ bool graphics::window_event_handler(const event &e) {
         assert(index != -1);
 
         target_window *targetWindow = &TargetWindows[index];
-        targetWindow->Window->Event.disconnect(targetWindow->CallbackID);
+        targetWindow->Window.disconnect_event(targetWindow->CallbackID);
         Impl.ReleaseTargetWindow(this, targetWindow);
 
         array_remove_at(TargetWindows, index);
@@ -138,7 +138,7 @@ bool graphics::window_event_handler(const event &e) {
         s64 index      = find(TargetWindows, &predicate);
         assert(index != -1);
 
-        if (!e.Window->is_visible()) return false;
+        if (!e.Window.is_visible()) return false;
         Impl.TargetWindowResized(this, &TargetWindows[index], e.Width, e.Height);
     }
     return false;
@@ -153,7 +153,7 @@ void graphics::release() {
     For_as(it_index, range(TargetWindows.Count)) {
         auto *it = &TargetWindows[it_index];
         if (it->Window) {
-            it->Window->Event.disconnect(it->CallbackID);
+            it->Window.disconnect_event(it->CallbackID);
             Impl.ReleaseTargetWindow(this, it);
         }
     }

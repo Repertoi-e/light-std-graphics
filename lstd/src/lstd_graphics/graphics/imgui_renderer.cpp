@@ -9,14 +9,16 @@ void imgui_renderer::init(graphics *g) {
     assert(!Graphics);
     Graphics = g;
 
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO &io            = ImGui::GetIO();
     io.BackendRendererName = "imgui_impl_lstd_graphics";
     io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;
     io.BackendFlags |= ImGuiBackendFlags_RendererHasViewports;
 
-    ImGuiPlatformIO &platformIO = ImGui::GetPlatformIO();
+    ImGuiPlatformIO &platformIO      = ImGui::GetPlatformIO();
     platformIO.Renderer_RenderWindow = [](auto *viewport, void *context) {
-        if (!((window *) viewport->PlatformHandle)->is_visible()) return;
+        window win;
+        win.ID = (u32) (u64) viewport->PlatformHandle;
+        if (!win.is_visible()) return;
 
         auto *renderer = (imgui_renderer *) context;
         if (!(viewport->Flags & ImGuiViewportFlags_NoRendererClear)) {
@@ -76,11 +78,11 @@ void imgui_renderer::draw(ImDrawData *drawData) {
     VB.unmap();
     IB.unmap();
 
-    auto *ub = UB.map(buffer_map_access::Write_Discard_Previous);
-    f32 L = drawData->DisplayPos.x;
-    f32 R = drawData->DisplayPos.x + drawData->DisplaySize.x;
-    f32 T = drawData->DisplayPos.y;
-    f32 B = drawData->DisplayPos.y + drawData->DisplaySize.y;
+    auto *ub      = UB.map(buffer_map_access::Write_Discard_Previous);
+    f32 L         = drawData->DisplayPos.x;
+    f32 R         = drawData->DisplayPos.x + drawData->DisplaySize.x;
+    f32 T         = drawData->DisplayPos.y;
+    f32 B         = drawData->DisplayPos.y + drawData->DisplaySize.y;
     f32 mvp[4][4] = {
         {2.0f / (R - L), 0.0f, 0.0f, 0.0f},
         {0.0f, 2.0f / (T - B), 0.0f, 0.0f},
@@ -108,10 +110,10 @@ void imgui_renderer::draw(ImDrawData *drawData) {
                     it.UserCallback(cmdList, &it);
                 }
             } else {
-                s32 left = (s32)(it.ClipRect.x - drawData->DisplayPos.x);
-                s32 top = (s32)(it.ClipRect.y - drawData->DisplayPos.y);
-                s32 right = (s32)(it.ClipRect.z - drawData->DisplayPos.x);
-                s32 bot = (s32)(it.ClipRect.w - drawData->DisplayPos.y);
+                s32 left  = (s32) (it.ClipRect.x - drawData->DisplayPos.x);
+                s32 top   = (s32) (it.ClipRect.y - drawData->DisplayPos.y);
+                s32 right = (s32) (it.ClipRect.z - drawData->DisplayPos.x);
+                s32 bot   = (s32) (it.ClipRect.w - drawData->DisplayPos.y);
                 Graphics->set_scissor_rect({left, top, right, bot});
 
                 if (it.TextureId) ((texture_2D *) it.TextureId)->bind(0);

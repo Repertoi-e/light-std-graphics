@@ -129,10 +129,10 @@ void d3d_init(graphics *g) {
 void d3d_init_target_window(graphics *g, graphics::target_window *targetWindow) {
     assert(targetWindow);
 
-    auto *win = targetWindow->Window;
+    auto win = targetWindow->Window;
     assert(win);
 
-    vec2<s32> windowSize = win->get_size();
+    vec2<s32> windowSize = win.get_size();
 
     DXGI_SWAP_CHAIN_DESC desc;
     zero_memory(&desc, sizeof(desc));
@@ -142,16 +142,16 @@ void d3d_init_target_window(graphics *g, graphics::target_window *targetWindow) 
         desc.BufferDesc.Height = windowSize.y;
         desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         desc.BufferDesc.RefreshRate.Numerator =
-            win->Flags & window::VSYNC ? os_monitor_from_window(win)->CurrentMode.RefreshRate : 0;
+            win.get_flags() & window::VSYNC ? os_monitor_from_window(win)->CurrentMode.RefreshRate : 0;
         desc.BufferDesc.RefreshRate.Denominator = 1;
         desc.BufferDesc.ScanlineOrdering        = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
         desc.BufferDesc.Scaling                 = DXGI_MODE_SCALING_UNSPECIFIED;
         desc.BufferDesc.Format                  = DXGI_FORMAT_R8G8B8A8_UNORM;
         desc.BufferUsage                        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        desc.OutputWindow                       = (HWND) win->PlatformData.Win32.hWnd;
+        desc.OutputWindow                       = (HWND) win.ID;
         desc.SwapEffect                         = DXGI_SWAP_EFFECT_DISCARD;
         desc.SampleDesc.Count                   = 1;
-        desc.Windowed                           = !win->is_fullscreen();
+        desc.Windowed                           = !win.is_fullscreen();
     }
 
     IDXGIDevice *device;
@@ -195,7 +195,7 @@ void d3d_target_window_resized(graphics *g, graphics::target_window *targetWindo
     auto *oldTargetWindow = g->CurrentTargetWindow;
     defer(g->set_target_window(oldTargetWindow->Window));
 
-    g->set_target_window(null);
+    g->set_target_window({});
     g->D3D.DeviceContext->Flush();
 
     DX_CHECK(targetWindow->D3D.SwapChain->ResizeBuffers(1, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0));
@@ -311,7 +311,7 @@ void d3d_draw_indexed(graphics *g, u32 indices, u32 startIndex, u32 baseVertexLo
 }
 
 void d3d_swap(graphics *g) {
-    g->CurrentTargetWindow->D3D.SwapChain->Present(g->CurrentTargetWindow->Window->Flags & window::VSYNC ? 1 : 0, 0);
+    g->CurrentTargetWindow->D3D.SwapChain->Present(g->CurrentTargetWindow->Window.get_flags() & window::VSYNC ? 1 : 0, 0);
 }
 
 void d3d_release(graphics *g) {

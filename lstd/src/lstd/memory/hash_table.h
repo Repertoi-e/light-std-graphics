@@ -367,9 +367,9 @@ key_value_pair<T> set(T &table, const key_t<T> &key, const value_t<T> &value) {
 // This method is useful if you have cached the hash.
 template <any_hash_table T>
 bool remove_prehashed(T &table, u64 hash, const key_t<T> &key) {
-    auto *ptr = find(table, hash, key);
-    if (ptr) {
-        s64 index           = ptr - table.Values;
+    auto [kp, vp] = find_prehashed(table, hash, key);
+    if (vp) {
+        s64 index           = vp - table.Values;
         table.Hashes[index] = 1;
         return true;
     }
