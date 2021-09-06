@@ -83,7 +83,7 @@ struct window {
     // Unique ID for each live window.
     // This is the only non-static member in this structure which means that
     // passing around _window_ is cheap and safe to copy. It's meant to be used as a handle.
-    // _ID_ is set to the pointer of the window data that the platform allocates.
+    // _ID_ is set to the platform specific handle (e.g. HWND for Windows).
     u64 ID = INVALID_ID;
 
     window() {}
