@@ -50,7 +50,7 @@ file_scope bool MonitorCallbackAdded = false;
 void win64_window_uninit() {
     auto *win = WindowsList;
     while (win) {
-        win->release();
+        free(*win);
         win = win->Next;
     }
 }
@@ -545,7 +545,7 @@ void window::update() {
         if (message.message == WM_QUIT) {
             auto *win = WindowsList;
             while (win) {
-                win->release();
+                free(*win);
                 win = win->Next;
             }
         } else {
@@ -623,35 +623,35 @@ file_scope void release_monitor(window *win) {
     os_restore_display_mode(win->Monitor);
 }
 
-void window::release() {
-    if (ID == INVALID_ID) return;
+void free(window &win) {
+    if (win.ID == window::INVALID_ID) return;
 
-    IsDestroying = true;
+    win.IsDestroying = true;
 
     event e;
-    e.Window = this;
+    e.Window = &win;
     e.Type   = event::Window_Closed;
-    (void) Event.emit(e);
+    (void) win.Event.emit(e);
 
-    if (Monitor) release_monitor(this);
-    if (DisabledCursorWindow == this) DisabledCursorWindow = null;
+    if (win.Monitor) release_monitor(&win);
+    if (DisabledCursorWindow == &win) DisabledCursorWindow = null;
 
-    if (PlatformData.Win32.hWnd) {
-        RemovePropW(PlatformData.Win32.hWnd, L"LSTD");
-        DestroyWindow(PlatformData.Win32.hWnd);
-        PlatformData.Win32.hWnd = null;
+    if (win.PlatformData.Win32.hWnd) {
+        RemovePropW(win.PlatformData.Win32.hWnd, L"LSTD");
+        DestroyWindow(win.PlatformData.Win32.hWnd);
+        win.PlatformData.Win32.hWnd = null;
     }
 
-    if (PlatformData.Win32.BigIcon) DestroyIcon(PlatformData.Win32.BigIcon);
-    if (PlatformData.Win32.SmallIcon) DestroyIcon(PlatformData.Win32.SmallIcon);
+    if (win.PlatformData.Win32.BigIcon) DestroyIcon(win.PlatformData.Win32.BigIcon);
+    if (win.PlatformData.Win32.SmallIcon) DestroyIcon(win.PlatformData.Win32.SmallIcon);
 
-    Event.release();
+    win.Event.release();
 
     window **prev = &WindowsList;
-    while (*prev != this) prev = &((*prev)->Next);
-    *prev = this->Next;
+    while (*prev != &win) prev = &((*prev)->Next);
+    *prev = win.Next;
 
-    ID = INVALID_ID;
+    win.ID = window::INVALID_ID;
 }
 
 string window::get_title() {
@@ -1346,7 +1346,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 e.Type   = event::Window_Closed;
                 (void) win->Event.emit(e);
             }
-            win->release();
+            free(*win);
             return 0;
         case WM_CHAR:
         case WM_UNICHAR: {

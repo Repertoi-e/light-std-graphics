@@ -16,11 +16,11 @@ LSTD_BEGIN_NAMESPACE
 struct window {
     union platform_data {
         struct {
-            void *hWnd = null;
+            void *hWnd    = null;
             void *BigIcon = null, *SmallIcon = null;
 
             bool CursorTracked = false;
-            bool FrameAction = false;
+            bool FrameAction   = false;
 
             u16 Surrogate = 0;  // Used when handling text input
 
@@ -41,27 +41,27 @@ struct window {
         // These flags are added/removed while the window is being used:
         // (read-only, use show(), hide(), minimize() etc. to change):
 
-        SHOWN = BIT(2),      // Window is visible
-        HIDDEN = BIT(3),     // Window is not visible
+        SHOWN     = BIT(2),  // Window is visible
+        HIDDEN    = BIT(3),  // Window is not visible
         MINIMIZED = BIT(4),  // Window is minimized
         MAXIMIZED = BIT(5),  // Window is maximized
-        FOCUSED = BIT(6),    // Window is focused
+        FOCUSED   = BIT(6),  // Window is focused
 
         // These flags get set by the user when the window is initialized or manually later:
 
         BORDERLESS = BIT(7),  // No window decoration; Specify in _init()_ or use _set_borderless()_
-        RESIZABLE = BIT(8),   // Window can be resized; Specify in _init()_ or use _set_resizable()_
+        RESIZABLE  = BIT(8),  // Window can be resized; Specify in _init()_ or use _set_resizable()_
 
         AUTO_MINIMIZE = BIT(9),   // Indicates whether a full screen window is minimized on focus loss
                                   // Specify in _init()_ or manually modify _Flags_
         ALWAYS_ON_TOP = BIT(10),  // Also called floating, topmost, etc.
                                   // Specify in _init()_ or use _set_always_on_top()_
         FOCUS_ON_SHOW = BIT(11),  // Specify in _init()_ or manually modify _Flags_
-        ALPHA = BIT(12),          // Window contents with alpha value get the color of the thing behind them, can only be
+        ALPHA         = BIT(12),  // Window contents with alpha value get the color of the thing behind them, can only be
                                   // specified when creating the window! Can also check this in the _Flags_ after creation
                                   // to see if the window was able to be created with this flag.
 
-        VSYNC = BIT(13),
+        VSYNC           = BIT(13),
         CLOSE_ON_ALT_F4 = BIT(14),  // Specify in _init()_ or manually modify _Flags_
         MOUSE_PASS_THROUGH =
             BIT(15),  // Specifies that the window is transparent for mouse input (e.g. when testing if
@@ -106,8 +106,8 @@ struct window {
     bool IsDestroying = false;
 
     display_mode DisplayMode;
-    monitor *Monitor = null;  // Non-null if we are fullscreen!
-    cursor *Cursor = null;
+    monitor *Monitor       = null;  // Non-null if we are fullscreen!
+    cursor *Cursor         = null;
     cursor_mode CursorMode = CURSOR_NORMAL;
 
     s32 AspectRatioNumerator = DONT_CARE, AspectRatioDenominator = DONT_CARE;
@@ -131,14 +131,11 @@ struct window {
     // Returns _this_.
     window *init(const string &title, s32 x, s32 y, s32 width, s32 height, u32 flags);
 
-    // Destroys the window
-    void release();
-
     static void update();
 
     signal<bool(const event &), collector_while0<bool>> Event;
 
-    [[nodiscard("Leak")]] string get_title(); // The caller is responsible for freeing
+    [[nodiscard("Leak")]] string get_title();  // The caller is responsible for freeing
     void set_title(const string &title);
 
     void set_fullscreen(monitor *mon, s32 width, s32 height, s32 refreshRate = DONT_CARE);
@@ -206,5 +203,8 @@ struct window {
     // Flashes the window
     void request_attention();
 };
+
+// Destroys the window
+void free(window &win);
 
 LSTD_END_NAMESPACE

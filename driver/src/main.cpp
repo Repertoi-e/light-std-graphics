@@ -669,6 +669,7 @@ file_scope void init_imgui_for_our_windows(window *mainWindow) {
                         }
                     }
                 }
+                free(*vd->Window);
                 free(vd->Window);
                 free(vd);
             }
