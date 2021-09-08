@@ -114,7 +114,7 @@ fmt_alignment get_alignment_from_char(utf8 ch) {
 // Note: When parsing, if we reach the end before } or : or whatever we don't report an error.
 // The caller of this should handle that. Returns -1 if an error occured (the error is reported).
 s64 fmt_parse_arg_id(fmt_parse_context *p) {
-    utf32 ch = p->It[0];
+    code_point ch = p->It[0];
     if (ch == '}' || ch == ':') {
         return p->next_arg_id();
     }
@@ -173,7 +173,7 @@ bool parse_fill_and_align(fmt_parse_context *p, fmt_type argType, fmt_specs *spe
 
     // If we got here and didn't get an alignment specifier we roll back and don't parse anything.
     if (align != fmt_alignment::NONE) {
-        s64 errorPosition = (const utf8 *) rest.Data - p->FormatString.Data;
+        s64 errorPosition = (const char *) rest.Data - p->FormatString.Data;
         if (fill == '{') {
             p->on_error("Invalid fill character \"{\"", errorPosition - 2);
             return false;
@@ -363,12 +363,12 @@ u32 parse_rgb_channel(fmt_parse_context *p, bool last) {
     auto [channel, status, rest] = parse_int<u8, parse_int_options{.ParseSign = false, .LookForBasePrefix = true}>(p->It);
 
     if (status == PARSE_INVALID) {
-        p->on_error("Invalid character encountered when parsing an integer channel value", (const utf8 *) rest.Data - p->FormatString.Data);
+        p->on_error("Invalid character encountered when parsing an integer channel value", (const char *) rest.Data - p->FormatString.Data);
         return (u32) -1;
     }
 
     if (status == PARSE_TOO_MANY_DIGITS) {
-        p->on_error("Channel value too big - it must be in the range [0-255]", (const utf8 *) rest.Data - p->FormatString.Data - 1);
+        p->on_error("Channel value too big - it must be in the range [0-255]", (const char *) rest.Data - p->FormatString.Data - 1);
         return (u32) -1;
     }
 
@@ -405,7 +405,7 @@ fmt_parse_text_style_result fmt_parse_text_style(fmt_parse_context *p) {
             ++p->It.Data, --p->It.Count;  // Skip the t
         }
 
-        const utf8 *it = p->It.Data;
+        const char *it = p->It.Data;
         s64 n = p->It.Count;
         do {
             ++it, --n;

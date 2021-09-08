@@ -2,7 +2,6 @@
 
 #include "asset.h"
 #include "gtype.h"
-#include "lstd/memory/array.h"
 
 #if OS == WINDOWS
 struct ID3D11VertexShader;
@@ -58,7 +57,7 @@ struct shader : public asset, non_copyable, non_movable {
     // @TODO
     array<uniform_buffer> UniformBuffers;
 
-    shader() = default;
+    shader() {}
 
     void init_from_file(graphics *g, const string &file);
     void init_from_source(graphics *g, const string &source);

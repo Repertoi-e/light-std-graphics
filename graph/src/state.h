@@ -1,8 +1,9 @@
 #pragma once
 
-#include <driver.h>
-
 #include "ast.h"
+
+struct camera;
+void camera_reinit(camera *cam);
 
 struct camera {
     //
@@ -24,15 +25,14 @@ struct camera {
     bool Panning;
 
     s32 ScrollY;  // This gets updated if the mouse is in the viewport, then we zoom the camera
+
+    camera() { camera_reinit(this); }  // Do this once when running for the first time
 };
 
-void camera_reinit(camera *cam);
 void camera_reset_constants(camera *cam);
 void camera_update(camera *cam);
 
-//
-// We support graphing multiple functions at once.
-//
+// We can graph multiple functions at once
 struct function_entry {
     static constexpr s64 FORMULA_INPUT_BUFFER_SIZE = 16_KiB;
     char Formula[FORMULA_INPUT_BUFFER_SIZE]{};
@@ -100,7 +100,7 @@ inline graph_state *GraphState = null;
 inline bool point_in_rect(v2 p, v2 min, v2 max) { return p.x > min.x && p.y > min.y && p.x < max.x && p.y < max.y; }
 
 inline bool mouse_in_viewport() {
-    v2 vpPos = GraphState->ViewportPos - (v2) Memory->MainWindow.get_pos();
+    v2 vpPos  = GraphState->ViewportPos - (v2) Memory->MainWindow.get_pos();
     v2 vpSize = GraphState->ViewportSize;
     return point_in_rect(GraphState->LastMouse, vpPos, vpPos + vpSize);
 }

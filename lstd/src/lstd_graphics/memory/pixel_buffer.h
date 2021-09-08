@@ -17,7 +17,7 @@ struct pixel_buffer {
     u8 *Pixels = null;
     s64 Reserved = 0;
 
-    pixel_buffer() = default;
+    pixel_buffer() {}
 
     // Just points to buffer (may get invalidated)
     pixel_buffer(u8 *pixels, u32 width, u32 height, pixel_format format);

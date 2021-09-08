@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "state.h"
 
 DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
@@ -6,11 +7,6 @@ DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
         Graphics = g;
 
         reload_global_state();
-
-        // Reinit the camera
-        // Should we?
-        auto *cam = &GraphState->Camera;
-        camera_reinit(cam);
 
         // Ensure at least one function entry exists
         if (!GraphState->Functions) array_append(GraphState->Functions);

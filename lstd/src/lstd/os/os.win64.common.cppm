@@ -1,7 +1,6 @@
 module;
 
 #include "lstd/io.h"
-#include "lstd/memory/array.h"
 #include "lstd/memory/delegate.h"
 #include "lstd/memory/string.h"
 #include "lstd/common/windows.h"  // Declarations of Win32 functions
@@ -153,8 +152,8 @@ byte State[sizeof(win64_common_state)];
 #define PERSISTENT internal::platform_get_persistent_allocator()
 #define TEMP internal::platform_get_temporary_allocator()
 
-utf16 *utf8_to_utf16(const string &str, allocator alloc = {}) { return internal::platform_utf8_to_utf16(str, alloc); }
-string utf16_to_utf8(const utf16 *str, allocator alloc = {}) { return internal::platform_utf16_to_utf8(str, alloc); }
+wchar *utf8_to_utf16(const string &str, allocator alloc = {}) { return internal::platform_utf8_to_utf16(str, alloc); }
+string utf16_to_utf8(const wchar *str, allocator alloc = {}) { return internal::platform_utf16_to_utf8(str, alloc); }
 
 void report_warning_no_allocations(string message) {
     DWORD ignored;
@@ -225,7 +224,7 @@ constexpr u32 ERROR_INSUFFICIENT_BUFFER = 122;
 
 void get_module_name() {
     // Get the module name
-    utf16 *buffer = malloc<utf16>({.Count = MAX_PATH, .Alloc = PERSISTENT});
+    wchar *buffer = malloc<wchar>({.Count = MAX_PATH, .Alloc = PERSISTENT});
     defer(free(buffer));
 
     s64 reserved = MAX_PATH;
@@ -236,7 +235,7 @@ void get_module_name() {
             if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
                 reserved *= 2;
                 free(buffer);
-                buffer = malloc<utf16>({.Count = reserved, .Alloc = PERSISTENT});
+                buffer = malloc<wchar>({.Count = reserved, .Alloc = PERSISTENT});
                 continue;
             }
         }
@@ -251,7 +250,7 @@ void get_module_name() {
 
 void parse_arguments() {
     // Get the arguments
-    utf16 **argv;
+    wchar **argv;
     s32 argc;
 
     // @Cleanup @DependencyCleanup: Parse arguments ourselves? We depend on this function which
@@ -388,7 +387,7 @@ export {
     string os_get_working_dir() {
         DWORD required = GetCurrentDirectoryW(0, null);
 
-        auto *dir16 = malloc<utf16>({.Count = required + 1, .Alloc = TEMP});
+        auto *dir16 = malloc<wchar>({.Count = required + 1, .Alloc = TEMP});
         if (!GetCurrentDirectoryW(required + 1, dir16)) {
             windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "GetCurrentDirectory");
             return "";
@@ -429,7 +428,7 @@ export {
 
         DWORD bufferSize = 65535;  // Limit according to http://msdn.microsoft.com/en-us/library/ms683188.aspx
 
-        auto *buffer = malloc<utf16>({.Count = bufferSize, .Alloc = TEMP});
+        auto *buffer = malloc<wchar>({.Count = bufferSize, .Alloc = TEMP});
         auto r = GetEnvironmentVariableW(name16, buffer, bufferSize);
 
         if (r == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
@@ -441,7 +440,7 @@ export {
 
         // 65535 may be the limit but let's not take risks
         if (r > bufferSize) {
-            buffer = malloc<utf16>({.Count = r, .Alloc = TEMP});
+            buffer = malloc<wchar>({.Count = r, .Alloc = TEMP});
             GetEnvironmentVariableW(name16, buffer, r);
             bufferSize = r;
 
@@ -477,7 +476,7 @@ export {
             return "";
         }
 
-        auto *clipboard16 = (utf16 *) GlobalLock(object);
+        auto *clipboard16 = (wchar *) GlobalLock(object);
         if (!clipboard16) {
             internal::platform_report_error("Failed to lock global handle");
             return "";
@@ -488,14 +487,14 @@ export {
     }
 
     void os_set_clipboard_content(const string &content) {
-        HANDLE object = GlobalAlloc(GMEM_MOVEABLE, content.Length * 2 * sizeof(utf16));
+        HANDLE object = GlobalAlloc(GMEM_MOVEABLE, content.Length * 2 * sizeof(wchar));
         if (!object) {
             internal::platform_report_error("Failed to open clipboard");
             return;
         }
         defer(GlobalFree(object));
 
-        auto *clipboard16 = (utf16 *) GlobalLock(object);
+        auto *clipboard16 = (wchar *) GlobalLock(object);
         if (!clipboard16) {
             internal::platform_report_error("Failed to lock global handle");
             return;

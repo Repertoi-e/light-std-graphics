@@ -1,7 +1,6 @@
 #pragma once
 
 #include "gtype.h"
-#include "lstd/memory/array.h"
 #include "lstd/memory/string.h"
 
 #if OS == WINDOWS
@@ -93,7 +92,7 @@ struct buffer : non_copyable, non_movable {
     s64 Size = 0;
     s64 Stride = 0;  // Determined by the buffer layout
 
-    buffer() = default;
+    buffer() {}
 
     void init(graphics *g, buffer_type type, buffer_usage usage, s64 size, const char *data = null);
 

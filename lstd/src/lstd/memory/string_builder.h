@@ -37,13 +37,13 @@ void string_builder_reset(string_builder &builder);
 void free(string_builder &builder);
 
 // Append a code point to the builder
-void string_append(string_builder &builder, utf32 codePoint);
+void string_append(string_builder &builder, code_point codePoint);
 
 // Append a string to the builder
 void string_append(string_builder &builder, const string &str);
 
 // Append _size_ bytes from _data_ to the builder
-void string_append(string_builder &builder, const utf8 *data, s64 size);
+void string_append(string_builder &builder, const char *data, s64 size);
 
 string_builder::buffer *string_builder_get_current_buffer(string_builder &builder);
 

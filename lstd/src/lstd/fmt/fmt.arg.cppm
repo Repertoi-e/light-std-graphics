@@ -7,6 +7,10 @@ export import fmt.fmt_type;
 
 LSTD_BEGIN_NAMESPACE
 
+struct fmt_context;
+
+void write_no_specs(fmt_context *f, const string &str);
+
 export {
     //
     // Specialize this for custom types,
@@ -16,13 +20,15 @@ export {
     // template <>
     // struct formatter<T> {
     //     void format(const T &value, fmt_context *f) {
-    //         to_writer(f, "v1: {}, v2: {}, ...", value.A, value.B);
+    //         fmt_to_writer(f, "v1: {}, v2: {}, ...", value.A, value.B);
     // 		   ...
     // 	   }
     // };
     template <typename T, typename Enable = void>
     struct formatter {
-        formatter() = delete;
+        void format(const T &value, fmt_context *f) {
+            f.on_error();
+        }
     };
 
     // Can T be formatted with a custom formatter
@@ -38,11 +44,10 @@ void call_formatter_on_custom_arg(const void *arg, FC *f) {
 
 export {
     // Contains a value of any type
-    template <typename FC>
     struct fmt_value {
         struct custom {
             void *Data;
-            void (*FormatFunc)(const void *arg, FC *f);
+            void (*FormatFunc)(const void *arg, fmt_context *f);
         };
 
         union {
@@ -67,7 +72,7 @@ export {
 
         template <typename T>
         fmt_value(const T *v) {
-            CUSTOM.Data = (void *) v;
+            CUSTOM.Data       = (void *) v;
             CUSTOM.FormatFunc = call_formatter_on_custom_arg<T, FC>;
         }
     };
@@ -185,7 +190,7 @@ export {
     // Stores either an array of values or arguments on the stack (just values if number is less than fmt_internal::MAX_PACKED_ARGS)
     template <typename FC, typename... Args>
     struct fmt_args_on_the_stack {
-        static constexpr s64 NUM_ARGS = sizeof...(Args);
+        static constexpr s64 NUM_ARGS   = sizeof...(Args);
         static constexpr bool IS_PACKED = NUM_ARGS < fmt_internal::MAX_PACKED_ARGS;
 
         using T = types::select_t<IS_PACKED, fmt_value<FC>, fmt_arg<FC>>;

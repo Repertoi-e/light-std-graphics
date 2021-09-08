@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../memory/array.h"
-#include "../memory/string_utils.h"
 #include "simd.h"
 
 #include "swizzle_1.inl"

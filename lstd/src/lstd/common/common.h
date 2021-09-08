@@ -398,6 +398,9 @@ constexpr void *const_copy_memory(void *dst, const void *src, u64 size) {
     return dst;
 }
 
+template <typename T>
+T *copy_elements(T *dst, T *src, s64 n) { return (T *) copy_memory(dst, src, n * sizeof(T)); }
+
 extern void *(*fill_memory)(void *dst, char value, u64 size);
 constexpr void *const_fill_memory(void *dst, char value, u64 size) {
     u64 uValue     = (u64) value;

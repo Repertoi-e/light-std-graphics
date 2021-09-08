@@ -16,7 +16,7 @@ struct imgui_renderer {
     shader Shader;
     s64 VBSize = 0, IBSize = 0;
 
-    imgui_renderer() = default;
+    imgui_renderer() {}
 
     void init(graphics *g);
     void draw(ImDrawData *drawData);

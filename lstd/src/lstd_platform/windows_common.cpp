@@ -40,7 +40,7 @@ guid guid_new() {
     GUID g;
     CoCreateGuid(&g);
 
-    auto data = to_stack_array((byte) (g.Data1 >> 24 & 0xFF),
+    auto data = make_stack_array((byte) (g.Data1 >> 24 & 0xFF),
                                (byte) (g.Data1 >> 16 & 0xFF),
                                (byte) (g.Data1 >> 8 & 0xFF),
                                (byte) (g.Data1 & 0xff),

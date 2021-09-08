@@ -42,7 +42,7 @@ export {
     }
 
     [[nodiscard("Leak")]] always_inline string path_join(const string &one, const string &other) {
-        auto arr = to_stack_array(one, other);
+        auto arr = make_stack_array(one, other);
         return path_join(arr);
     }
 

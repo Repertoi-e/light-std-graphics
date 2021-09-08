@@ -38,7 +38,7 @@ struct context {
     // (or the allocator module if you are living in the future).
     //
     // We store an arena allocator in the Context that is meant to be used as temporary storage.
-    // It can be used to allocate memory that is not meant to last long (e.g. converting utf8 to utf16
+    // It can be used to allocate memory that is not meant to last long (e.g. converting utf8 to wchar
     // to pass to a windows call).
     //
     // If you are programming a game and you need to do some calculations each frame,
@@ -106,9 +106,10 @@ struct context {
     allocator Alloc;  // = null by default. The user should provide an allocator at the start of the program.
 
     //
-    // Controls how newly allocated blocks get aligned, we do this instead of providing
-    // an allocate_aligned function. Remember that you can change this for an entire scope
-    // (or an entire run of a program).
+    // Controls how newly allocated memory gets aligned.
+    // You can control individual allocations with the .Alignment option in malloc<>(). 
+    // This is here so you can change alignment for every allocation 
+    // in an entire scope (or an entire run of a program).
     //
     u16 AllocAlignment = POINTER_SIZE;
 

@@ -89,7 +89,7 @@ struct win64_memory_state {
     thread::mutex PersistentAllocMutex;
 
     // We don't use the temporary allocator bundled with the Context because we don't want to mess with the user's memory.
-    allocator TempAlloc;  // Used for temporary storage (e.g. converting strings from utf8 to utf16 for windows calls).
+    allocator TempAlloc;  // Used for temporary storage (e.g. converting strings from utf8 to wchar for windows calls).
                           // Memory returned is only guaranteed to be valid until the next TempAlloc call, because we call free_all
                           // if we don't have enough space for the allocation.
     void *TempStorageBlock;
@@ -197,19 +197,19 @@ void platform_init_allocators() {
     create_persistent_alloc_block(PLATFORM_PERSISTENT_STORAGE_STARTING_SIZE);
 }
 
-// Windows uses utf16.. Sigh...
+// Windows uses wchar.. Sigh...
 //
 // This function uses the platform temporary allocator if no explicit allocator was specified.
-utf16 *platform_utf8_to_utf16(const string &str, allocator alloc = {}) {
+wchar *platform_utf8_to_utf16(const string &str, allocator alloc = {}) {
     if (!str.Length) return null;
 
     if (!alloc) alloc = S->TempAlloc;
 
-    utf16 *result;
+    wchar *result;
     PUSH_ALLOC(alloc) {
         // src.Length * 2 because one unicode character might take 2 wide chars.
         // This is just an approximation, not all space will be used!
-        result = malloc<utf16>({.Count = str.Length * 2 + 1});
+        result = malloc<wchar>({.Count = str.Length * 2 + 1});
     }
 
     utf8_to_utf16(str.Data, str.Length, result);
@@ -217,7 +217,7 @@ utf16 *platform_utf8_to_utf16(const string &str, allocator alloc = {}) {
 }
 
 // This function uses the platform temporary allocator if no explicit allocator was specified.
-string platform_utf16_to_utf8(const utf16 *str, allocator alloc = {}) {
+string platform_utf16_to_utf8(const wchar *str, allocator alloc = {}) {
     string result;
 
     if (!alloc) alloc = S->TempAlloc;
@@ -228,7 +228,7 @@ string platform_utf16_to_utf8(const utf16 *str, allocator alloc = {}) {
         string_reserve(result, c_string_length(str) * 4);
     }
 
-    utf16_to_utf8(str, (utf8 *) result.Data, &result.Count);
+    utf16_to_utf8(str, (char *) result.Data, &result.Count);
     result.Length = utf8_length(result.Data, result.Count);
 
     return result;
@@ -311,7 +311,7 @@ export {
     }
 
     void os_write_shared_block(const string &name, void *data, s64 size) {
-        utf16 *name16 = internal::platform_utf8_to_utf16(name, S->PersistentAlloc);
+        wchar *name16 = internal::platform_utf8_to_utf16(name, S->PersistentAlloc);
         defer(free(name16));
 
         CREATE_MAPPING_CHECKED(h, CreateFileMappingW(INVALID_HANDLE_VALUE, null, PAGE_READWRITE, 0, (DWORD) size, name16));
@@ -327,7 +327,7 @@ export {
     }
 
     void os_read_shared_block(const string &name, void *out, s64 size) {
-        utf16 *name16 = internal::platform_utf8_to_utf16(name, S->PersistentAlloc);
+        wchar *name16 = internal::platform_utf8_to_utf16(name, S->PersistentAlloc);
         defer(free(name16));
 
         CREATE_MAPPING_CHECKED(h, OpenFileMappingW(FILE_MAP_READ, false, name16));

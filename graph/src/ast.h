@@ -1,8 +1,6 @@
 #pragma once
 
-#include <driver.h>
-#include <lstd/fmt/fmt.h>
-#include <lstd/parse.h>
+#include "pch.h"
 
 inline s32 op_precedence(string op, bool unary = false) {
     if (op == "sentinel") return 0;
@@ -81,9 +79,9 @@ inline void free(token_stream &stream) {
     free(stream.Tokens);
 }
 
-inline bool is_op(utf32 ch) { return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^'; }
-inline bool is_unary_op(utf32 ch) { return ch == '+' || ch == '-'; }
-inline bool is_parenthesis(utf32 ch) { return ch == '(' || ch == ')'; }
+inline bool is_op(code_point ch) { return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^'; }
+inline bool is_unary_op(code_point ch) { return ch == '+' || ch == '-'; }
+inline bool is_parenthesis(code_point ch) { return ch == '(' || ch == ')'; }
 
 // errorPos = -1 means we calculate from _It_,
 // if we are tokenizing, then the caller must pass the correct position (since we don't have a full token array yet!)

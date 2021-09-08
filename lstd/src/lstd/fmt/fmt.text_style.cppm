@@ -1,7 +1,6 @@
 module;
 
 #include "../memory/string.h"
-#include "../memory/string_utils.h"
 
 export module fmt.text_style;
 
@@ -93,7 +92,7 @@ export {
 
     namespace fmt_internal {
     // Used when making ANSI escape codes for text styles
-    inline utf8 *u8_to_esc(utf8 *p, utf8 delimiter, u8 c) {
+    inline char *u8_to_esc(char *p, utf8 delimiter, u8 c) {
         *p++ = '0' + c / 100;
         *p++ = '0' + c / 10 % 10;
         *p++ = '0' + c % 10;
@@ -101,8 +100,8 @@ export {
         return p;
     }
 
-    inline utf8 *color_to_ansi(utf8 *buffer, fmt_text_style style) {
-        utf8 *p = buffer;
+    inline char *color_to_ansi(char *buffer, fmt_text_style style) {
+        char *p = buffer;
         if (style.ColorKind != fmt_text_style::color_kind::NONE) {
             if (style.ColorKind == fmt_text_style::color_kind::TERMINAL) {
                 // Background terminal colors are 10 more than the foreground ones
@@ -135,14 +134,14 @@ export {
         return p;
     }
 
-    inline utf8 *emphasis_to_ansi(utf8 *buffer, u8 emphasis) {
+    inline char *emphasis_to_ansi(char *buffer, u8 emphasis) {
         u8 codes[4] = {};
         if (emphasis & BOLD) codes[0] = 1;
         if (emphasis & ITALIC) codes[1] = 3;
         if (emphasis & UNDERLINE) codes[2] = 4;
         if (emphasis & STRIKETHROUGH) codes[3] = 9;
 
-        utf8 *p = buffer;
+        char *p = buffer;
         For(range(4)) {
             if (!codes[it]) continue;
 

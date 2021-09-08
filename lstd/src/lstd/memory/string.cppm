@@ -1,52 +1,54 @@
 #pragma once
 
 #include "../memory/allocator.h"
-#include "array.h"
 
 LSTD_BEGIN_NAMESPACE
 
-// UTF-8 string
 // This string doesn't guarantee a null termination at the end.
+// It's essentially a data pointer and a count.
 //
-// Documentation for array is relevant here.
+// This means that you can load a binary file into a string.
 //
-// Contains the pre-calculated amount of code points in the string.
+// There are routines that assume the data in _string_ is valid UTF-8
+// for working with text, but we can't guarantee that. We don't do any checks.
+// That is left up to the programmer to verify.
+//
+// Those routines begin with utf8_
+//
+// @TODO: Provide a _utf8_validate()_.
 //
 // Functions on this object allow negative reversed indexing which begins at
 // the end of the string, so -1 is the last code point -2 the one before that, etc. (Python-style)
-struct string : array<utf8> {
-    s64 Length = 0;  // Length of the string in unicode code points
+//
+// Substrings don't allocate memory but just return a new data pointer and count
+// since strings in this library are not null-terminated.
+//
+// The substring operator is defined in array<> and is called like this:    str[{1, 3}];
 
-    constexpr string() {}
+export {
+    using string = array<u8>;
+    
+    using utf8_string = array<u8>;
 
-    // Create a string from a null terminated c-string.
-    // Note that this constructor doesn't validate if the passed in string is valid utf8.
-    constexpr string(const utf8 *str) : array<utf8>((utf8 *) str, c_string_length(str)), Length(utf8_length(str, Count)) {}
+    // Overload these from array_like.h which in turn change the way operators in array<> behave.
+    // We do this because string should work with utf8 by default.
+    constexpr const char *get(string * str, s64 index) { return utf8_get_cp_at_index(str->Data, translate_index(index, str->Count)); }
+    constexpr const char *get(const string *str, s64 index) { return utf8_get_cp_at_index(str->Data, translate_index(index, str->Count)); }
 
-    // This constructor allows constructing from the utf8 encoded u8"..." string literals.
-    constexpr string(const char8_t *str) : array<utf8>((utf8 *) str, c_string_length(str)), Length(utf8_length((utf8 *) str, Count)) {}
+    // This may remove const from _arr_
+    template <is_array_like T>
+    constexpr auto get_subarray(string * str, s64 begin, s64 end) {
+        s64 targetBegin = translate_index(begin, arr->Count);
+        s64 targetEnd   = translate_index(end, arr->Count, true);
 
-    // Create a string from a buffer and a length.
-    // Note that this constructor doesn't validate if the passed in string is valid utf8.
-    constexpr string(const utf8 *str, s64 size) : array<utf8>((utf8 *) str, size), Length(utf8_length(str, size)) {}
+        types::remove_cvref<T> result;
+        result.Data  = arr.Data + targetBegin;
+        result.Count = targetEnd - targetBegin + 1;
+        return result;
+    }
+}
 
-    // Create a string from a buffer and a length.
-    // Note that this constructor doesn't validate if the passed in string is valid utf8.
-    constexpr string(const byte *str, s64 size) : array<utf8>((utf8 *) str, size), Length(utf8_length(Data, size)) {}
-
-    constexpr string(const array<utf8> &arr) : array<utf8>(arr), Length(utf8_length(Data, Count)) {}
-    constexpr string(const array<byte> &arr) : array<utf8>((utf8 *) arr.Data, arr.Count), Length(utf8_length(Data, Count)) {}
-
-    // Allocates a buffer (using the Context's allocator by default)
-    string(utf32 codePoint, s64 repeat);
-
-    // Allocates a buffer (using the Context's allocator by default)
-    string(utf16 codePoint, s64 repeat) : string((utf32) codePoint, repeat) {}
-
-    //
-    // Iterator:
-    //
-   private:
+/*
     template <bool Const>
     struct string_iterator {
         using string_t = types::select_t<Const, const string, string>;
@@ -96,7 +98,7 @@ struct string : array<utf8> {
 
         auto operator*() { return (*Parent)[Index]; }
 
-        operator const utf8 *() const { return get_cp_at_index(Parent->Data, translate_index(Index, Parent->Length, true)); }
+        operator const char *() const { return utf8_get_cp_at_index(Parent->Data, translate_index(Index, Parent->Length, true)); }
     };
 
    public:
@@ -126,8 +128,8 @@ struct string : array<utf8> {
         code_point_ref() {}
         code_point_ref(string *parent, s64 index) : Parent(parent), Index(index) {}
 
-        code_point_ref &operator=(utf32 other);
-        operator utf32() const;
+        code_point_ref &operator=(code_point other);
+        operator code_point() const;
     };
 
     // The non-const version allows to modify the character by simply =.
@@ -135,23 +137,24 @@ struct string : array<utf8> {
     //
     // We support Python-like negative indices.
     code_point_ref operator[](s64 index) { return code_point_ref(this, translate_index(index, Length)); }
-    constexpr utf32 operator[](s64 index) const { return decode_cp(get_cp_at_index(Data, translate_index(index, Length))); }
+    constexpr code_point operator[](s64 index) const { return decode_cp(utf8_get_cp_at_index(Data, translate_index(index, Length))); }
 
+    //
     // Substring operator:
     //
-    // e.g. call like this: string[{2, -1}]     
+    // e.g. call like this: str[{2, -1}]     
     //      to get everything from the second to the last character (without the last).
     // 
     // We support Python-like negative indices.
+    //
+    // This doesn't allocate memory but just returns a new data pointer and count
+    // since strings in this library are not null-terminated.
     struct substring_indices {
         s64 b, e;
     };
     constexpr string operator[](substring_indices range) const;
 };
-
-// We need to tell the is_array helper, because string is non-templated.
-template <>
-struct is_array_helper<string> : types::true_t {};
+    */
 
 // Make sure you call the string_ overloads because array_ functions don't calculate the Length (which we cache).
 inline void string_reserve(string &s, s64 n) { array_reserve(s, n); }
@@ -161,35 +164,35 @@ inline void free(string &s) { free((array<utf8> &) s), s.Length = 0; }
 
 //
 // Utilities to convert to c-style strings.
-// Functions for conversion between utf8, utf16 and utf32 are provided in string_utils.h
+// Functions for conversion between utf8, wchar and code_point are provided in string_utils.h
 //
 
 // Allocates a buffer, copies the string's contents and also appends a zero terminator.
 // Uses the Context's current allocator. The caller is responsible for freeing.
-[[nodiscard("Leak")]] utf8 *string_to_c_string(const string &s, allocator alloc = {});
+[[nodiscard("Leak")]] char *string_to_c_string(const string &s, allocator alloc = {});
 
 // Allocates a buffer, copies the string's contents and also appends a zero terminator.
 // Uses the temporary allocator.
-utf8 *string_to_c_string_temp(const string &s);
+char *string_to_c_string_temp(const string &s);
 
 //
 // String modification:
 //
 
 // Sets the _index_'th code point in the string.
-void string_set(string &s, s64 index, utf32 codePoint);
+void string_set(string &s, s64 index, code_point codePoint);
 
 // Insert a code point at a specified index.
-void string_insert_at(string &s, s64 index, utf32 codePoint);
+void string_insert_at(string &s, s64 index, code_point codePoint);
 
 // Insert a buffer of bytes at a specified index.
-void string_insert_at(string &s, s64 index, const utf8 *str, s64 size);
+void string_insert_at(string &s, s64 index, const char *str, s64 size);
 
 // Insert a string at a specified index.
 inline void string_insert_at(string &s, s64 index, const string &str) { return string_insert_at(s, index, str.Data, str.Count); }
 
 // Remove the first occurence of a code point.
-void string_remove(string &s, utf32 cp);
+void string_remove(string &s, code_point cp);
 
 // Remove code point at specified index.
 void string_remove_at(string &s, s64 index);
@@ -198,10 +201,10 @@ void string_remove_at(string &s, s64 index);
 void string_remove_range(string &s, s64 begin, s64 end);
 
 // Append a non encoded character to a string.
-inline void string_append(string &s, utf32 codePoint) { return string_insert_at(s, s.Length, codePoint); }
+inline void string_append(string &s, code_point codePoint) { return string_insert_at(s, s.Length, codePoint); }
 
 // Append _size_ bytes of string contained in _data_.
-inline void string_append(string &s, const utf8 *str, s64 size) { return string_insert_at(s, s.Length, str, size); }
+inline void string_append(string &s, const char *str, s64 size) { return string_insert_at(s, s.Length, str, size); }
 
 // Append one string to another.
 inline void string_append(string &s, const string &str) { return string_append(s, str.Data, str.Count); }
@@ -213,41 +216,41 @@ inline void string_replace_all(string &s, const string &oldStr, const string &ne
 }
 
 // Replace all occurences of _oldCp_ with _newCp_
-inline void string_replace_all(string &s, utf32 oldCp, utf32 newCp) {
+inline void string_replace_all(string &s, code_point oldCp, code_point newCp) {
     utf8 encodedOld[4];
-    encode_cp(encodedOld, oldCp);
+    utf8_encode_cp(encodedOld, oldCp);
 
     utf8 encodedNew[4];
-    encode_cp(encodedNew, newCp);
+    utf8_encode_cp(encodedNew, newCp);
 
-    string_replace_all(s, string(encodedOld, get_size_of_cp(encodedOld)), string(encodedNew, get_size_of_cp(encodedNew)));
+    string_replace_all(s, string(encodedOld, utf8_get_size_of_cp(encodedOld)), string(encodedNew, utf8_get_size_of_cp(encodedNew)));
 }
 
 // Removes all occurences of _cp_
-inline void string_remove_all(string &s, utf32 cp) {
+inline void string_remove_all(string &s, code_point cp) {
     utf8 encodedCp[4];
-    encode_cp(encodedCp, cp);
+    utf8_encode_cp(encodedCp, cp);
 
-    string_replace_all(s, string(encodedCp, get_size_of_cp(encodedCp)), "");
+    string_replace_all(s, string(encodedCp, utf8_get_size_of_cp(encodedCp)), "");
 }
 
 // Remove all occurences of _str_
 inline void string_remove_all(string &s, const string &str) { string_replace_all(s, str, ""); }
 
 // Replace all occurences of _oldCp_ with _newStr_
-inline void string_replace_all(string &s, utf32 oldCp, const string &newStr) {
+inline void string_replace_all(string &s, code_point oldCp, const string &newStr) {
     utf8 encodedCp[4];
-    encode_cp(encodedCp, oldCp);
+    utf8_encode_cp(encodedCp, oldCp);
 
-    string_replace_all(s, string(encodedCp, get_size_of_cp(encodedCp)), newStr);
+    string_replace_all(s, string(encodedCp, utf8_get_size_of_cp(encodedCp)), newStr);
 }
 
 // Replace all occurences of _oldStr_ with _newCp_
-inline void string_replace_all(string &s, const string &oldStr, utf32 newCp) {
+inline void string_replace_all(string &s, const string &oldStr, code_point newCp) {
     utf8 encodedCp[4];
-    encode_cp(encodedCp, newCp);
+    utf8_encode_cp(encodedCp, newCp);
 
-    string_replace_all(s, oldStr, string(encodedCp, get_size_of_cp(encodedCp)));
+    string_replace_all(s, oldStr, string(encodedCp, utf8_get_size_of_cp(encodedCp)));
 }
 
 //
@@ -265,8 +268,8 @@ constexpr s64 compare(const string &s, const string &other) {
 
     s64 index = 0;
     while (decode_cp(p1) == decode_cp(p2)) {
-        p1 += get_size_of_cp(p1);
-        p2 += get_size_of_cp(p2);
+        p1 += utf8_get_size_of_cp(p1);
+        p2 += utf8_get_size_of_cp(p2);
         if (p1 == e1 && p2 == e2) return -1;
         if (p1 == e1 || p2 == e2) return index;
         ++index;
@@ -285,8 +288,8 @@ constexpr s64 compare_ignore_case(const string &s, const string &other) {
 
     s64 index = 0;
     while (to_lower(decode_cp(p1)) == to_lower(decode_cp(p2))) {
-        p1 += get_size_of_cp(p1);
-        p2 += get_size_of_cp(p2);
+        p1 += utf8_get_size_of_cp(p1);
+        p2 += utf8_get_size_of_cp(p2);
         if (p1 == e1 && p2 == e2) return -1;
         if (p1 == e1 || p2 == e2) return index;
         ++index;
@@ -308,8 +311,8 @@ constexpr s32 compare_lexicographically(const string &a, const string &b) {
 
     s64 index = 0;
     while (decode_cp(p1) == decode_cp(p2)) {
-        p1 += get_size_of_cp(p1);
-        p2 += get_size_of_cp(p2);
+        p1 += utf8_get_size_of_cp(p1);
+        p2 += utf8_get_size_of_cp(p2);
         if (p1 == e1 && p2 == e2) return 0;
         if (p1 == e1) return -1;
         if (p2 == e2) return 1;
@@ -332,8 +335,8 @@ constexpr s32 compare_lexicographically_ignore_case(const string &a, const strin
 
     s64 index = 0;
     while (to_lower(decode_cp(p1)) == to_lower(decode_cp(p2))) {
-        p1 += get_size_of_cp(p1);
-        p2 += get_size_of_cp(p2);
+        p1 += utf8_get_size_of_cp(p1);
+        p2 += utf8_get_size_of_cp(p2);
         if (p1 == e1 && p2 == e2) return 0;
         if (p1 == e1) return -1;
         if (p2 == e2) return 1;
@@ -351,7 +354,7 @@ constexpr s64 find_substring(const string &haystack, const string &needle, s64 s
 
     if (start >= haystack.Length || start <= -haystack.Length) return -1;
 
-    auto *p = get_cp_at_index(haystack.Data, translate_index(start, haystack.Length));
+    auto *p   = utf8_get_cp_at_index(haystack.Data, translate_index(start, haystack.Length));
     auto *end = haystack.Data + haystack.Count;
 
     auto *needleEnd = needle.Data + needle.Count;
@@ -369,7 +372,7 @@ constexpr s64 find_substring(const string &haystack, const string &needle, s64 s
 
         if (p == end) return -1;
 
-        auto *search = p + 1;
+        auto *search   = p + 1;
         auto *progress = needle.Data + 1;
         while (search != end && progress != needleEnd && *search == *progress) ++search, ++progress;
         if (progress == needleEnd) return utf8_length(haystack.Data, p - haystack.Data);
@@ -380,10 +383,10 @@ constexpr s64 find_substring(const string &haystack, const string &needle, s64 s
 
 // Searches for the first occurence of a code point which is after a specified _start_ index.
 // Returns -1 if no index was found.
-constexpr s64 find_cp(const string &haystack, utf32 cp, s64 start = 0) {
+constexpr s64 find_cp(const string &haystack, code_point cp, s64 start = 0) {
     utf8 encoded[4]{};
-    encode_cp(encoded, cp);
-    return find_substring(haystack, string(encoded, get_size_of_cp(encoded)), start);
+    utf8_encode_cp(encoded, cp);
+    return find_substring(haystack, string(encoded, utf8_get_size_of_cp(encoded)), start);
 }
 
 // Searches for the last occurence of a substring which is before a specified _start_ index.
@@ -396,7 +399,7 @@ constexpr s64 find_substring_reverse(const string &haystack, const string &needl
     if (start >= haystack.Length || start <= -haystack.Length) return -1;
     if (start == 0) start = haystack.Length;
 
-    auto *p = get_cp_at_index(haystack.Data, translate_index(start, haystack.Length, true) - 1);
+    auto *p   = utf8_get_cp_at_index(haystack.Data, translate_index(start, haystack.Length, true) - 1);
     auto *end = haystack.Data + haystack.Count;
 
     auto *needleEnd = needle.Data + needle.Count;
@@ -414,7 +417,7 @@ constexpr s64 find_substring_reverse(const string &haystack, const string &needl
 
         if (*p != *needle.Data && p == haystack.Data) return -1;
 
-        auto *search = p + 1;
+        auto *search   = p + 1;
         auto *progress = needle.Data + 1;
         while (search != end && progress != needleEnd && *search == *progress) ++search, ++progress;
         if (progress == needleEnd) return utf8_length(haystack.Data, p - haystack.Data);
@@ -425,10 +428,10 @@ constexpr s64 find_substring_reverse(const string &haystack, const string &needl
 
 // Searches for the last occurence of a code point which is before a specified _start_ index.
 // Returns -1 if no index was found.
-constexpr s64 find_cp_reverse(const string &haystack, utf32 cp, s64 start = 0) {
+constexpr s64 find_cp_reverse(const string &haystack, code_point cp, s64 start = 0) {
     utf8 encoded[4]{};
-    encode_cp(encoded, cp);
-    return find_substring_reverse(haystack, string(encoded, get_size_of_cp(encoded)), start);
+    utf8_encode_cp(encoded, cp);
+    return find_substring_reverse(haystack, string(encoded, utf8_get_size_of_cp(encoded)), start);
 }
 
 // Searches for the first occurence of a substring which is different from _eat_ and is after a specified _start_ index.
@@ -445,7 +448,7 @@ constexpr s64 find_substring_not(const string &s, const string &eat, s64 start =
 
     if (start >= s.Length || start <= -s.Length) return -1;
 
-    auto *p = get_cp_at_index(s.Data, translate_index(start, s.Length));
+    auto *p   = utf8_get_cp_at_index(s.Data, translate_index(start, s.Length));
     auto *end = s.Data + s.Count;
 
     auto *eatEnd = eat.Data + eat.Count;
@@ -457,7 +460,7 @@ constexpr s64 find_substring_not(const string &s, const string &eat, s64 start =
 
         if (p == end) return -1;
 
-        auto *search = p + 1;
+        auto *search   = p + 1;
         auto *progress = eat.Data + 1;
         while (search != end && progress != eatEnd && *search != *progress) ++search, ++progress;
         if (progress == eatEnd) return utf8_length(s.Data, p - s.Data);
@@ -468,10 +471,10 @@ constexpr s64 find_substring_not(const string &s, const string &eat, s64 start =
 
 // Searches for the first occurence of a code point which is not _cp_ and is after a specified _start_ index.
 // Returns -1 if no index was found.
-constexpr s64 find_cp_not(const string &s, utf32 cp, s64 start = 0) {
+constexpr s64 find_cp_not(const string &s, code_point cp, s64 start = 0) {
     utf8 encoded[4]{};
-    encode_cp(encoded, cp);
-    return find_substring_not(s, string(encoded, get_size_of_cp(encoded)), start);
+    utf8_encode_cp(encoded, cp);
+    return find_substring_not(s, string(encoded, utf8_get_size_of_cp(encoded)), start);
 }
 
 // Searches for the last occurence of a substring which is different from _eat_ and is before a specified _start_ index.
@@ -489,7 +492,7 @@ constexpr s64 find_substring_reverse_not(const string &s, const string &eat, s64
     if (start >= s.Length || start <= -s.Length) return -1;
     if (start == 0) start = s.Length;
 
-    auto *p = get_cp_at_index(s.Data, translate_index(start, s.Length, true) - 1);
+    auto *p   = utf8_get_cp_at_index(s.Data, translate_index(start, s.Length, true) - 1);
     auto *end = s.Data + s.Count;
 
     auto *eatEnd = eat.Data + eat.Count;
@@ -502,7 +505,7 @@ constexpr s64 find_substring_reverse_not(const string &s, const string &eat, s64
 
         if (*p == *eat.Data && p == s.Data) return -1;
 
-        auto *search = p + 1;
+        auto *search   = p + 1;
         auto *progress = eat.Data + 1;
         while (search != end && progress != eatEnd && *search != *progress) ++search, ++progress;
         if (progress == eatEnd) return utf8_length(s.Data, p - s.Data);
@@ -518,10 +521,10 @@ constexpr s64 find_substring_reverse_not(const string &s, const string &eat, s64
 //   find_cp_reverse_not("user/stuff/file.txtCCCCCC", 'C')
 //   returns:                               ^
 //
-constexpr s64 find_cp_reverse_not(const string &s, utf32 cp, s64 start = 0) {
+constexpr s64 find_cp_reverse_not(const string &s, code_point cp, s64 start = 0) {
     utf8 encoded[4]{};
-    encode_cp(encoded, cp);
-    return find_substring_reverse_not(s, string(encoded, get_size_of_cp(encoded)), start);
+    utf8_encode_cp(encoded, cp);
+    return find_substring_reverse_not(s, string(encoded, utf8_get_size_of_cp(encoded)), start);
 }
 
 // Searches for the first occurence of a code point which is also present in _anyOfThese_ and is before a specified _start_ index.
@@ -533,12 +536,12 @@ constexpr s64 find_any_of(const string &s, const string &anyOfThese, s64 start =
 
     if (start >= s.Length || start <= -s.Length) return -1;
 
-    start = translate_index(start, s.Length);
-    auto *p = get_cp_at_index(s.Data, start);
+    start   = translate_index(start, s.Length);
+    auto *p = utf8_get_cp_at_index(s.Data, start);
 
     For(range(start, s.Length)) {
         if (find_cp(anyOfThese, decode_cp(p)) != -1) return utf8_length(s.Data, p - s.Data);
-        p += get_size_of_cp(p);
+        p += utf8_get_size_of_cp(p);
     }
     return -1;
 }
@@ -553,12 +556,12 @@ constexpr s64 find_reverse_any_of(const string &s, const string &anyOfThese, s64
     if (start >= s.Length || start <= -s.Length) return -1;
     if (start == 0) start = s.Length;
 
-    start = translate_index(start, s.Length, true) - 1;
-    auto *p = get_cp_at_index(s.Data, start);
+    start   = translate_index(start, s.Length, true) - 1;
+    auto *p = utf8_get_cp_at_index(s.Data, start);
 
     For(range(start, -1, -1)) {
         if (find_cp(anyOfThese, decode_cp(p)) != -1) return utf8_length(s.Data, p - s.Data);
-        p -= get_size_of_cp(p);
+        p -= utf8_get_size_of_cp(p);
     }
     return -1;
 }
@@ -572,12 +575,12 @@ constexpr s64 find_not_any_of(const string &s, const string &anyOfThese, s64 sta
 
     if (start >= s.Length || start <= -s.Length) return -1;
 
-    start = translate_index(start, s.Length);
-    auto *p = get_cp_at_index(s.Data, start);
+    start   = translate_index(start, s.Length);
+    auto *p = utf8_get_cp_at_index(s.Data, start);
 
     For(range(start, s.Length)) {
         if (find_cp(anyOfThese, decode_cp(p)) == -1) return utf8_length(s.Data, p - s.Data);
-        p += get_size_of_cp(p);
+        p += utf8_get_size_of_cp(p);
     }
     return -1;
 }
@@ -592,18 +595,18 @@ constexpr s64 find_reverse_not_any_of(const string &s, const string &anyOfThese,
     if (start >= s.Length || start <= -s.Length) return -1;
     if (start == 0) start = s.Length;
 
-    start = translate_index(start, s.Length, true) - 1;
-    auto *p = get_cp_at_index(s.Data, start);
+    start   = translate_index(start, s.Length, true) - 1;
+    auto *p = utf8_get_cp_at_index(s.Data, start);
 
     For(range(start, -1, -1)) {
         if (find_cp(anyOfThese, decode_cp(p)) == -1) return utf8_length(s.Data, p - s.Data);
-        p -= get_size_of_cp(p);
+        p -= utf8_get_size_of_cp(p);
     }
     return -1;
 }
 
 // Counts the number of occurences of _cp_
-constexpr s64 count(const string &s, utf32 cp) {
+constexpr s64 count(const string &s, code_point cp) {
     s64 result = 0, index = 0;
     while ((index = find_cp(s, cp, index)) != -1) {
         ++result, ++index;
@@ -623,7 +626,7 @@ constexpr s64 count(const string &s, const string &str) {
 }
 
 // Returns true if the string contains _cp_ anywhere
-constexpr bool has(const string &s, utf32 cp) { return find_cp(s, cp) != -1; }
+constexpr bool has(const string &s, code_point cp) { return find_cp(s, cp) != -1; }
 
 // Returns true if the string contains _str_ anywhere
 constexpr bool has(const string &s, const string &str) { return find_substring(s, str) != -1; }
@@ -639,11 +642,11 @@ constexpr string substring(const string &s, s64 begin, s64 end) {
     if (begin == end) return "";
 
     s64 beginIndex = translate_index(begin, s.Length);
-    s64 endIndex = translate_index(end, s.Length, true);
+    s64 endIndex   = translate_index(end, s.Length, true);
 
-    const utf8 *beginPtr = get_cp_at_index(s.Data, beginIndex);
-    const utf8 *endPtr = beginPtr;
-    For(range(beginIndex, endIndex)) endPtr += get_size_of_cp(endPtr);
+    const char *beginPtr = utf8_get_cp_at_index(s.Data, beginIndex);
+    const char *endPtr   = beginPtr;
+    For(range(beginIndex, endIndex)) endPtr += utf8_get_size_of_cp(endPtr);
 
     return string(beginPtr, endPtr - beginPtr);
 }
@@ -690,18 +693,17 @@ constexpr bool operator>=(const string &one, const string &other) { return !(one
 // constexpr auto operator<=>(const string &one, const string &other) { return compare_lexicographically(one, other); }
 
 // operator<=> doesn't work on these for some reason...
-constexpr bool operator==(const utf8 *one, const string &other) { return compare_lexicographically(one, other) == 0; }
-constexpr bool operator!=(const utf8 *one, const string &other) { return !(one == other); }
-constexpr bool operator<(const utf8 *one, const string &other) { return compare_lexicographically(one, other) < 0; }
-constexpr bool operator>(const utf8 *one, const string &other) { return compare_lexicographically(one, other) > 0; }
-constexpr bool operator<=(const utf8 *one, const string &other) { return !(one > other); }
-constexpr bool operator>=(const utf8 *one, const string &other) { return !(one < other); }
+constexpr bool operator==(const char *one, const string &other) { return compare_lexicographically(one, other) == 0; }
+constexpr bool operator!=(const char *one, const string &other) { return !(one == other); }
+constexpr bool operator<(const char *one, const string &other) { return compare_lexicographically(one, other) < 0; }
+constexpr bool operator>(const char *one, const string &other) { return compare_lexicographically(one, other) > 0; }
+constexpr bool operator<=(const char *one, const string &other) { return !(one > other); }
+constexpr bool operator>=(const char *one, const string &other) { return !(one < other); }
 
 // Substring operator:
 // constexpr string string::operator()(s64 begin, s64 end) const { return substring(*this, begin, end); }
 
 constexpr string string::operator[](substring_indices range) const { return substring(*this, range.b, range.e); }
-
 
 // Be careful not to call this with _dest_ pointing to _src_!
 // Returns just _dest_.
@@ -709,7 +711,7 @@ string *clone(string *dest, const string &src);
 
 // Hash for strings
 inline u64 get_hash(const string &value) {
-    u64 hash = 5381;
+    u64 hash        = 5381;
     For(value) hash = ((hash << 5) + hash) + it;
     return hash;
 }

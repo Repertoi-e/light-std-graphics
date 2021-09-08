@@ -16,7 +16,7 @@ struct string_builder_writer : writer {
         //
         // @Robustness: Optional utf8 validation would be good here?
         //
-        string_append(Builder, (const utf8 *) data, size);
+        string_append(Builder, (const char *) data, size);
     }
 };
 

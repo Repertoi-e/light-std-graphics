@@ -144,14 +144,14 @@ file_scope LONG exception_filter(LPEXCEPTION_POINTERS e) {
 
 void win64_crash_handler_init() {
     const DWORD bufferSize = 65535;
-    utf16 buffer[bufferSize];
+    wchar buffer[bufferSize];
 
     auto r = GetEnvironmentVariableW(L"PROCESSOR_ARCHITECTURE", buffer, bufferSize);
     if (r == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
         assert(false && "Couldn't find environment variable PROCESSOR_ARCHITECTURE");
     }
 
-    const utf16 *processor = buffer;
+    const wchar *processor = buffer;
     if (compare_c_string(processor, L"EM64T") == -1 || compare_c_string(processor, L"AMD64") == -1) {
         MachineType = IMAGE_FILE_MACHINE_AMD64;
     } else if (compare_c_string(processor, L"x86") == -1) {

@@ -34,7 +34,7 @@ struct cursor {
         } Win32;
     } PlatformData{};
 
-    cursor() = default;
+    cursor() {}
     cursor(const pixel_buffer &image, vec2<s32> hot);
     cursor(os_cursor osCursor);
 

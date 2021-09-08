@@ -157,7 +157,7 @@ big_int_2048 bigint_pow10(s32 exp) {
 //
 // _v_           - f32 or f64; contains the value of the float to be formatted.
 //
-export void dragon4_format_float(utf8 *b, s64 *outWritten, s32 *outExp, s32 precision, types::is_floating_point auto v) {
+export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 precision, types::is_floating_point auto v) {
     // floating point value above/below the significand.
 
     // Lower and upper are differences between value and corresponding boundaries.

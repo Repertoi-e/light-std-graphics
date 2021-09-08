@@ -82,6 +82,7 @@ function common_settings()
     filter "configurations:Release"
         defines { "RELEASE", "NDEBUG" } 
         optimize "Full"
+		symbols "Off"
         floatingpoint "Strict"
     filter {}
 end

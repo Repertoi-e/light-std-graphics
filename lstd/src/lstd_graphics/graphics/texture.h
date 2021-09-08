@@ -58,7 +58,7 @@ struct texture_2D : asset {
     texture_filter Filter;
     bool RenderTarget = false;  // When true, the texture can be used as a framebuffer
 
-    texture_2D() = default;
+    texture_2D() {}
 
     void init(graphics *g, s32 width, s32 height, texture_filter filter = texture_filter::Linear,
               texture_wrap wrap = texture_wrap::Clamp);

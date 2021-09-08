@@ -189,7 +189,7 @@ struct allocation_header {
     //
     // To debug allocations you can try to use the _ID_ and set a breakpoint. See commment above.
     //
-    const utf8 *FileName;
+    const char *FileName;
     s64 FileLine;
 #endif
 
@@ -530,7 +530,7 @@ void *arena_allocator(allocator_mode mode, void *context, s64 size, void *oldMem
 //   pool (and prints a warning to the console).
 //
 // We store an arena allocator in the Context that is meant to be used as temporary storage.
-// It can be used to allocate memory that is not meant to last long (e.g. converting utf8 to utf16
+// It can be used to allocate memory that is not meant to last long (e.g. converting utf8 to wchar
 // to pass to a windows call).
 //
 // If you are programming a game and you need to do some calculations each frame,

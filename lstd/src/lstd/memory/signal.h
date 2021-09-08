@@ -1,7 +1,5 @@
 #pragma once
 
-#include "array.h"
-
 LSTD_BEGIN_NAMESPACE
 
 // Returns the result of the last callback from a signal emission.

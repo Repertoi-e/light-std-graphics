@@ -1,6 +1,5 @@
 #pragma once
 
-#include "memory/array.h"
 #include "memory/guid.h"
 #include "memory/string.h"
 
@@ -170,9 +169,9 @@ inline void advance_bytes(bytes *p, s64 count) {
 
 // Unsafe
 inline void advance_cp(string *p, s64 count) {
-    auto *t = get_cp_at_index(p->Data, count);
+    auto *t = utf8_get_cp_at_index(p->Data, count);
     p->Count -= t - p->Data;
-    p->Data = (utf8 *) t;
+    p->Data = (char *) t;
     p->Length -= count;
 }
 
@@ -688,10 +687,10 @@ inline eat_bytes_result eat_bytes_while_any_of(bytes buffer, bytes anyOfTheseEat
 //
 // :ParseInvalidConsumesByte
 // Read the doc in _eat_code_points_until_!
-inline parse_result<utf32> eat_code_point(bytes buffer) {
+inline parse_result<code_point> eat_code_point(bytes buffer) {
     if (!buffer) return {0, PARSE_EXHAUSTED, buffer};
 
-    s64 sizeOfCp = get_size_of_cp((utf8 *) buffer.Data);
+    s64 sizeOfCp = utf8_get_size_of_cp((char *) buffer.Data);
     if (buffer.Count < sizeOfCp) return {0, PARSE_EXHAUSTED, buffer};
 
     utf8 data[4]{};
@@ -699,7 +698,7 @@ inline parse_result<utf32> eat_code_point(bytes buffer) {
         data[it] = buffer[0];
         advance_bytes(&buffer, 1);
     }
-    if (!is_valid_utf8(data)) {
+    if (!utf8_is_valid_cp(data)) {
         advance_bytes(&buffer, 1);
         return {0, PARSE_INVALID, buffer};
     }
@@ -726,7 +725,7 @@ struct parse_string_result {
 //      This was a valid utf8 string until XXXX
 //                                         ^ error happened here. This is the last byte in the returned value. Rest of string in this case is "XXX".
 //
-inline parse_string_result eat_code_points_until(bytes buffer, utf32 delim) {
+inline parse_string_result eat_code_points_until(bytes buffer, code_point delim) {
     bytes p = buffer;
     while (true) {
         auto [cp, status, rest] = eat_code_point(p);
@@ -769,7 +768,7 @@ inline parse_string_result eat_code_points_until_any_of(bytes buffer, const stri
 //
 // :ParseInvalidConsumesByte
 // Read the doc in _eat_code_points_until_!
-inline parse_string_result eat_code_points_while(bytes buffer, utf32 eats) {
+inline parse_string_result eat_code_points_while(bytes buffer, code_point eats) {
     bytes p = buffer;
     while (true) {
         auto [cp, status, rest] = eat_code_point(p);

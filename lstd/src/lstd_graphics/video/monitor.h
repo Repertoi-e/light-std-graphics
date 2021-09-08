@@ -1,7 +1,6 @@
 #pragma once
 
 #include "lstd/math.h"
-#include "lstd/memory/array.h"
 #include "lstd/memory/signal.h"
 #include "lstd/memory/string.h"
 #include "window.h"

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../common/context.h"
-#include "array.h"
 #include "string.h"
 
 LSTD_BEGIN_NAMESPACE

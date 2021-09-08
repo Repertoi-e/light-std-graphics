@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "state.h"
 
 import os;
@@ -17,10 +18,6 @@ void copy_state_from_exe() {
     // We mark allocations as LEAK because any leftover are handled by the exe and we don't to report them when this .dll terminates.
     ImGui::SetAllocatorFunctions([](size_t size, void *) { return (void *) malloc<char>({.Count = (s64) size, .Alloc = Memory->Alloc, .Options = LEAK}); },
                                  [](void *ptr, void *) { free(ptr); });
-}
-
-void reload_global_state() {
-    copy_state_from_exe();
 
     auto newContext           = Context;
     newContext.Alloc          = Memory->Alloc;
@@ -28,6 +25,10 @@ void reload_global_state() {
     newContext.Log            = &cout;
     newContext.TempAlloc      = Memory->TempAlloc;
     OVERRIDE_CONTEXT(newContext);
+}
+
+void reload_global_state() {
+    copy_state_from_exe();
 
     MANAGE_GLOBAL_VARIABLE(GraphState);
 }

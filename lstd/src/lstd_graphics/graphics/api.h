@@ -6,7 +6,6 @@
 #include "../video/window.h"
 #include "lstd/math/rect.h"
 #include "lstd/math/vec.h"
-#include "lstd/memory/array.h"
 
 #if OS == WINDOWS
 struct ID3D11Device;
@@ -83,7 +82,7 @@ struct graphics : non_copyable, non_movable {
 
     graphics_api API = graphics_api::None;
 
-    graphics() = default;
+    graphics() {}
 
     struct impl {
         void (*Init)(graphics *g) = null;

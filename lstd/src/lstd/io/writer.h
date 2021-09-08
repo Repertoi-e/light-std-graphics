@@ -22,10 +22,10 @@ inline void write(writer *w, const byte *data, s64 size) { w->write(data, size);
 inline void write(writer *w, const bytes &data) { w->write(data.Data, data.Count); }
 inline void write(writer *w, const string &str) { w->write((byte *) str.Data, str.Count); }
 
-inline void write(writer *w, utf32 cp) {
+inline void write(writer *w, code_point cp) {
     utf8 data[4];
-    encode_cp(data, cp);
-    w->write((byte *) data, get_size_of_cp(data));
+    utf8_encode_cp(data, cp);
+    w->write((byte *) data, utf8_get_size_of_cp(data));
 }
 
 inline void flush(writer *w) { w->flush(); }

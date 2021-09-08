@@ -47,7 +47,7 @@ enum class gen_digits_result {
 };
 
 struct gen_digits_state {
-    utf8 *Buffer;
+    char *Buffer;
     s32 Size;
 
     bool Fixed;
@@ -264,7 +264,7 @@ export s32 grisu_format_float(string_builder &floatBuffer, types::is_floating_po
         // On error we fallback to the dragon4 algorithm...
         exp += state.Size - cachedExp10 - 1;
 
-        utf8 *buf = floatBuffer.BaseBuffer.Data + floatBuffer.BaseBuffer.Occupied;
+        char *buf = floatBuffer.BaseBuffer.Data + floatBuffer.BaseBuffer.Occupied;
         s64 written;
 
         // Here we pass handler.Precision, and not the raw precision we

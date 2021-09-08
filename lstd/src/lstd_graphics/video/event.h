@@ -1,7 +1,6 @@
 #pragma once
 
 #include "lstd/math/vec.h"
-#include "lstd/memory/array.h"
 #include "lstd/memory/string.h"
 #include "window_def.h"
 

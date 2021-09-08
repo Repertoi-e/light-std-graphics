@@ -13,7 +13,7 @@ LSTD_BEGIN_NAMESPACE
 string get_error_string(HRESULT hr) {
     if (!hr) return "No error";
 
-    utf16 *message16 = null;
+    wchar *message16 = null;
 
     size_t size = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, null, hr, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPWSTR) &message16, 0, null);
     defer(LocalFree(message16));

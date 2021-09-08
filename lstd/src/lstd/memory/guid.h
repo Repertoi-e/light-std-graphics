@@ -1,7 +1,5 @@
 #pragma once
 
-#include "stack_array.h"
-
 LSTD_BEGIN_NAMESPACE
 
 // Used for generating unique ids

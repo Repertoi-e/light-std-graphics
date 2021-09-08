@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../memory/stack_array.h"
 #include "vec_util.h"
 
 LSTD_BEGIN_NAMESPACE

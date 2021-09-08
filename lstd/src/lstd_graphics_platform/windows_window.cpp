@@ -22,7 +22,7 @@ extern BOOL is_windows_10_build_or_greater(WORD build);
 // Right now, functions dealing with windows must be called from the main thread only.
 //
 
-file_scope utf16 *WindowClassName;
+file_scope wchar *WindowClassName;
 
 file_scope s32 AcquiredMonitorCount = 0;
 file_scope u32 MouseTrailSize       = 0;
@@ -788,7 +788,7 @@ string window::get_title() {
 
     s32 length = GetWindowTextLengthW(win->hWnd) + 1;
 
-    auto *titleUtf16 = malloc<utf16>({.Count = length, .Alloc = internal::platform_get_temporary_allocator()});
+    auto *titleUtf16 = malloc<wchar>({.Count = length, .Alloc = internal::platform_get_temporary_allocator()});
     defer(free(titleUtf16));
 
     GetWindowTextW(win->hWnd, titleUtf16, length);
@@ -801,7 +801,7 @@ void window::set_title(const string &title) {
 
     // title.Length * 2 because one unicode character might take 2 wide chars.
     // This is just an approximation, not all space will be used!
-    auto *titleUtf16 = malloc<utf16>({.Count = title.Length * 2 + 1, .Alloc = internal::platform_get_temporary_allocator()});
+    auto *titleUtf16 = malloc<wchar>({.Count = title.Length * 2 + 1, .Alloc = internal::platform_get_temporary_allocator()});
     utf8_to_utf16(title.Data, title.Length, titleUtf16);
 
     SetWindowTextW(win->hWnd, titleUtf16);
@@ -1595,7 +1595,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
         case WM_UNICHAR: {
             if (message == WM_UNICHAR && wParam == UNICODE_NOCHAR) return true;
 
-            auto cp = (utf32) wParam;
+            auto cp = (code_point) wParam;
             if (cp < 32 || (cp > 126 && cp < 160)) return 0;
 
             if ((cp >= 0xD800) && (cp <= 0xDBFF)) {
@@ -2013,7 +2013,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             For(range(count)) {
                 u32 length = DragQueryFileW(drop, (u32) it, null, 0);
 
-                utf16 *buffer = malloc<utf16>({.Count = length + 1, .Alloc = internal::platform_get_temporary_allocator()});
+                wchar *buffer = malloc<wchar>({.Count = length + 1, .Alloc = internal::platform_get_temporary_allocator()});
                 DragQueryFileW(drop, (u32) it, buffer, length + 1);
 
                 array_append(paths, internal::platform_utf16_to_utf8(buffer, internal::platform_get_persistent_allocator()));
@@ -2075,7 +2075,7 @@ cursor::cursor(const pixel_buffer &image, vec2<s32> hot) {
 }
 
 cursor::cursor(os_cursor osCursor) {
-    const utf16 *id = null;
+    const wchar *id = null;
     if (osCursor == OS_APPSTARTING) id = IDC_APPSTARTING;
     if (osCursor == OS_ARROW) id = IDC_ARROW;
     if (osCursor == OS_IBEAM) id = IDC_IBEAM;

@@ -19,7 +19,7 @@ import os;
 LSTD_BEGIN_NAMESPACE
 
 // @TODO: These are so useful that we should include them in the API
-string utf16_to_utf8(const utf16 *str, allocator alloc = {});
+string utf16_to_utf8(const wchar *str, allocator alloc = {});
 
 void d3d_init(graphics *g) {
     IDXGIFactory *factory;

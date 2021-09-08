@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "state.h"
 
 f64 evaluate_function_at(f64 x, function_entry *f, ast *node) {

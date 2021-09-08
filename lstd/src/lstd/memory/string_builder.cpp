@@ -25,15 +25,15 @@ void reset(string_builder &builder) {
     }
 }
 
-void string_append(string_builder &builder, utf32 cp) {
+void string_append(string_builder &builder, code_point cp) {
     utf8 encoded[4];
-    encode_cp(encoded, cp);
-    string_append(builder, encoded, get_size_of_cp(cp));
+    utf8_encode_cp(encoded, cp);
+    string_append(builder, encoded, utf8_get_size_of_cp(cp));
 }
 
 void string_append(string_builder &builder, const string &str) { string_append(builder, str.Data, str.Count); }
 
-void string_append(string_builder &builder, const utf8 *data, s64 size) {
+void string_append(string_builder &builder, const char *data, s64 size) {
     auto *currentBuffer = string_builder_get_current_buffer(builder);
 
     s64 availableSpace = builder.BUFFER_SIZE - currentBuffer->Occupied;

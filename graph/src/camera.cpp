@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "state.h"
 
 void camera_reinit(camera *cam) {

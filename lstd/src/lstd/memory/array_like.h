@@ -1,46 +1,54 @@
 #pragma once
 
-#include "../memory/string_utils.h"
-#include "../types.h"
+#include "../common/common.h"
+#include "../common/type_info.h"
 
 //
 // :CodeReusability: This file implements:
-//  * find, find_not, find_any_of, find_not_any_of, has, compare, compare_lexicographically and operators ==, !=, <, <=, >, >=
+//  * get, get_subarray, find, find_not, find_any_of, find_not_any_of, has, compare, compare_lexicographically
+// and operators ==, !=, <, <=, >, >=
+//
 // for structures that have members Data and Count - we call these array-likes.
 //
-// You can flag your custom types with a member "static constexpr bool IS_ARRAY = false;"
+// e.g. stack_array, array, string, delegate, guid, all have the members Data and Count, so functions
+// are automatically generated to all three types using the definition below.
+// They also resolves for mismatching types, e.g. stack_array != array, etc. for which otherwise
+// we need a combinatorial amount of code to support.
 //
-// e.g. stack_array, array, delegate, guid, all have the members Data and Count, so != is automatically generated to all three types using the definition below.
-// It also resolves for different types, e.g. stack_array != array, etc. for which otherwise we need a combinatorial amount of code.
+// Note: For arrays of different data types comparing doesn't reinterpret the values
+// but directly returns false. e.g. array<char> is ALWAYS != array<s8>.
 //
 // Your custom types (which aren't explicitly flagged) will also automatically get this treatment.
+// You can explicitly disable this with a member "static constexpr bool IS_ARRAY = false;"
+//
+// Note: We currently expect the members to be named exactly Data and Count which may conflict with other naming styles.
+// How should we handle this?
 //
 
 LSTD_BEGIN_NAMESPACE
 
 template <typename T>
-concept array_has_flag = requires(T t)
-{
-    { t.IS_ARRAY };
+concept array_has_flag = requires(T t) {
+    {t.IS_ARRAY};
 };
 
 template <typename T>
-concept array_flag_false = requires(T t)
-{
-    { t.IS_ARRAY == false };
+concept array_flag_false = requires(T t) {
+    {t.IS_ARRAY == false};
 };
 
 template <typename T>
-concept array_has_members = requires(T t)
-{
-    { t.Data };
-    { t.Count };
+concept array_has_members = requires(T t) {
+    {t.Data};
+    {t.Count};
 };
+
+template <typename T>
+concept is_array_like_helper = array_has_members<T> &&(array_has_flag<T> && !array_flag_false<T> || !array_has_flag<T>);
 
 // True if the type has _Data_ and _Count_ members (and the optional explicit flag is not false).
-// We use this for generic methods below that work on either array or stack_array or your own custom array types! We want code reusability!
 template <typename T>
-concept is_array_like = array_has_members<T> && (array_has_flag<T> && !array_flag_false<T> || !array_has_flag<T>);
+concept is_array_like = is_array_like_helper<types::remove_cvref_t<T>>;
 
 // This returns the type of the _Data_ member of an array-like object
 template <is_array_like T>
@@ -50,7 +58,8 @@ using array_data_t = types::remove_pointer_t<decltype(T::Data)>;
 // This function translates an index that may be negative to an actual index.
 // For example 5 maps to 5
 // but -5 maps to length - 5
-// This function is used to support Python-like negative indexing.
+//
+// It is used to support Python-like negative indexing.
 //
 // This function checks if the index is in range.
 //
@@ -75,11 +84,26 @@ constexpr always_inline s64 translate_index(s64 index, s64 length, bool tolerate
 //
 
 //
-// @TODO @Speed Optimize these functions for scalars (using bit hacks)
+// @Speed Optimize these functions for scalars (using bit hacks)
 //
 
 template <typename T>
 struct delegate;
+
+template <is_array_like T>
+constexpr auto get(T *arr, s64 index) { return &arr.Data[translate_index(index, arr->Count)]; }
+
+// This may remove const from _arr_
+template <is_array_like T>
+constexpr auto get_subarray(T *arr, s64 begin, s64 end) {
+    s64 targetBegin = translate_index(begin, arr->Count);
+    s64 targetEnd   = translate_index(end, arr->Count, true);
+
+    types::remove_cvref<T> result;
+    result.Data  = arr.Data + targetBegin;
+    result.Count = targetEnd - targetBegin + 1;
+    return result;
+}
 
 // Find the first occurence of an element which matches the predicate and is after a specified index.
 // Predicate must take a single argument (the current element) and return if it matches.
@@ -157,8 +181,7 @@ template <typename T, typename U>
 concept arrays_comparable = requires(T t, U u) { t.Data[0] == u.Data[0]; };
 
 template <typename T, typename U>
-concept arrays_lexicographically_comparable = requires(T t, U u)
-{
+concept arrays_lexicographically_comparable = requires(T t, U u) {
     t.Data[0] == u.Data[0];
     t.Data[0] < u.Data[0];
 };
@@ -166,7 +189,7 @@ concept arrays_lexicographically_comparable = requires(T t, U u)
 // Compares this array to _arr_ and returns the index of the first element that is different.
 // If the arrays are equal, the returned value is -1.
 template <is_array_like T, is_array_like U>
-    requires arrays_comparable<T, U>
+requires arrays_comparable<T, U>
 constexpr s64 compare(const T &arr1, const U &arr2) {
     if ((void *) arr1.Data == (void *) arr2.Data && arr1.Count == arr2.Count) return -1;
 
@@ -189,8 +212,8 @@ constexpr s64 compare(const T &arr1, const U &arr2) {
 // Compares this array to to _arr_ lexicographically.
 // The result is -1 if this array sorts before the other, 0 if they are equal, and +1 otherwise.
 template <is_array_like T, is_array_like U>
-    requires arrays_lexicographically_comparable<T, U>
-s32 compare_lexicographically(const T &arr1, const U &arr2) {
+requires arrays_lexicographically_comparable<T, U>
+constexpr s32 compare_lexicographically(const T &arr1, const U &arr2) {
     if ((void *) arr1.Data == (void *) arr2.Data && arr1.Count == arr2.Count) return 0;
 
     if (!arr1.Count && !arr2.Count) return 0;
@@ -219,12 +242,13 @@ s32 compare_lexicographically(const T &arr1, const U &arr2) {
 // For now let's implement them separately..
 
 template <is_array_like T, is_array_like U>
-    requires arrays_comparable<T, U>
-constexpr bool operator==(const T &arr1, const U &arr2) {
-    return compare(arr1, arr2) == -1;
+requires arrays_comparable<T, U>
+constexpr auto operator<=>(const T &arr1, const U &arr2) {
+    return compare_lexicographically(arr1, arr2);
 }
 
-template <is_array_like T, is_array_like U>
+/*
+    template <is_array_like T, is_array_like U>
     requires arrays_comparable<T, U>
 constexpr bool operator!=(const T &arr1, const U &arr2) {
     return compare(arr1, arr2) != -1;
@@ -253,5 +277,6 @@ template <is_array_like T, is_array_like U>
 constexpr bool operator>=(const T &arr1, const U &arr2) {
     return !(compare_lexicographically(arr1, arr2) < 0);
 }
+*/
 
 LSTD_END_NAMESPACE

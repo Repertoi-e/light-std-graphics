@@ -221,8 +221,6 @@ s32 main() {
     PersistentAlloc         = {tlsf_allocator, data};
     allocator_add_pool(PersistentAlloc, pool, MemoryInBytes);
 
-    allocator_add_pool(Context.TempAlloc, os_allocate_block(1_MiB), 1_MiB);
-
     Memory   = m;
     Graphics = g;
 
@@ -231,8 +229,10 @@ s32 main() {
     newContext.Alloc = PersistentAlloc;
     OVERRIDE_CONTEXT(newContext);
 
-    m->Alloc     = PersistentAlloc;
-    m->TempAlloc = Context.TempAlloc;
+    m->PersistentAlloc = PersistentAlloc;
+
+    allocator_add_pool(Context.TempAlloc, os_allocate_block(1_MiB), 1_MiB);
+    m->TemporaryAlloc = Context.TempAlloc;
 
     parse_arguments();
     setup_paths();

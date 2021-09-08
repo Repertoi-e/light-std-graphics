@@ -202,7 +202,7 @@ export {
         path_walker(const string &path) : Path(path) {}
 
        private:
-        utf16 *Path16 = null;
+        wchar *Path16 = null;
 
         char PlatformFileInfo[sizeof(WIN32_FIND_DATAW)]{};
 
@@ -253,7 +253,7 @@ string get_path_from_here_to(const string &here, const string &there) {
     }
 }
 
-utf16 *utf8_to_utf16(const string &str) { return internal::platform_utf8_to_utf16(str); }
+wchar *utf8_to_utf16(const string &str) { return internal::platform_utf8_to_utf16(str); }
 
 constexpr path_split_drive_result path_split_drive(const string &path) {
     if (path.Length >= 2) {
@@ -343,7 +343,7 @@ constexpr bool path_is_absolute(const string &path) {
 }
 
 [[nodiscard("Leak")]] string path_join(const string &one, const string &other) {
-    auto arr = to_stack_array(one, other);
+    auto arr = make_stack_array(one, other);
     return path_join(arr);
 }
 
@@ -609,7 +609,7 @@ void path_read_next_entry(path_walker &walker) {
 
         auto *fileName = ((WIN32_FIND_DATAW *) walker.PlatformFileInfo)->cFileName;
         string_reserve(walker.CurrentFileName, c_string_length(fileName) * 4);                         // @Cleanup
-        utf16_to_utf8(fileName, (utf8 *) walker.CurrentFileName.Data, &walker.CurrentFileName.Count);  // @Constcast
+        utf16_to_utf8(fileName, (char *) walker.CurrentFileName.Data, &walker.CurrentFileName.Count);  // @Constcast
         walker.CurrentFileName.Length = utf8_length(walker.CurrentFileName.Data, walker.CurrentFileName.Count);
     } while (walker.CurrentFileName == ".." || walker.CurrentFileName == ".");
     assert(walker.CurrentFileName != ".." && walker.CurrentFileName != ".");

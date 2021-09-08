@@ -109,15 +109,15 @@ using LRESULT = s64;
 using LPARAM = LONG_PTR;
 using WPARAM = UINT_PTR;
 
-using WCHAR   = utf16;
-using LPCCH   = const utf8 *;
-using LPSTR   = const utf8 *;
-using PCSTR   = const utf8 *;
-using LPCSTR  = const utf8 *;
-using PWSTR   = utf16 *;
-using LPWSTR  = utf16 *;
-using LPCWSTR = const utf16 *;
-using LPCWCH  = const utf16 *;
+using WCHAR   = wchar;
+using LPCCH   = const char *;
+using LPSTR   = const char *;
+using PCSTR   = const char *;
+using LPCSTR  = const char *;
+using PWSTR   = wchar *;
+using LPWSTR  = wchar *;
+using LPCWSTR = const wchar *;
+using LPCWCH  = const wchar *;
 
 using PVOID   = void *;
 using LPVOID  = void *;
@@ -602,7 +602,7 @@ using PCONSOLE_SCREEN_BUFFER_INFO = CONSOLE_SCREEN_BUFFER_INFO *;
 #define CS_BYTEALIGNWINDOW 0x2000
 #define CS_GLOBALCLASS 0x4000
 
-using TCHAR   = utf16;
+using TCHAR   = wchar;
 using LPTSTR  = TCHAR *;
 using LPCTSTR = const TCHAR *;
 
