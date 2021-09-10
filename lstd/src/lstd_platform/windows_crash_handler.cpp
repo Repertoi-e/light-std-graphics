@@ -1,4 +1,4 @@
-#include "lstd/common/common.h"
+#include "lstd/common.h"
 
 #if OS == WINDOWS
 #include "lstd/common/os_function_call.h"

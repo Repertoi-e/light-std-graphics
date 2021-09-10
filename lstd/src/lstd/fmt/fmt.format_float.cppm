@@ -1,6 +1,6 @@
 module;
 
-#include "../memory/string_builder.h"
+#include "../common.h"
 
 export module fmt.format_float;
 
@@ -22,7 +22,7 @@ void string_append_u64(string_builder &builder, u64 value) {
 
     while (value) {
         auto d = value % 10;
-        *p--   = (utf8)('0' + d);
+        *p--   = (utf8) ('0' + d);
         value /= 10;
     }
 

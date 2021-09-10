@@ -34,7 +34,7 @@ function common_settings()
     -- that are normally defined in the STL and on which certain C++ features rely on.
     -- (e.g. the compare header - required by the spaceship operator, placement new and initializer_lists)
     -- defines { "LSTD_DONT_DEFINE_STD" }
-    
+	
     -- Uncomment this to build the library without a namespace
     -- defines { "LSTD_NO_NAMESPACE" }
     
@@ -71,19 +71,33 @@ function common_settings()
     -- Setup configurations and optimization level
     filter "configurations:Debug"
         defines "DEBUG"
+		
+		-- Trips an assert if you try to access an element out of bounds.
+		-- Works for arrays and strings in the library. I don't think we can check raw C arrays...
+		defines "LSTD_ARRAY_BOUNDS_CHECK"
+		
         symbols "On"
         buildoptions { "/FS" }
     filter "configurations:DebugOptimized"
         defines { "DEBUG", "DEBUG_OPTIMIZED" }
-        optimize "On"
+        
+		defines "LSTD_ARRAY_BOUNDS_CHECK"
+		
+		optimize "On"
+		
+		 -- Otherwise MSVC generates internal undocumented intrinsics which we can't provide .. shame
+		floatingpoint "Strict"
+
         symbols "On"
-        buildoptions { "/FS" }
-        floatingpoint "Strict" -- Otherwise MSVC generates internal undocumented intrinsics which we can't provide .. shame
+        
+		buildoptions { "/FS" }
     filter "configurations:Release"
         defines { "RELEASE", "NDEBUG" } 
+
         optimize "Full"
+		floatingpoint "Strict"
+
 		symbols "Off"
-        floatingpoint "Strict"
     filter {}
 end
 

@@ -41,7 +41,7 @@ char *string_to_c_string_temp(const string &s) { return string_to_c_string(s, Co
 
 // Sets the _index_'th code point in the string.
 void string_set(string &s, s64 index, code_point codePoint) {
-    char *targetOctet = (char *) utf8_get_cp_at_index(s.Data, translate_index(index, s.Length));
+    char *targetOctet = (char *) utf8_get_cp_at_index_unsafe(s.Data, translate_index(index, s.Length));
 
     s64 cpSize       = utf8_get_size_of_cp(codePoint);
     s64 cpTargetSize = utf8_get_size_of_cp(targetOctet);
@@ -71,21 +71,21 @@ void string_insert_at(string &s, s64 index, code_point codePoint) {
     utf8 data[4];
     utf8_encode_cp(data, codePoint);
 
-    s64 offset = utf8_get_cp_at_index(s.Data, translate_index(index, s.Length, true)) - s.Data;
+    s64 offset = utf8_get_cp_at_index_unsafe(s.Data, translate_index(index, s.Length, true)) - s.Data;
     array_insert_at(s, offset, data, utf8_get_size_of_cp(data));
 
     ++s.Length;
 }
 
 void string_insert_at(string &s, s64 index, const char *str, s64 size) {
-    s64 offset = utf8_get_cp_at_index(s.Data, translate_index(index, s.Length, true)) - s.Data;
+    s64 offset = utf8_get_cp_at_index_unsafe(s.Data, translate_index(index, s.Length, true)) - s.Data;
 
     array_insert_at(s, offset, str, size);
     s.Length += utf8_length(str, size);
 }
 
 void string_remove_at(string &s, s64 index) {
-    auto *target = utf8_get_cp_at_index(s.Data, translate_index(index, s.Length, true));
+    auto *target = utf8_get_cp_at_index_unsafe(s.Data, translate_index(index, s.Length, true));
     s64 offset   = target - s.Data;
 
     array_remove_range(s, offset, offset + utf8_get_size_of_cp(target));
@@ -97,7 +97,7 @@ void string_remove_range(string &s, s64 begin, s64 end) {
     s64 tbegin = translate_index(begin, s.Length);
     s64 tend   = translate_index(end, s.Length, true);
 
-    auto *t1 = utf8_get_cp_at_index(s.Data, tbegin), *t2 = utf8_get_cp_at_index(s.Data, tend);
+    auto *t1 = utf8_get_cp_at_index_unsafe(s.Data, tbegin), *t2 = utf8_get_cp_at_index_unsafe(s.Data, tend);
 
     s64 bi = t1 - s.Data, ei = t2 - s.Data;
     array_remove_range(s, bi, ei);

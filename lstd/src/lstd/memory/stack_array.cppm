@@ -1,17 +1,25 @@
 module;
 
 #include "../types.h"
-#include "array_like.h"
 #include "qsort.h"
 
 export module lstd.stack_array;
 
-import lstd.string.utils;
+export import lstd.string.utils;
 
 LSTD_BEGIN_NAMESPACE
 
 template <typename T>
 struct array;
+
+template <typename D, typename...>
+struct return_type_helper {
+    using type = D;
+};
+
+template <typename... Types>
+struct return_type_helper<void, Types...> : types::common_type<Types...> {
+};
 
 //
 // A wrapper around T arr[..] which makes it easier to pass around and work with.
@@ -52,50 +60,39 @@ export {
         constexpr operator bool() { return Count; }
 
         // Convert to an array view
-        explicit operator array<T>() const;
+        operator array<T>() const;
 
         constexpr auto operator[](s64 index) { return get(this, index); }
         constexpr auto operator[](s64 index) const { return get(this, index); }
     };
 
-    // To make C++ range based for loops work.
-    auto begin(stack_array & arr) { return arr.Data; }
-    auto end(stack_array & arr) { return arr.Data + arr.Count; }
+    template <typename T>
+    concept any_stack_array = types::is_same_template_decayed<T, stack_array<s32, 1>>;
 
-    auto begin(const stack_array &arr) { return arr.Data; }
-    auto end(const stack_array &arr) { return arr.Data + arr.Count; }
+    // To make range based for loops work.
+    auto begin(any_stack_array auto &arr) { return arr.Data; }
+    auto end(any_stack_array auto &arr) { return arr.Data + arr.Count; }
 
     template <typename D = void, class... Types>
-    constexpr stack_array<typename internal::return_type_helper<D, Types...>::type, sizeof...(Types)> make_stack_array(Types && ...t);
+    constexpr stack_array<typename return_type_helper<D, Types...>::type, sizeof...(Types)> make_stack_array(Types && ...t);
 
     template <typename T, s64 N>
     constexpr stack_array<types::remove_cv_t<T>, N> make_stack_array(T(&a)[N]);
 }
-
-module : private;
-
-template <typename D, typename...>
-struct return_type_helper {
-    using type = D;
-};
-
-template <typename... Types>
-struct return_type_helper<void, Types...> : types::common_type<Types...> {
-};
 
 template <class T, s64 N, s64... I>
 constexpr stack_array<types::remove_cv_t<T>, N> to_array_impl(T (&a)[N], integer_sequence<I...>) {
     return {{a[I]...}};
 }
 
-template <typename D = void, class... Types>
-constexpr stack_array<typename internal::return_type_helper<D, Types...>::type, sizeof...(Types)> make_stack_array(Types &&...t) {
+template <typename D, class... Types>
+constexpr stack_array<typename return_type_helper<D, Types...>::type, sizeof...(Types)> make_stack_array(Types &&...t) {
     return {(Types &&) t...};
 }
 
 template <typename T, s64 N>
 constexpr stack_array<types::remove_cv_t<T>, N> make_stack_array(T (&a)[N]) {
-    return internal::to_array_impl(a, make_integer_sequence<N>{});
+    return to_array_impl(a, make_integer_sequence<N>{});
 }
 
 LSTD_END_NAMESPACE

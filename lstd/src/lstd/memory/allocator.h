@@ -4,7 +4,7 @@
 /// Defines the structure of allocators in this library.
 ///
 
-#include "../common/common.h"
+#include "../common.h"
 #include "../thread.h"
 #include "vendor/tlsf/tlsf.h"
 
@@ -143,9 +143,8 @@ constexpr u8 CLEAN_LAND_FILL = 0xCD;
 // we do that by padding this structure. Info about that is saved in the header itself.
 // Right now this uses 32 bytes when DEBUG_MEMORY is not defined, 96 bytes when storing debug info.
 //
-// @TODO: This is way too bug of an overhead. We CAN make this smaller!
-//        We should be careful in aranging this header. We can split allocations into medium/large,
-//        etc. and use a smaller header for medium allocations to reduce overhead (like https://nothings.org/stb/stb_malloc.h).
+// @TODO: This may be too big of an overhead. We can make this smaller!
+//        We can split allocations into small/medium/large, and use different headers (like https://nothings.org/stb/stb_malloc.h).
 //
 struct allocation_header {
 #if defined DEBUG_MEMORY
@@ -218,7 +217,7 @@ struct allocation_header {
     //   ...[..Alignment padding..][............Header..................]............
     //      ^ The pointer returned by the allocator implementation       ^ The resulting pointer (aligned)
     //
-    u16 Alignment;         // We allow a maximum of 65535 bit (8191 byte) alignment
+    u16 Alignment;         // We allow a maximum of 65535 byte alignment
     u16 AlignmentPadding;  // Offset from the block that needs to be there in order for the result to be aligned
 
 #if defined DEBUG_MEMORY
@@ -750,6 +749,11 @@ T *realloc(T *block, reallocate_options options, source_location loc = source_lo
 //
 // new[] and delete[] are implemented the same way (save an integer before the returned block).
 // That's why it's dangerous to mix new and delete[] and new[] and delete.
+//
+//
+// In C++20 we can do constexpr allocations. They work by calling new/delete,
+// it seems like the compiler doesn't care if they are overloaded or even defined,
+// it just looks for those magic symbols.
 template <non_void T>
 requires(!types::is_const<T>) void free(T *block, u64 options = 0) {
     if (!block) return;
@@ -765,7 +769,14 @@ requires(!types::is_const<T>) void free(T *block, u64 options = 0) {
         }
     }
 
+    // @TODO
+    //if constexpr (is_constant_evaluated()) {
+    //    // Constexpr allocations in C++20 seem to just look for the magic symbol "delete".
+    //    // Doesn't care if it's defined or not.
+    //    delete block;
+    //} else {
     general_free(block, options);
+    // }
 }
 
 LSTD_END_NAMESPACE
@@ -875,4 +886,3 @@ void operator delete[](void *ptr) noexcept;
 
 void operator delete(void *ptr, align_val_t alignment) noexcept;
 void operator delete[](void *ptr, align_val_t alignment) noexcept;
-

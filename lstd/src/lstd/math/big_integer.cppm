@@ -1,6 +1,6 @@
 module;
 
-#include "../memory/string_builder.h"
+#include "../common.h"
 
 export module lstd.big_integer;
 
@@ -395,9 +395,9 @@ export {
             For(range(sizea)) {
                 double_digit f = lhs.Bigits[it];
 
-                digit *pz    = const_cast<digit *>(result.Bigits.Data) + (it << 1);
-                digit *pa    = const_cast<digit *>(lhs.Bigits.Data) + it + 1;
-                digit *paend = const_cast<digit *>(lhs.Bigits.Data) + sizea;
+                auto *pz    = result.Bigits.Data + (it << 1);
+                auto *pa    = lhs.Bigits.Data + it + 1;
+                auto *paend = lhs.Bigits.Data + sizea;
 
                 double_digit carry = *pz + f * f;
 
@@ -432,9 +432,9 @@ export {
             For(range(sizea)) {
                 double_digit f = lhs.Bigits[it];
 
-                digit *pz    = const_cast<digit *>(result.Bigits.Data) + it;
-                digit *pb    = const_cast<digit *>(rhs.Bigits.Data);
-                digit *pbend = const_cast<digit *>(rhs.Bigits.Data) + sizeb;
+                auto *pz    = result.Bigits.Data + it;
+                auto *pb    = rhs.Bigits.Data;
+                auto *pbend = rhs.Bigits.Data + sizeb;
 
                 double_digit carry = 0;
 

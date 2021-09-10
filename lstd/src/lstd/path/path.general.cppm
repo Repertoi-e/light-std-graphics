@@ -1,7 +1,6 @@
 module;
 
 #include "../common/context.h"
-#include "../memory/string.h"
 
 export module path.general;
 

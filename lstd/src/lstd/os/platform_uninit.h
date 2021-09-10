@@ -1,6 +1,6 @@
 #pragma once
 
-#include "lstd/common/common.h"
+#include "lstd/common.h"
 
 // @Cleanup: Decouple lstd lstd-graphics
 

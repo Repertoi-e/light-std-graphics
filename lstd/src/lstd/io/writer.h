@@ -1,7 +1,6 @@
 #pragma once
 
-#include "../common/common.h"
-#include "../memory/string.h"
+#include "../common.h"
 
 LSTD_BEGIN_NAMESPACE
 

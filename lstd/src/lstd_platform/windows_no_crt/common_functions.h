@@ -1,6 +1,6 @@
 #pragma once
 
-#include "lstd/common/common.h"
+#include "lstd/common.h"
 
 extern "C" {
 const void *memchr(const void *s, int c, size_t n);

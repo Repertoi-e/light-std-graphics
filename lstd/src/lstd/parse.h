@@ -1,7 +1,6 @@
 #pragma once
 
 #include "memory/guid.h"
-#include "memory/string.h"
 
 LSTD_BEGIN_NAMESPACE
 
@@ -169,7 +168,7 @@ inline void advance_bytes(bytes *p, s64 count) {
 
 // Unsafe
 inline void advance_cp(string *p, s64 count) {
-    auto *t = utf8_get_cp_at_index(p->Data, count);
+    auto *t = utf8_get_cp_at_index_unsafe(p->Data, count);
     p->Count -= t - p->Data;
     p->Data = (char *) t;
     p->Length -= count;
@@ -702,7 +701,7 @@ inline parse_result<code_point> eat_code_point(bytes buffer) {
         advance_bytes(&buffer, 1);
         return {0, PARSE_INVALID, buffer};
     }
-    return {decode_cp(data), PARSE_SUCCESS, buffer};
+    return {utf8_decode_cp(data), PARSE_SUCCESS, buffer};
 }
 
 struct parse_string_result {

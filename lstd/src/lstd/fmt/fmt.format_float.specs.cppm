@@ -1,8 +1,10 @@
 module;
 
-#include "../memory/string_builder.h"
+#include "../common.h"
 
 export module fmt.format_float.specs;
+
+export import lstd.string_builder;
 
 export import fmt.specs;
 export import fmt.parse_context;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../memory/stack_dynamic_buffer.h"
-#include "../memory/string_builder.h"
 #include "writer.h"
 
 LSTD_BEGIN_NAMESPACE

@@ -256,7 +256,7 @@ void write_helper(fmt_context *f, const byte *data, s64 size) {
     if (f->Specs->Precision != -1) {
         assert(f->Specs->Precision >= 0);
         length = f->Specs->Precision;
-        size   = utf8_get_cp_at_index((const char *) data, length) - (const char *) data;
+        size   = utf8_get_cp_at_index_unsafe((const char *) data, length) - (const char *) data;
     }
     write_padded_helper(
         f, *f->Specs, [&]() { write_no_specs(f, (const char *) data, size); }, length);

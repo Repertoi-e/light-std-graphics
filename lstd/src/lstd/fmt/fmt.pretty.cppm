@@ -1,7 +1,5 @@
 module;
 
-#include "../memory/string.h"
-
 export module fmt.pretty;
 
 import fmt.context;

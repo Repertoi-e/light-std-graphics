@@ -1,16 +1,8 @@
 #pragma once
 
-#include "../common/namespace.h"
+#include "../namespace.h"
 #include "../platform.h"
-
-LSTD_BEGIN_NAMESPACE
-// Replacement for the std::is_constant_evaluated
-#if COMPILER == MSVC
-[[nodiscard]] constexpr bool is_constant_evaluated() noexcept { return __builtin_is_constant_evaluated(); }
-#else
-#error Implement.
-#endif
-LSTD_END_NAMESPACE
+#include "cpp/is_constant_evaluated.h"
 
 //
 // The following integral types are defined: s8, s16, s32, s64 (and corresponding unsigned types: u8, u16, u32, u64)

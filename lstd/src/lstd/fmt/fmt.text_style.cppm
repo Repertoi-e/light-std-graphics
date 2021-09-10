@@ -1,8 +1,10 @@
 module;
 
-#include "../memory/string.h"
+#include "../common.h"
 
 export module fmt.text_style;
+
+export import lstd.string;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -70,9 +72,9 @@ export {
         return terminal_color::NONE;
     }
 
-    enum emphasis : u8 { BOLD = BIT(0),
-                         ITALIC = BIT(1),
-                         UNDERLINE = BIT(2),
+    enum emphasis : u8 { BOLD          = BIT(0),
+                         ITALIC        = BIT(1),
+                         UNDERLINE     = BIT(2),
                          STRIKETHROUGH = BIT(3) };
 
     struct fmt_text_style {
@@ -87,10 +89,9 @@ export {
         } Color{};
 
         bool Background = false;
-        u8 Emphasis = 0;
+        u8 Emphasis     = 0;
     };
 
-    namespace fmt_internal {
     // Used when making ANSI escape codes for text styles
     inline char *u8_to_esc(char *p, utf8 delimiter, u8 c) {
         *p++ = '0' + c / 100;
@@ -122,9 +123,9 @@ export {
                 copy_memory(p, style.Background ? "\x1b[48;2;" : "\x1b[38;2;", 7);
                 p += 7;
 
-                p = u8_to_esc(p, ';', (u8)((style.Color.RGB >> 16) & 0xFF));
-                p = u8_to_esc(p, ';', (u8)((style.Color.RGB >> 8) & 0xFF));
-                p = u8_to_esc(p, 'm', (u8)((style.Color.RGB) & 0xFF));
+                p = u8_to_esc(p, ';', (u8) ((style.Color.RGB >> 16) & 0xFF));
+                p = u8_to_esc(p, ';', (u8) ((style.Color.RGB >> 8) & 0xFF));
+                p = u8_to_esc(p, 'm', (u8) ((style.Color.RGB) & 0xFF));
             }
         } else if ((u8) style.Emphasis == 0) {
             // Empty text style means "reset"
@@ -152,7 +153,6 @@ export {
         }
         return p;
     }
-    }  // namespace fmt_internal
 }
 
 LSTD_END_NAMESPACE

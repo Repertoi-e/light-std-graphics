@@ -1,6 +1,6 @@
 module;
 
-#include "../memory/string.h"
+#include "../common.h"
 
 export module fmt.specs;
 

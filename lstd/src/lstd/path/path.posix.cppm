@@ -1,7 +1,6 @@
 module;
 
-#include "../common/common.h"
-#include "../memory/string.h"
+#include "../common.h"
 
 export module path.posix;
 

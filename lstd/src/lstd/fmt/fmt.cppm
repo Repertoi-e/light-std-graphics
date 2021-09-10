@@ -4,7 +4,6 @@ module;
 #include "../io.h"
 #include "../math.h"
 #include "../memory/guid.h"
-#include "../memory/string_builder.h"
 
 export module fmt;
 
@@ -222,8 +221,8 @@ template <typename FC>
 fmt_arg<FC> get_arg(fmt_args ars, s64 index) {
     if (index >= ars.Count) return {};
 
-    if (!(ars.Types & fmt_internal::IS_UNPACKED_BIT)) {
-        if (index > fmt_internal::MAX_PACKED_ARGS) return {};
+    if (!(ars.Types & IS_UNPACKED_BIT)) {
+        if (index > MAX_PACKED_ARGS) return {};
 
         auto type = get_type(ars, index);
         if (type == fmt_type::NONE) return {};
@@ -324,7 +323,7 @@ void fmt_parse_and_format(fmt_context *f) {
                 return;
             }
 
-            auto *pbracket = utf8_get_cp_at_index(searchString.Data, bracket);
+            auto *pbracket = utf8_get_cp_at_index_unsafe(searchString.Data, bracket);
             if (*(pbracket + 1) != '}') {
                 f->on_error("Unmatched \"}\" in format string - if you want to print it use \"}}\" to escape", pbracket - f->Parse.FormatString.Data);
                 return;
@@ -347,7 +346,7 @@ void fmt_parse_and_format(fmt_context *f) {
             return;
         }
 
-        auto *pbracket = utf8_get_cp_at_index(p->It.Data, bracket);
+        auto *pbracket = utf8_get_cp_at_index_unsafe(p->It.Data, bracket);
         write_until(pbracket);
 
         s64 advance = pbracket + 1 - p->It.Data;
@@ -378,13 +377,13 @@ void fmt_parse_and_format(fmt_context *f) {
 
             if (!Context.FmtDisableAnsiCodes) {
                 utf8 ansiBuffer[7 + 3 * 4 + 1];
-                auto *ansiEnd = fmt_internal::color_to_ansi(ansiBuffer, style);
+                auto *ansiEnd = color_to_ansi(ansiBuffer, style);
                 write_no_specs(f, ansiBuffer, ansiEnd - ansiBuffer);
 
                 u8 emphasis = (u8) style.Emphasis;
                 if (emphasis) {
                     assert(!style.Background);
-                    ansiEnd = fmt_internal::emphasis_to_ansi(ansiBuffer, emphasis);
+                    ansiEnd = emphasis_to_ansi(ansiBuffer, emphasis);
                     write_no_specs(f, ansiBuffer, ansiEnd - ansiBuffer);
                 }
             }

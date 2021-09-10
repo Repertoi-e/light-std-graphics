@@ -1,7 +1,7 @@
 #pragma once
 
 #include "numeric_info.h"
-#include "scalar_types.h"
+#include "type_info.h"
 
 struct s128;
 
@@ -510,7 +510,7 @@ constexpr s128 &s128::operator^=(s128 other) { return (*this = *this ^ other), *
 constexpr s128(&s128::operator<<=(s32 amount)) { return (*this = *this << amount), *this; }
 constexpr s128 &s128::operator>>=(s32 amount) { return (*this = *this >> amount), *this; }
 
-// Defined in common.h, but common.h includes this file (through types.h)
+// Defined in bits.h, but common.h includes this file.
 LSTD_BEGIN_NAMESPACE
 template <typename T>
 constexpr always_inline s32 msb(T x);
@@ -595,3 +595,5 @@ struct numeric_info<s128> : public numeric_info_int_base {
 };
 
 LSTD_END_NAMESPACE
+
+DECLARE_INTEGRAL_PAIR(s128, u128)

@@ -1,7 +1,6 @@
 #pragma once
 
-#include "../common/common.h"
-#include "array_like.h"
+#include "../common.h"
 
 //
 // This file is a modified implementation of a delegate by Vadim Karkhin.

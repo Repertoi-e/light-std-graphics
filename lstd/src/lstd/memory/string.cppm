@@ -1,54 +1,130 @@
-#pragma once
+module;
 
 #include "../memory/allocator.h"
 
+export module lstd.string;
+
+export import lstd.array;
+
 LSTD_BEGIN_NAMESPACE
 
-// This string doesn't guarantee a null termination at the end.
+//
+// String doesn't guarantee a null termination at the end.
 // It's essentially a data pointer and a count.
 //
 // This means that you can load a binary file into a string.
 //
-// There are routines that assume the data in _string_ is valid UTF-8
-// for working with text, but we can't guarantee that. We don't do any checks.
-// That is left up to the programmer to verify.
+// The routines defined in array.cppm work with _string_ because
+// _string_ is a typedef for array<u8>. However they treat indices
+// as pointing to bytes and NOT to code points.
 //
-// Those routines begin with utf8_
+// This file provides functions prefixed with string_ which
+// treat indices properly (pointing to code points).
+// Whenever working with strings we assume valid UTF-8.
+// We don't do any checks, that is left up to the programmer to verify.
 //
-// @TODO: Provide a _utf8_validate()_.
+// @TODO: Provide a _string_utf8_validate()_.
 //
 // Functions on this object allow negative reversed indexing which begins at
-// the end of the string, so -1 is the last code point -2 the one before that, etc. (Python-style)
+// the end of the string, so -1 is the last byte, -2 the one before that, etc. (Python-style)
 //
-// Substrings don't allocate memory but just return a new data pointer and count
+//
+// Getting substrings doesn't allocate memory but just returns a new data pointer and count
 // since strings in this library are not null-terminated.
 //
-// The substring operator is defined in array<> and is called like this:    str[{1, 3}];
+// The subarray operator can be called like this:    str[{1, 3}];
+// which calls _subarray()_ defined in array_like.cppm.
+// NOTE: This treats indices as pointing to bytes and NOT code points!
+// To get a proper substring call _substring()_, defined in this file.
+//
+// @TODO: It would be nice to have the same terse substring operator that works for code points...
+//
 
 export {
     using string = array<u8>;
-    
-    using utf8_string = array<u8>;
 
-    // Overload these from array_like.h which in turn change the way operators in array<> behave.
-    // We do this because string should work with utf8 by default.
-    constexpr const char *get(string * str, s64 index) { return utf8_get_cp_at_index(str->Data, translate_index(index, str->Count)); }
-    constexpr const char *get(const string *str, s64 index) { return utf8_get_cp_at_index(str->Data, translate_index(index, str->Count)); }
+    struct code_point_ref {
+        string *Parent;
+        s64 Index;
 
-    // This may remove const from _arr_
-    template <is_array_like T>
-    constexpr auto get_subarray(string * str, s64 begin, s64 end) {
-        s64 targetBegin = translate_index(begin, arr->Count);
-        s64 targetEnd   = translate_index(end, arr->Count, true);
+        constexpr code_point_ref(string *parent = null, s64 index = -1) : Parent(parent), Index(index) {}
 
-        types::remove_cvref<T> result;
-        result.Data  = arr.Data + targetBegin;
-        result.Count = targetEnd - targetBegin + 1;
-        return result;
+        constexpr code_point_ref &operator=(code_point other);
+        constexpr operator code_point() const;
+    };
+
+    // The non-const version returns a special structure that allows assigning a new code point.
+    // This is legal to do:
+    //
+    //      string a = "Hello";
+    //      string_get(a, 0) = u8'Л';
+    //      // a is now "Лello" and contains a two byte code point in the beginning.
+    //
+    // We need to do this because not all code points are 1 byte.
+    //
+    // We use a & here because taking a pointer is annoying for the caller.
+    constexpr code_point_ref string_get(string & str, s64 index);
+
+    // The const version just returns the decoded code point at that location
+    constexpr code_point string_get(const string str, s64 index);
+
+    constexpr code_point_ref &code_point_ref::operator=(code_point other) {
+        string_set(Parent, Index, other);
+        return *this;
     }
-}
 
-/*
+    constexpr code_point_ref::operator code_point() { return string_get((const string *) Parent, Index); }
+
+    constexpr code_point_ref string_get(string & str, s64 index) { return code_point_ref(&str, index); }
+
+    // The const version just returns the decoded code point at that location
+    constexpr code_point string_get(const string str, s64 index) {
+        if (index < 0) {
+            // @Speed... should we cache this in _string_?
+            // We need to calculate the total length (in code points)
+            // in order for the negative index to be converted properly.
+            s64 length = utf8_length(str->Data, str->Count);
+            index      = translate_index(index, length);
+
+            // If LSTD_ARRAY_BOUNDS_CHECK is defined:
+            // _utf8_get_cp_at_index()_ also checks for out of bounds but we are sure the index is valid
+            // (since translate_index also checks for out of bounds) so we can get away with the unsafe version here.
+            auto *s = str.Data;
+            For(range(index)) s += utf8_get_size_of_cp(str);
+            return utf8_decode_cp(s);
+        } else {
+            auto *s = utf8_get_pointer_to_cp_at_translated_index(str->Data, str->Count, index);
+            return utf8_decode_cp(s);
+        }
+    }
+
+    // Changes the code point at _index_ to a new one. May allocate and change the byte count of the string.
+    void string_set(string * str, s64 index, code_point cp) {
+        const char *target = utf8_get_pointer_to_cp_at_translated_index(str->Data, str->Count, index);
+
+        char encodedCp[4];
+        utf8_encode_cp(encodedCp, cp);
+
+        replace_range(str, target - str->Data, target - str->Data + utf8_get_size_of_cp(target), array<char>(endodedCp, utf8_get_size_of_cp(cp)));
+    }
+
+    // Doesn't allocate memory, strings in this library are not null-terminated.
+    // We allow negative reversed indexing which begins at the end of the string,
+    // so -1 is the last code point, -2 is the one before that, etc. (Python-style)
+    constexpr string substring(string str, s64 begin, s64 end) {
+        s64 length     = utf8_length(str.Data, str.Count);
+        s64 beginIndex = translate_index(begin, length);
+        s64 endIndex   = translate_index(end, length, true);
+
+        const char *beginPtr = utf8_get_cp_at_index_unsafe(str.Data, beginIndex);
+        const char *endPtr   = beginPtr;
+
+        // @Speed
+        For(range(beginIndex, endIndex)) endPtr += utf8_get_size_of_cp(endPtr);
+
+        return string(beginPtr, endPtr - beginPtr);
+    }
+
     template <bool Const>
     struct string_iterator {
         using string_t = types::select_t<Const, const string, string>;
@@ -56,55 +132,28 @@ export {
         string_t *Parent;
         s64 Index;
 
-        string_iterator() {}
-        string_iterator(string_t *parent, s64 index) : Parent(parent), Index(index) {}
+        string_iterator(string_t *parent = null, s64 index = 0) : Parent(parent), Index(index) {}
 
-        string_iterator &operator+=(s64 amount) { return Index += amount, *this; }
-        string_iterator &operator-=(s64 amount) { return Index -= amount, *this; }
         string_iterator &operator++() { return *this += 1; }
-        string_iterator &operator--() { return *this -= 1; }
         string_iterator operator++(s32) {
             string_iterator temp = *this;
             return ++(*this), temp;
         }
 
-        string_iterator operator--(s32) {
-            string_iterator temp = *this;
-            return --(*this), temp;
-        }
-
-        s64 operator-(const string_iterator &other) const {
-            s64 lesser = Index, greater = other.Index;
-            if (lesser > greater) {
-                lesser = other.Index;
-                greater = Index;
-            }
-            s64 difference = greater - lesser;
-            return Index <= other.Index ? difference : -difference;
-        }
-
-        string_iterator operator+(s64 amount) const { return string_iterator(Parent, Index + amount); }
-        string_iterator operator-(s64 amount) const { return string_iterator(Parent, Index - amount); }
-
-        friend string_iterator operator+(s64 amount, const string_iterator &it) { return it + amount; }
-        friend string_iterator operator-(s64 amount, const string_iterator &it) { return it - amount; }
-
-        bool operator==(const string_iterator &other) const { return Index == other.Index; }
-        bool operator!=(const string_iterator &other) const { return Index != other.Index; }
-        bool operator>(const string_iterator &other) const { return Index > other.Index; }
-        bool operator<(const string_iterator &other) const { return Index < other.Index; }
-        bool operator>=(const string_iterator &other) const { return Index >= other.Index; }
-        bool operator<=(const string_iterator &other) const { return Index <= other.Index; }
+        auto operator<=>(string_iterator other) const { return Index <=> other.Index; };
 
         auto operator*() { return (*Parent)[Index]; }
 
-        operator const char *() const { return utf8_get_cp_at_index(Parent->Data, translate_index(Index, Parent->Length, true)); }
+        operator const char *() const { return utf8_get_cp_at_index_unsafe(Parent->Data, translate_index(Index, Parent->Length, true)); }
     };
+}
 
+/*
    public:
     using iterator = string_iterator<false>;
     using const_iterator = string_iterator<true>;
 
+    // To make range based for loops work.
     iterator begin() { return iterator(this, 0); }
     iterator end() { return iterator(this, Length); }
 
@@ -137,7 +186,7 @@ export {
     //
     // We support Python-like negative indices.
     code_point_ref operator[](s64 index) { return code_point_ref(this, translate_index(index, Length)); }
-    constexpr code_point operator[](s64 index) const { return decode_cp(utf8_get_cp_at_index(Data, translate_index(index, Length))); }
+    constexpr code_point operator[](s64 index) const { return utf8_decode_cp(utf8_get_cp_at_index_unsafe(Data, translate_index(index, Length))); }
 
     //
     // Substring operator:
@@ -267,7 +316,7 @@ constexpr s64 compare(const string &s, const string &other) {
     auto *e1 = p1 + s.Count, *e2 = p2 + other.Count;
 
     s64 index = 0;
-    while (decode_cp(p1) == decode_cp(p2)) {
+    while (utf8_decode_cp(p1) == utf8_decode_cp(p2)) {
         p1 += utf8_get_size_of_cp(p1);
         p2 += utf8_get_size_of_cp(p2);
         if (p1 == e1 && p2 == e2) return -1;
@@ -287,7 +336,7 @@ constexpr s64 compare_ignore_case(const string &s, const string &other) {
     auto *e1 = p1 + s.Count, *e2 = p2 + other.Count;
 
     s64 index = 0;
-    while (to_lower(decode_cp(p1)) == to_lower(decode_cp(p2))) {
+    while (to_lower(utf8_decode_cp(p1)) == to_lower(utf8_decode_cp(p2))) {
         p1 += utf8_get_size_of_cp(p1);
         p2 += utf8_get_size_of_cp(p2);
         if (p1 == e1 && p2 == e2) return -1;
@@ -310,7 +359,7 @@ constexpr s32 compare_lexicographically(const string &a, const string &b) {
     auto *e1 = p1 + a.Count, *e2 = p2 + b.Count;
 
     s64 index = 0;
-    while (decode_cp(p1) == decode_cp(p2)) {
+    while (utf8_decode_cp(p1) == utf8_decode_cp(p2)) {
         p1 += utf8_get_size_of_cp(p1);
         p2 += utf8_get_size_of_cp(p2);
         if (p1 == e1 && p2 == e2) return 0;
@@ -318,7 +367,7 @@ constexpr s32 compare_lexicographically(const string &a, const string &b) {
         if (p2 == e2) return 1;
         ++index;
     }
-    return ((s64) decode_cp(p1) - (s64) decode_cp(p2)) < 0 ? -1 : 1;
+    return ((s64) utf8_decode_cp(p1) - (s64) utf8_decode_cp(p2)) < 0 ? -1 : 1;
 }
 
 // Compares two utf8 encoded strings lexicographically while ignoring case and returns:
@@ -334,7 +383,7 @@ constexpr s32 compare_lexicographically_ignore_case(const string &a, const strin
     auto *e1 = p1 + a.Count, *e2 = p2 + b.Count;
 
     s64 index = 0;
-    while (to_lower(decode_cp(p1)) == to_lower(decode_cp(p2))) {
+    while (to_lower(utf8_decode_cp(p1)) == to_lower(utf8_decode_cp(p2))) {
         p1 += utf8_get_size_of_cp(p1);
         p2 += utf8_get_size_of_cp(p2);
         if (p1 == e1 && p2 == e2) return 0;
@@ -342,7 +391,7 @@ constexpr s32 compare_lexicographically_ignore_case(const string &a, const strin
         if (p2 == e2) return 1;
         ++index;
     }
-    return ((s64) to_lower(decode_cp(p1)) - (s64) to_lower(decode_cp(p2))) < 0 ? -1 : 1;
+    return ((s64) to_lower(utf8_decode_cp(p1)) - (s64) to_lower(utf8_decode_cp(p2))) < 0 ? -1 : 1;
 }
 
 // Searches for the first occurence of a substring which is after a specified _start_ index.
@@ -354,7 +403,7 @@ constexpr s64 find_substring(const string &haystack, const string &needle, s64 s
 
     if (start >= haystack.Length || start <= -haystack.Length) return -1;
 
-    auto *p   = utf8_get_cp_at_index(haystack.Data, translate_index(start, haystack.Length));
+    auto *p   = utf8_get_cp_at_index_unsafe(haystack.Data, translate_index(start, haystack.Length));
     auto *end = haystack.Data + haystack.Count;
 
     auto *needleEnd = needle.Data + needle.Count;
@@ -399,7 +448,7 @@ constexpr s64 find_substring_reverse(const string &haystack, const string &needl
     if (start >= haystack.Length || start <= -haystack.Length) return -1;
     if (start == 0) start = haystack.Length;
 
-    auto *p   = utf8_get_cp_at_index(haystack.Data, translate_index(start, haystack.Length, true) - 1);
+    auto *p   = utf8_get_cp_at_index_unsafe(haystack.Data, translate_index(start, haystack.Length, true) - 1);
     auto *end = haystack.Data + haystack.Count;
 
     auto *needleEnd = needle.Data + needle.Count;
@@ -448,7 +497,7 @@ constexpr s64 find_substring_not(const string &s, const string &eat, s64 start =
 
     if (start >= s.Length || start <= -s.Length) return -1;
 
-    auto *p   = utf8_get_cp_at_index(s.Data, translate_index(start, s.Length));
+    auto *p   = utf8_get_cp_at_index_unsafe(s.Data, translate_index(start, s.Length));
     auto *end = s.Data + s.Count;
 
     auto *eatEnd = eat.Data + eat.Count;
@@ -492,7 +541,7 @@ constexpr s64 find_substring_reverse_not(const string &s, const string &eat, s64
     if (start >= s.Length || start <= -s.Length) return -1;
     if (start == 0) start = s.Length;
 
-    auto *p   = utf8_get_cp_at_index(s.Data, translate_index(start, s.Length, true) - 1);
+    auto *p   = utf8_get_cp_at_index_unsafe(s.Data, translate_index(start, s.Length, true) - 1);
     auto *end = s.Data + s.Count;
 
     auto *eatEnd = eat.Data + eat.Count;
@@ -537,10 +586,10 @@ constexpr s64 find_any_of(const string &s, const string &anyOfThese, s64 start =
     if (start >= s.Length || start <= -s.Length) return -1;
 
     start   = translate_index(start, s.Length);
-    auto *p = utf8_get_cp_at_index(s.Data, start);
+    auto *p = utf8_get_cp_at_index_unsafe(s.Data, start);
 
     For(range(start, s.Length)) {
-        if (find_cp(anyOfThese, decode_cp(p)) != -1) return utf8_length(s.Data, p - s.Data);
+        if (find_cp(anyOfThese, utf8_decode_cp(p)) != -1) return utf8_length(s.Data, p - s.Data);
         p += utf8_get_size_of_cp(p);
     }
     return -1;
@@ -557,10 +606,10 @@ constexpr s64 find_reverse_any_of(const string &s, const string &anyOfThese, s64
     if (start == 0) start = s.Length;
 
     start   = translate_index(start, s.Length, true) - 1;
-    auto *p = utf8_get_cp_at_index(s.Data, start);
+    auto *p = utf8_get_cp_at_index_unsafe(s.Data, start);
 
     For(range(start, -1, -1)) {
-        if (find_cp(anyOfThese, decode_cp(p)) != -1) return utf8_length(s.Data, p - s.Data);
+        if (find_cp(anyOfThese, utf8_decode_cp(p)) != -1) return utf8_length(s.Data, p - s.Data);
         p -= utf8_get_size_of_cp(p);
     }
     return -1;
@@ -576,10 +625,10 @@ constexpr s64 find_not_any_of(const string &s, const string &anyOfThese, s64 sta
     if (start >= s.Length || start <= -s.Length) return -1;
 
     start   = translate_index(start, s.Length);
-    auto *p = utf8_get_cp_at_index(s.Data, start);
+    auto *p = utf8_get_cp_at_index_unsafe(s.Data, start);
 
     For(range(start, s.Length)) {
-        if (find_cp(anyOfThese, decode_cp(p)) == -1) return utf8_length(s.Data, p - s.Data);
+        if (find_cp(anyOfThese, utf8_decode_cp(p)) == -1) return utf8_length(s.Data, p - s.Data);
         p += utf8_get_size_of_cp(p);
     }
     return -1;
@@ -596,10 +645,10 @@ constexpr s64 find_reverse_not_any_of(const string &s, const string &anyOfThese,
     if (start == 0) start = s.Length;
 
     start   = translate_index(start, s.Length, true) - 1;
-    auto *p = utf8_get_cp_at_index(s.Data, start);
+    auto *p = utf8_get_cp_at_index_unsafe(s.Data, start);
 
     For(range(start, -1, -1)) {
-        if (find_cp(anyOfThese, decode_cp(p)) == -1) return utf8_length(s.Data, p - s.Data);
+        if (find_cp(anyOfThese, utf8_decode_cp(p)) == -1) return utf8_length(s.Data, p - s.Data);
         p -= utf8_get_size_of_cp(p);
     }
     return -1;
@@ -644,7 +693,7 @@ constexpr string substring(const string &s, s64 begin, s64 end) {
     s64 beginIndex = translate_index(begin, s.Length);
     s64 endIndex   = translate_index(end, s.Length, true);
 
-    const char *beginPtr = utf8_get_cp_at_index(s.Data, beginIndex);
+    const char *beginPtr = utf8_get_cp_at_index_unsafe(s.Data, beginIndex);
     const char *endPtr   = beginPtr;
     For(range(beginIndex, endIndex)) endPtr += utf8_get_size_of_cp(endPtr);
 

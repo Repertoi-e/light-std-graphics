@@ -4,7 +4,8 @@ module;
 
 export module lstd.array;
 
-import lstd.stack_array;
+export import lstd.array_like;
+export import lstd.stack_array;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -35,10 +36,8 @@ LSTD_BEGIN_NAMESPACE
 //
 
 export {
-    template <typename T_>
+    template <typename T>
     struct array {
-        using T = T_;
-
         T *Data   = null;
         s64 Count = 0;
 
@@ -65,44 +64,40 @@ export {
 
         // Subarray operator:
         //
-        // e.g. call like this: arr[{2, -1}]
+        // e.g. this is valid:   arr[{2, -1}]
         //      to get everything from the second to the last element (without the last).
         //
         // We support Python-like negative indices.
         //
         // This doesn't allocate memory but just returns a new data pointer and count.
+        //
+        // Strings are just array<u8>, this operator treats indices as pointing to bytes and NOT code points!
+        // To get a proper substring on an utf-8 string call _substring()_, defined in string.cppm.
         struct subarray_indices {
             s64 Begin, End;
         };
 
-        constexpr auto operator[](subarray_indices range) { return get_subarray(this, range.Begin, range.End); }
-        constexpr auto operator[](subarray_indices range) const { return get_subarray(this, range.Begin, range.End); }
+        constexpr auto operator[](subarray_indices range) { return subarray(this, range.Begin, range.End); }
+        constexpr auto operator[](subarray_indices range) const { return subarray(this, range.Begin, range.End); }
     };
 
-    // Operator to convert a stack array into an array view
-    template <typename T, s64 N>
-    stack_array<T, N>::operator array<T>() const { return array<T>((T *) Data, Count); }
+    template <typename T>
+    concept any_array = types::is_same_template_decayed<T, array<s32>>;
 
-    // We need helpers because we can't check templated types with types::is_same...
-    template <typename T>
-    struct is_array_helper : types::false_t {};
-    template <typename T>
-    struct is_array_helper<array<T>> : types::true_t {};
-
-    // For the terse C++20 templated function syntax ...
-    template <typename T>
-    concept is_array = is_array_helper<T>::value;
+    // To make range based for loops work.
+    auto begin(any_array auto &arr) { return arr.Data; }
+    auto end(any_array auto &arr) { return arr.Data + arr.Count; }
 
     // Allocates a buffer (using the Context's allocator by default).
     // If _arr->Count_ is not zero we copy the elements _arr_ is pointing to.
     //
     // When adding elements to a dynamic array it grows automatically.
     // However, coming up with a good value for the initial _n_ can improve performance.
-    void make_dynamic_array(is_array auto *arr, s64 n, allocator alloc = {});
+    void make_dynamic(any_array auto *arr, s64 n, allocator alloc = {});
 
     // Returns how many elements fit in _arr->Data_, i.e. the size of the buffer.
     // This is not always == arr->Count. When the buffer fills we resize it to fit more.
-    s64 get_allocated(is_array auto *arr);
+    s64 get_allocated(any_array auto arr);
 
     // When DEBUG_MEMORY is defined we keep a global list of allocations,
     // so we can check if the array is dynamically allocated.
@@ -110,102 +105,112 @@ export {
     // This can catch bugs. Calling routines that
     // insert/remove/modify elements to a non-heap array is dangerous.
     //
-    // In Release configurations we don't do this check.
-    bool is_dynamically_allocated(is_array auto *arr);
+    // In Release configuration we don't do this check.
+    bool is_dynamically_allocated(any_array auto arr);
 
     // Allocates a buffer (using the Context's allocator) and copies the old elements.
     // We try to call realloc which may actually save us an allocation.
-    void resize(is_array auto *arr, s64 n);
+    void resize(any_array auto *arr, s64 n);
 
     // Checks _arr_ if there is space for at least _fit_ new elements.
     // Resizes the array if there is not enough space. The new size is equal to the next
     // power of two bigger than (arr->Count + fit), minimum 8.
-    void maybe_grow(is_array auto *arr, s64 fit);
+    void maybe_grow(any_array auto *arr, s64 fit);
 
     // Don't free the buffer, just move Count to 0
-    void reset(is_array auto *arr) { arr->Count = 0; }
+    void reset(any_array auto *arr) { arr->Count = 0; }
 
     // Checks if there is enough reserved space for _fit_ elements
-    bool has_space_for(is_array auto *arr, s64 fit) { return arr->Count + n <= get_allocated(arr); }
+    bool has_space_for(any_array auto arr, s64 fit) { return arr.Count + fit <= get_allocated(arr); }
 
     // Overrides the _index_'th element in the array
-    void set(is_array auto *arr, s64 index, auto element);
+    void set(any_array auto *arr, s64 index, auto element);
 
     // Inserts an element at a specified index and returns a pointer to it in the buffer
-    auto *insert_at(is_array auto *arr, s64 index, auto element);
+    auto *insert_at_index(any_array auto *arr, s64 index, auto element);
 
     // Insert a buffer of elements at a specified index
-    auto *insert_at(is_array auto *arr, s64 index, auto *ptr, s64 size);
+    auto *insert_at_index(any_array auto *arr, s64 index, auto *ptr, s64 size);
 
     // Insert an array at a specified index and returns a pointer to the beginning of it in the buffer
-    auto *insert_at(is_array auto *arr, s64 index, is_array arr2) { return insert_at(arr, index, arr2.Data, arr2.Count); }
+    auto *insert_at_index(any_array auto *arr, s64 index, any_array auto arr2) { return insert_at_index(arr, index, arr2.Data, arr2.Count); }
 
     // Removes element at specified index and moves following elements back
-    void remove_at(is_array auto *arr, s64 index);
+    void remove_ordered_at_index(any_array auto *arr, s64 index);
 
     // Removes element at specified index and moves the last element to the empty slot.
     // This is faster than remove because it doesn't move everything back
     // but this doesn't keep the order of the elements.
-    void remove_at_unordered(is_array auto *arr, s64 index);
+    void remove_unordered_at_index(any_array auto *arr, s64 index);
+
     // Removes a range [begin, end) and moves following elements back
-    void remove_range(is_array auto *arr, s64 begin, s64 end);
+    void remove_range(any_array auto *arr, s64 begin, s64 end);
+
+    // Removes a range [begin, end) and inserts _replace_.
+    // May allocate and change the count:
+    // moves following elements forward/backward if (end - begin) != replace.Count.
+    void replace_range(any_array auto *arr, s64 begin, s64 end, any_array auto replace);
 
     // Appends an element to the end and returns a pointer to it in the buffer
-    auto *add(is_array auto *arr, auto element) { return insert_at(arr, arr->Count, element); }
+    auto *add(any_array auto *arr, auto element) { return insert_at_index(arr, arr->Count, element); }
 
     // Appends a buffer of elements to the end and returns a pointer to it in the buffer
-    auto *add(is_array auto *arr, auto *ptr, s64 size) { return insert_at(arr, arr->Count, ptr, size); }
+    auto *add(any_array auto *arr, auto *ptr, s64 size) { return insert_at_index(arr, arr->Count, ptr, size); }
 
     // Appends an array to the end and returns a pointer to the beginning of it in the buffer
-    auto *add(is_array auto *arr, is_array auto arr2) { return insert_at(arr, arr->Count, arr2); }
+    auto *add(any_array auto *arr, any_array auto arr2) { return insert_at_index(arr, arr->Count, arr2); }
 
     // Replace all occurences of a subarray with another array.
-    // @Speed See comments in function.
-    void replace_all(is_array auto *arr, is_array auto search, is_array auto replace);
+    // @Speed Fine if search.Count == replace.Count, slow and dumb otherwise (but we could improve). See comments in implementation.
+    void replace_all(any_array auto *arr, any_array auto search, any_array auto replace);
 
     // Replace all occurences of an element from an array with another element.
-    void replace_all(is_array auto *arr, auto search, auto replace) {
+    void replace_all(any_array auto *arr, auto search, auto replace) {
         auto s = make_stack_array(search);
         auto r = make_stack_array(replace);
         replace_all(arr, s, r);
     }
 
     // Replace all occurences of an element from an array with an array.
-    void replace_all(is_array auto *arr, auto search, is_array auto replace) {
+    void replace_all(any_array auto *arr, auto search, any_array auto replace) {
         auto s = make_stack_array(search);
         replace_all(arr, s, replace);
     }
 
     // Replace all occurences of a subarray from an array with an element.
-    void replace_all(is_array auto *arr, is_array auto search, auto replace) {
+    void replace_all(any_array auto *arr, any_array auto search, auto replace) {
         auto r = make_stack_array(replace);
         replace_all(arr, search, r);
     }
 
     // Removes all occurences of a subarray from an array.
-    template <is_array T>
-    void remove_all(is_array auto *arr, is_array auto search) {
+    template <any_array T>
+    void remove_all(any_array auto *arr, any_array auto search) {
         replace_all(arr, search, {});  // Replace with an empty array
     }
 
     // Removes all occurences of an element from an array.
-    void remove_all(is_array auto *arr, auto search) {
+    void remove_all(any_array auto *arr, auto search) {
         auto s = make_stack_array(search);
         remove_all(arr, s);
     }
 
     // Returns a deep copy of _src_
-    auto clone(is_array auto src, allocator alloc = {}) {
+    auto clone(any_array auto src, allocator alloc = {}) {
         decltype(src) result;
-        make_dynamic_array(&result, src.Count, alloc);
+        make_dynamic(&result, src.Count, alloc);
         add(&result, src);
         return result;
     }
 }
 
-module : private;
+LSTD_MODULE_PRIVATE
 
-void make_dynamic_array(is_array auto *arr, s64 n, allocator alloc = {}) {
+// Operator to convert a stack array into an array view
+template <typename T, s64 N>
+stack_array<T, N>::operator array<T>() const { return array<T>((T *) Data, Count); }
+
+void make_dynamic(any_array auto *arr, s64 n, allocator alloc = {}) {
     auto *oldData = arr->Data;
 
     using T = types::remove_pointer_t<decltype(arr->Data)>;
@@ -215,24 +220,28 @@ void make_dynamic_array(is_array auto *arr, s64 n, allocator alloc = {}) {
     if (arr->Count) copy_elements(arr->Data, oldData, arr->Count);
 }
 
-s64 get_allocated(is_array auto *arr) {
-    using T = types::remove_pointer_t<decltype(arr->Data)>;
+// @Cleanup Decide if we want to store an _Allocated_ in the array object itself.
+// This would use more memory (the object becomes 24 bytes) but wouldn't rely on the allocation header?
+// Right now can't disable encoding an allocation header when using the temporary allocator
+// because we can't guarantee temporary dynamic arrays would work.
+s64 get_allocated(any_array auto arr) {
+    using T = types::remove_pointer_t<decltype(arr.Data)>;
     return ((allocation_header *) arr.Data - 1)->Size / sizeof(T);
 }
 
-bool is_dynamically_allocated(is_array auto *arr) {
+bool is_dynamically_allocated(any_array auto *arr) {
 #if defined DEBUG_MEMORY
 // @TODO: Do work
 #endif
     return true;
 }
 
-void resize(is_array auto *arr, s64 n) {
+void resize(any_array auto *arr, s64 n) {
     assert(n >= arr->Count && "There will be no space to fit the old elements");
     arr->Data = realloc(arr->Data, {.NewCount = n});
 }
 
-void maybe_grow(is_array auto *arr, s64 fit) {
+void maybe_grow(any_array auto *arr, s64 fit) {
     assert(is_dynamically_allocated(arr));
 
     s64 space = get_allocated(arr);
@@ -243,7 +252,7 @@ void maybe_grow(is_array auto *arr, s64 fit) {
     resize(target);
 }
 
-void set(is_array auto *arr, s64 index, auto element) {
+void set(any_array auto *arr, s64 index, auto element) {
     using T = types::remove_pointer_t<decltype(arr->Data)>;
     static_assert(types::is_convertible<decltype(element), T>, "Cannot convert element to array type");
 
@@ -253,7 +262,7 @@ void set(is_array auto *arr, s64 index, auto element) {
     *arr->Data[i] = element;
 }
 
-auto *insert_at(is_array auto *arr, s64 index, auto element) {
+auto *insert_at_index(any_array auto *arr, s64 index, auto element) {
     using T = types::remove_pointer_t<decltype(arr->Data)>;
     static_assert(types::is_convertible<decltype(element), T>, "Cannot convert element to array type");
 
@@ -269,7 +278,7 @@ auto *insert_at(is_array auto *arr, s64 index, auto element) {
     return where;
 }
 
-auto *insert_at(is_array auto *arr, s64 index, auto *ptr, s64 size) {
+auto *insert_at_index(any_array auto *arr, s64 index, auto *ptr, s64 size) {
     using T = types::remove_pointer_t<decltype(arr->Data)>;
     using U = types::remove_pointer_t<ptr>;
     static_assert(types::is_same<T, U>, "Adding elements of different types");
@@ -286,7 +295,7 @@ auto *insert_at(is_array auto *arr, s64 index, auto *ptr, s64 size) {
     return where;
 }
 
-void remove_at(is_array auto *arr, s64 index) {
+void remove_ordered_at_index(any_array auto *arr, s64 index) {
     assert(is_dynamically_allocated(arr));
 
     s64 offset = translate_index(index, arr->Count);
@@ -296,7 +305,7 @@ void remove_at(is_array auto *arr, s64 index) {
     --arr->Count;
 }
 
-void remove_at_unordered(is_array auto *arr, s64 index) {
+void remove_unordered_at_index(any_array auto *arr, s64 index) {
     assert(is_dynamically_allocated(arr));
 
     s64 offset = translate_index(index, arr->Count);
@@ -310,7 +319,7 @@ void remove_at_unordered(is_array auto *arr, s64 index) {
     --arr->Count;
 }
 
-void remove_range(is_array auto *arr, s64 begin, s64 end) {
+void remove_range(any_array auto *arr, s64 begin, s64 end) {
     assert(is_dynamically_allocated(arr));
 
     s64 targetBegin = translate_index(begin, arr->Count);
@@ -324,12 +333,38 @@ void remove_range(is_array auto *arr, s64 begin, s64 end) {
     arr->Count -= elementCount;
 }
 
-void replace_all(is_array auto *arr, is_array auto search, is_array auto replace) {
+void replace_range(any_array auto *arr, s64 begin, s64 end, any_array auto replace) {
+    assert(is_dynamically_allocated(arr));
+
+    s64 targetBegin = translate_index(begin, arr->Count);
+    s64 targetEnd   = translate_index(end, arr->Count, true);
+
+    auto where    = arr->Data + targetBegin;
+    s64 whereSize = targetEnd - targetBegin;
+
+    s64 diff = replace.Count - whereSize;
+
+    if (diff > 0) {
+        maybe_grow(arr, diff);
+    }
+
+    // Make space for the new elements
+    copy_elements(where + replace.Count, where + whereSize, arr->Count - i - whereSize);
+
+    // Copy replace elements
+    copy_elements(data, replace.Data, replace.Count);
+
+    arr->Count += diff;
+}
+
+void replace_all(any_array auto *arr, any_array auto search, any_array auto replace) {
     using T = types::remove_pointer_t<decltype(arr->Data)>;
     using U = types::remove_pointer_t<decltype(arr.search)>;
     using V = types::remove_pointer_t<decltype(replace.search)>;
     static_assert(types::is_same<T, U>, "Searching for a subarray of different type");
     static_assert(types::is_same<T, V>, "Replacement elements of different type");
+
+    assert(is_dynamically_allocated(arr));
 
     if (!arr->Data || !arr->Count) return;
 
@@ -364,35 +399,24 @@ void replace_all(is_array auto *arr, is_array auto search, is_array auto replace
             }
         }
     } else {
-        // @Speed This is a slow and dumb version for now.
-        // We can improve performance (at the cost of space) by either:
-        // * Allocating a buffer first which holds the result
+        //
+        // @Speed This is the slow and dumb version for now.
+        // We can improve performance by either:
+        // * Allocating a buffer first which holds the result (space cost increases)
         // * Doing two passes, first one counting the number of occurences
         //   so we know the offsets for the second pass.
         // Though the second option would only work if search.Count > replace.Count.
         //
         // I think going with the former makes the most sense,
         // however at that point letting the caller write their own routine
-        // will probably be better, since we can't for sure know the context.
-
+        // will probably be better, since we can't for sure know the context
+        // and if allocating another (possibly big) array is fine.
+        //
         s64 diff = replace.Count - search.Count;
 
         s64 i = 0;
         while (i < arr->Count && (i = find(arr, search, i)) != -1) {
-            if (diff > 0) {
-                maybe_grow(arr, diff);
-            }
-
-            auto *data = arr->Data + i;
-
-            // Make space for the new elements
-            copy_elements(data + replace.Count, data + search.Count, arr->Count - i - arr2.Count);
-
-            // Copy replace elements
-            copy_elements(data, replace.Data, replace.Count);
-
-            arr->Count += diff;
-
+            replace_range(arr, i, i + search.Count, replace);  // @Speed Slow and dumb version for now
             i += replace.Count;
         }
     }

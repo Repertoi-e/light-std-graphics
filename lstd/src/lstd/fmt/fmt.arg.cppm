@@ -1,9 +1,9 @@
 module;
 
-#include "../memory/string.h"
-
 export module fmt.arg;
+
 export import fmt.fmt_type;
+import fmt.fmt_type_constant;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -131,7 +131,7 @@ export {
     // To format custom types, implement a formatter specialization.
     // !!!
     template <typename T>
-    constexpr auto fmt_mapped_type_constant_v = fmt_internal::type_constant_v<decltype(fmt_map_arg(types::declval<T>()))>;
+    constexpr auto fmt_mapped_type_constant_v = type_constant_v<decltype(fmt_map_arg(types::declval<T>()))>;
 
     template <typename FC, typename T>
     fmt_arg<FC> fmt_make_arg(const T &v) { return {fmt_mapped_type_constant_v<T>, fmt_value<FC>(fmt_map_arg(v))}; }
@@ -187,18 +187,18 @@ u64 get_packed_fmt_types() {
 
 export {
     // We can't really combine this with _fmt_args_, ugh!
-    // Stores either an array of values or arguments on the stack (just values if number is less than fmt_internal::MAX_PACKED_ARGS)
+    // Stores either an array of values or arguments on the stack (just values if number is less than MAX_PACKED_ARGS)
     template <typename FC, typename... Args>
     struct fmt_args_on_the_stack {
         static constexpr s64 NUM_ARGS   = sizeof...(Args);
-        static constexpr bool IS_PACKED = NUM_ARGS < fmt_internal::MAX_PACKED_ARGS;
+        static constexpr bool IS_PACKED = NUM_ARGS < MAX_PACKED_ARGS;
 
         using T = types::select_t<IS_PACKED, fmt_value<FC>, fmt_arg<FC>>;
         stack_array<T, NUM_ARGS> Data;
 
         u64 Types;
 
-        fmt_args_on_the_stack(FC &&, Args &&...args) : Types(IS_PACKED ? get_packed_fmt_types<types::unused, Args...>() : fmt_internal::IS_UNPACKED_BIT | NUM_ARGS) {
+        fmt_args_on_the_stack(FC &&, Args &&...args) : Types(IS_PACKED ? get_packed_fmt_types<types::unused, Args...>() : IS_UNPACKED_BIT | NUM_ARGS) {
             Data = {fmt_make_arg<FC, IS_PACKED>(args)...};
         }
     };

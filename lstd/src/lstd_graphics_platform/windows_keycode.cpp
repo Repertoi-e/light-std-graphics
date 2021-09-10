@@ -1,4 +1,4 @@
-#include "lstd/common/common.h"
+#include "lstd/common.h"
 
 // This file has been automatically generated
 
