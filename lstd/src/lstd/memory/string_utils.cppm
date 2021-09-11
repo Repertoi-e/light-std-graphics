@@ -52,7 +52,7 @@ export {
     // C++ mess
     template <typename T>
     concept c_string = types::is_same < c_string_type<T>,
-    char * > || types::is_same<c_string_type<T>, s8 *> || types::is_same<c_string_type<T>, u8 *> || types::is_same<c_string_type<T>, wchar *> || types::is_same<c_string_type<T>, char8_t *> || types::is_same<c_string_type<T>, char16_t *> || types::is_same<c_string_type<T>, char32_t *>;
+    char * > || types::is_same<c_string_type<T>, s8 *> || types::is_same<c_string_type<T>, u8 *> || types::is_same<c_string_type<T>, wchar *> || types::is_same<c_string_type<T>, char8_t *> || types::is_same<c_string_type<T>, char16_t *> || types::is_same<c_string_type<T>, char32_t *> || types::is_same<c_string_type<T>, code_point *>;
 
     // Retrieve the length of a null-terminated. Doesn't care about encoding.
     // Note that this calculation does not include the null byte.

@@ -272,7 +272,7 @@ struct event {
             u32 DX, DY;  // Only set on Mouse_Moved
         };
 
-        char32_t CP;  // Only set on Code_Point_Typed
+        code_point CP;  // Only set on Code_Point_Typed
 
         struct {
             u32 Width, Height;  // Only set on Window_Resized

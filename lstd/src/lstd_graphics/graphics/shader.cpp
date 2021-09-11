@@ -2,7 +2,7 @@
 
 #include "api.h"
 
-import path;
+import lstd.path;
 
 LSTD_BEGIN_NAMESPACE
 

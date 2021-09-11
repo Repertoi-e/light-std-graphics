@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.h"
+#include "lstd/common/types.h"
 
 //
 // In this file we define some types found in Windows.h.
@@ -2151,7 +2151,6 @@ LONG SetWindowLongW(
     HWND hWnd,
     int nIndex,
     LONG dwNewLong);
-
 
 LONG_PTR SetWindowLongPtrW(
     HWND hWnd,

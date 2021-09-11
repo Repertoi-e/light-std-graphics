@@ -2,7 +2,7 @@
 #include "lstd/common.h"
 #include "lstd/memory/delegate.h"
 
-import os;
+import lstd.os;
 
 int __cdecl atexit(_PVFV function) {
     LSTD_NAMESPACE::exit_schedule(function);

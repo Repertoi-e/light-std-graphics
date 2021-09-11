@@ -6,9 +6,9 @@
 
 #include <lstd/parse.h>
 
-import os;
-import fmt;
-import path;
+import lstd.os;
+import lstd.fmt;
+import lstd.path;
 
 // These can be modified with command line arguments.
 s64 MemoryInBytes = 64_MiB;
@@ -37,7 +37,6 @@ file_scope void setup_paths() {
     BuildLockFile = path_join(exeDir, "buildlock");
 }
 
-// @TODO: This fails in Dist configuration for some reason
 file_scope bool reload_code() {
     UpdateAndRender = null;
     MainWindowEvent = null;
@@ -405,7 +404,7 @@ file_scope bool common_event_callback(const event &e) {
     return false;
 }
 
-#include <lstd/common/windows.h>
+#include <lstd_platform/windows.h>
 
 // We provide a Win32 implementation because this is such a common issue for IME users
 #if OS == WINDOWS && !defined IMGUI_DISABLE_WIN32_FUNCTIONS && !defined IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS

@@ -2,10 +2,10 @@ module;
 
 #include "../common.h"
 
-export module fmt.format_float.grisu;
+export module lstd.fmt.format_float.grisu;
 
-import fmt.format_float.specs;
-import fmt.format_float.dragon4;
+import lstd.fmt.format_float.specs;
+import lstd.fmt.format_float.dragon4;
 
 //
 // Use Grisu + Dragon4 when formatting a float with a given precision:

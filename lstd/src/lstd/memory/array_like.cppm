@@ -101,8 +101,7 @@ export {
 
     // Overload these for your custom type if other things need to happen.
 
-    template <any_array_like T>
-    constexpr auto get(any_array_like auto &arr, s64 index) { return &arr.Data[translate_index(index, arr->Count)]; }  // This overloads for both const and non-const.
+    constexpr auto get(any_array_like auto &arr, s64 index) { return &arr.Data[translate_index(index, arr.Count)]; }  // This overloads for both const and non-const.
 
     //
     // We support Python-like negative indices.
@@ -120,10 +119,10 @@ export {
     // Overloads both for const and non-const, but we cannot return a const, because we are making a new array essentially.
     // This means that you can modify the original through the subarray regardless.
     constexpr auto subarray(any_array_like auto &arr, s64 begin, s64 end) {
-        s64 targetBegin = translate_index(begin, arr->Count);
-        s64 targetEnd   = translate_index(end, arr->Count, true);
+        s64 targetBegin = translate_index(begin, arr.Count);
+        s64 targetEnd   = translate_index(end, arr.Count, true);
 
-        types::remove_cvref<decltype(arr)> result;
+        types::remove_cvref_t<decltype(arr)> result;
         result.Data  = arr.Data + targetBegin;
         result.Count = targetEnd - targetBegin + 1;
         return result;
@@ -132,7 +131,7 @@ export {
     // Find the first occurence of an element which matches the predicate and is after a specified index.
     // Predicate must take a single argument (the current element) and return if it matches.
     template <any_array_like Arr>
-    constexpr s64 find(const Arr &arr, const delegate<bool(array_data_t<Arr> &)> &predicate, s64 start = 0, bool reversed = false) {
+    constexpr s64 find(const Arr &arr, const delegate<bool(const array_data_t<Arr> &)> &predicate, s64 start = 0, bool reversed = false) {
         if (!arr.Data || arr.Count == 0) return -1;
         start = translate_index(start, arr.Count);
         For(range(start, reversed ? -1 : arr.Count, reversed ? -1 : 1)) if (predicate(arr.Data[it])) return it;
@@ -153,12 +152,15 @@ export {
         if (!arr.Data || arr.Count == 0) return -1;
         if (!search.Data || search.Count == 0) return -1;
         start = translate_index(start, arr.Count);
+
+        auto searchEnd = search.Data + search.Count;
+
         For(range(start, reversed ? -1 : arr.Count, reversed ? -1 : 1)) {
             auto progress = search.Data;
-            for (auto s = arr.Data + it; progress != search.Data + search.Count; ++s, ++progress) {
+            for (auto s = arr.Data + it; progress != searchEnd; ++s, ++progress) {
                 if (!(*s == *progress)) break;
             }
-            if (progress == search.end()) return it;
+            if (progress == searchEnd) return it;
         }
         return -1;
     }

@@ -2,7 +2,7 @@
 #include "context.h"
 #include "os_function_call.h"
 
-import fmt;
+import lstd.fmt;
 
 LSTD_BEGIN_NAMESPACE
 

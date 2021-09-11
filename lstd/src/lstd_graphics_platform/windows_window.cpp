@@ -2,13 +2,13 @@
 
 #if OS == WINDOWS
 
-#include "lstd/common/windows.h"
+#include "lstd_platform/windows.h"
 #include "lstd/fmt/fmt.h"
 #include "lstd/memory/hash_table.h"
 #include "lstd_graphics/video/window.h"
 
-import path;
-import os;
+import lstd.path;
+import lstd.os;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -2037,8 +2037,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
 
 void win64_window_init() {
     GUID guid;
-    WIN_CHECKHR(CoCreateGuid(&guid));
-    WIN_CHECKHR(StringFromCLSID(guid, &WindowClassName));
+    WIN_CHECK_HR(CoCreateGuid(&guid));
+    WIN_CHECK_HR(StringFromCLSID(guid, &WindowClassName));
 
     WNDCLASSEXW wc;
     zero_memory(&wc, sizeof(wc));

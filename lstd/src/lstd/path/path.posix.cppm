@@ -2,9 +2,9 @@ module;
 
 #include "../common.h"
 
-export module path.posix;
+export module lstd.path.posix;
 
-import path.general;
+import lstd.path.general;
 
 //
 // This module provides facilities to work with paths and files, POSIX version.
@@ -20,7 +20,7 @@ LSTD_BEGIN_NAMESPACE
 export {
     constexpr char OS_PATH_SEPARATOR = '/';
 
-    always_inline constexpr bool path_is_sep(char32_t ch) { return ch == '/'; }
+    always_inline constexpr bool path_is_sep(code_point ch) { return ch == '/'; }
 
     // Returns whether a path is absolute.
     // Trivial in POSIX (starts with '/'), harder on Windows.

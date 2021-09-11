@@ -1,8 +1,8 @@
 #include "lstd/common/debug_break.h"
 #include "lstd/common/namespace.h"
-#include "lstd/common/windows.h"  // For definitions
+#include "lstd_platform/windows.h"  // For definitions
 
-import os;
+import lstd.os;
 
 // The DECLARE_ALTERNATE_NAME macro provides an architecture-neutral way
 // of specifying /alternatename comments to the linker.  It prepends the leading

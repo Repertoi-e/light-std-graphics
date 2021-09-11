@@ -2,11 +2,11 @@ module;
 
 #include "../parse.h"
 
-export module fmt.parse_context;
+export module lstd.fmt.parse_context;
 
-import fmt.arg;
-import fmt.specs;
-import fmt.text_style;
+import lstd.fmt.arg;
+import lstd.fmt.specs;
+import lstd.fmt.text_style;
 
 LSTD_BEGIN_NAMESPACE
 

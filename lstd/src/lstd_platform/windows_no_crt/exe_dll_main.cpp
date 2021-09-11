@@ -4,9 +4,9 @@
 
 #include "common.h"
 #include "lstd/common/context.h"
-#include "lstd/common/windows.h"  // For definitions
+#include "lstd_platform/windows.h"  // For definitions
 
-import os;
+import lstd.os;
 
 #if OS != WINDOWS
 #error LSTD_NO_CRT is Windows-only

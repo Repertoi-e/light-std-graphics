@@ -5,7 +5,7 @@ module;
 #include "../math.h"
 #include "../memory/guid.h"
 
-export module fmt;
+export module lstd.fmt;
 
 //
 // Format specification:
@@ -160,10 +160,10 @@ export module fmt;
 // That is useful when logging to a file and not a console. The ansi escape codes look like garbage in files.
 //
 
-export import fmt.arg;
-export import fmt.parse_context;
-export import fmt.context;
-export import fmt.text_style;
+export import lstd.fmt.arg;
+export import lstd.fmt.parse_context;
+export import lstd.fmt.context;
+export import lstd.fmt.text_style;
 
 LSTD_BEGIN_NAMESPACE
 

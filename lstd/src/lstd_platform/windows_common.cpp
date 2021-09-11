@@ -2,13 +2,13 @@
 
 #if OS == WINDOWS
 
-#include "lstd/common/windows.h"  // Declarations of Win32 functions
+#include "lstd_platform/windows.h"  // Declarations of Win32 functions
 #include "lstd/io.h"
 #include "lstd/memory/guid.h"
 
-import path;
-import fmt;
-import os;
+import lstd.path;
+import lstd.fmt;
+import lstd.os;
 
 //
 // This is here to assist cases where you want to share the memory between two modules (e.g. an exe and a dll or multiple dlls, etc.)

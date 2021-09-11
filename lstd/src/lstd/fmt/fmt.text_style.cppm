@@ -2,7 +2,7 @@ module;
 
 #include "../common.h"
 
-export module fmt.text_style;
+export module lstd.fmt.text_style;
 
 export import lstd.string;
 

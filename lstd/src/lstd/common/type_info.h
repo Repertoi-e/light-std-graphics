@@ -2,7 +2,6 @@
 
 #include "cpp/space_ship.h"
 #include "ieee.h"
-#include "types.h"
 
 //
 // @Cleanup: We can remove most of this. It's useless.
@@ -140,9 +139,6 @@ constexpr bool is_same_template_helper<T<A...>, T<B...>> = true;
 
 template <typename T, typename U>
 concept is_same_template = is_same_template_helper<T, U>;
-
-template <typename T, typename U>
-concept is_same_template_decayed = is_same_template<decay_t<T>, decay_t<U>>;
 
 // Are the decayed versions of "T" and "U" the same basic type?
 // Gets around the fact that is_same will treat, say "bool" and "bool&" as different types.
@@ -322,6 +318,9 @@ struct remove_cv {
 
 template <typename T>
 using remove_cv_t = typename remove_cv<T>::type;
+
+template <typename T, typename U>
+concept is_same_template_decayed = is_same_template<remove_cv_t<T>, remove_cv_t<U>>;
 
 // The remove_reference transformation trait removes top-level of
 // indirection by reference (if any) from the type to which it is applied.

@@ -2,11 +2,11 @@ module;
 
 #include "../common.h"
 
-export module fmt.format_float;
+export module lstd.fmt.format_float;
 
-export import fmt.format_float.specs;
-import fmt.format_float.dragonbox;
-import fmt.format_float.grisu;
+export import lstd.fmt.format_float.specs;
+import lstd.fmt.format_float.dragonbox;
+import lstd.fmt.format_float.grisu;
 
 LSTD_BEGIN_NAMESPACE
 

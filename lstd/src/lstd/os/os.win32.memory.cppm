@@ -1,6 +1,6 @@
 module;
 
-#include "lstd/common/windows.h"  // Declarations of Win32 functions
+#include "lstd_platform/windows.h"  // Declarations of Win32 functions
 
 //
 // Platform specific memory functions.
@@ -8,7 +8,7 @@ module;
 
 export module lstd.os.win32.memory;
 
-import fmt;
+import lstd.fmt;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -28,25 +28,27 @@ export {
     void os_free_block(void *ptr);
 
     // Creates/opens a shared memory block and writes data to it (use this for communication between processes)
-    void os_write_shared_block(const string &name, void *data, s64 size);
+    // @Security?
+    void os_write_shared_block(string name, void *data, s64 size);
 
     // Read data from a shared memory block (use this for communication between processes)
-    void os_read_shared_block(const string &name, void *out, s64 size);
+    // @Security?
+    void os_read_shared_block(string name, void *out, s64 size);
 
-    // This is a utility which aids in reducing fragmentation when you can allocate program state in one place in the code.
+    // This is a utility which helps reduce fragmentation when you allocate multiple structs.
     //
     // Allocates one giant block with size determined from the size of types passed in (+ extraDynamicSize).
-    // Returns pointers in the block spaced out accordingly.
     // After that this calls constructors on non-scalar values.
     //
-    // Note: @Robustness This doesn't call constructors on arrays, e.g. my_data_t[n].
-    //       We can implement this but the code is going to get much more complicated.
-    //
-    // Returns a tuple with pointers to each type in the resulting block (the first pointer is the pointer to the beginning of the big block).
+    // Returns a tuple with the pointers to the structs. The first pointer is the pointer to the beginning of the big block
+    // which is the one which may eventually be passed to os_free_block().
     // The block with size _extraDynamicSize_ is the last in the tuple (with type void*).
+    //
+    // @Robustness Caveat: This doesn't call constructors on arrays, e.g. my_data_t[n].
+    //       We can implement this but the code is going to get much more complicated.
     template <typename... Types>
     [[nodiscard("Leak")]] auto os_allocate_packed(s64 extraDynamicSize) {
-        constexpr s64 TYPE_SIZE[] = {sizeof(Types)...};
+        constexpr s64 TYPE_SIZE[]     = {sizeof(Types)...};
         constexpr s64 TOTAL_TYPE_SIZE = (sizeof(Types) + ...);
 
         // We decay, remove pointers and add a pointer in order to handle arrays
@@ -63,7 +65,7 @@ export {
         static_for<0, sizeof...(Types)>([&](auto i) {
             using element_t = tuple_get_t<i, result_t>;
 
-            auto *p = (element_t)((byte *) block + offset);
+            auto *p              = (element_t) ((byte *) block + offset);
             tuple_get<i>(result) = p;
 
             using element_t_no_pointer = types::remove_pointer_t<element_t>;
@@ -151,11 +153,11 @@ void *win64_temp_alloc(allocator_mode mode, void *context, s64 size, void *oldMe
 void create_temp_storage_block(s64 size) {
     // We allocate the arena allocator data and the starting pool in one big block in order to reduce fragmentation.
     auto [data, pool] = os_allocate_packed<arena_allocator_data>(size);
-    S->TempAlloc = {win64_temp_alloc, data};
+    S->TempAlloc      = {win64_temp_alloc, data};
     allocator_add_pool(S->TempAlloc, pool, size);
 
     S->TempStorageBlock = pool;
-    S->TempStorageSize = size;
+    S->TempStorageSize  = size;
 }
 
 void *win64_persistent_alloc(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
@@ -178,13 +180,14 @@ void *win64_persistent_alloc(allocator_mode mode, void *context, s64 size, void 
 
 void create_persistent_alloc_block(s64 size) {
     // We allocate the arena allocator data and the starting pool in one big block in order to reduce fragmentation.
-    auto [data, pool] = os_allocate_packed<tlsf_allocator_data>(size);
+    auto [data, pool]  = os_allocate_packed<tlsf_allocator_data>(size);
     S->PersistentAlloc = {win64_persistent_alloc, data};
     allocator_add_pool(S->PersistentAlloc, pool, size);
 }
 
 export namespace internal {
 // These functions are used by other windows platform files.
+// @Cleanup Move this to a more general place
 allocator platform_get_persistent_allocator() { return S->PersistentAlloc; }
 allocator platform_get_temporary_allocator() { return S->TempAlloc; }
 
@@ -250,101 +253,79 @@ bool is_contraction_possible(s64 oldSize) {
     return true;
 }
 
-void *try_heap_realloc(void *ptr, s64 newSize, bool *reportError) {
-    void *result = null;
-    __try {
-        result = HeapReAlloc(GetProcessHeap(), HEAP_REALLOC_IN_PLACE_ONLY | HEAP_GENERATE_EXCEPTIONS, ptr, newSize);
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
-        // We specify HEAP_REALLOC_IN_PLACE_ONLY, so STATUS_NO_MEMORY is a valid error.
-        // We don't need to report it.
-        *reportError = GetExceptionCode() != STATUS_NO_MEMORY;
+void *os_allocate_block(s64 size) {
+    assert(size < MAX_ALLOCATION_REQUEST);
+    return HeapAlloc(GetProcessHeap(), 0, size);
+}
+
+void *os_resize_block(void *ptr, s64 newSize) {
+    assert(ptr);
+    assert(newSize < MAX_ALLOCATION_REQUEST);
+
+    s64 oldSize = os_get_block_size(ptr);
+    if (newSize == 0) newSize = 1;
+
+    void *result = HeapReAlloc(GetProcessHeap(), HEAP_REALLOC_IN_PLACE_ONLY, ptr, newSize);
+    if (result) return result;
+
+    // If a failure to contract was caused by platform limitations, just return the original block
+    if (newSize < oldSize && !is_contraction_possible(oldSize)) return ptr;
+
+    // HeapReAlloc doesn't set an error
+
+    return null;
+}
+
+s64 os_get_block_size(void *ptr) {
+    s64 result = HeapSize(GetProcessHeap(), 0, ptr);
+    if (result == -1) {
+        // HeapSize doesn't set an error
+        return 0;
     }
     return result;
 }
-
-export {
-    void *os_allocate_block(s64 size) {
-        assert(size < MAX_ALLOCATION_REQUEST);
-        return HeapAlloc(GetProcessHeap(), 0, size);
-    }
-
-    void *os_resize_block(void *ptr, s64 newSize) {
-        assert(ptr);
-        assert(newSize < MAX_ALLOCATION_REQUEST);
-
-        s64 oldSize = os_get_block_size(ptr);
-        if (newSize == 0) newSize = 1;
-
-        bool reportError = false;
-        void *result = try_heap_realloc(ptr, newSize, &reportError);
-
-        if (result) return result;
-
-        // If a failure to contract was caused by platform limitations, just return the original block
-        if (newSize < oldSize && !is_contraction_possible(oldSize)) return ptr;
-
-        if (reportError) {
-            windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "HeapReAlloc");
-        }
-        return null;
-    }
-
-    s64 os_get_block_size(void *ptr) {
-        s64 result = HeapSize(GetProcessHeap(), 0, ptr);
-        if (result == -1) {
-            windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "HeapSize");
-            return 0;
-        }
-        return result;
-    }
 
 #define CREATE_MAPPING_CHECKED(handleName, call)                                                               \
     HANDLE handleName = call;                                                                                  \
     if (!handleName) {                                                                                         \
         string extendedCallSite = sprint("{}\n        (the name was: {!YELLOW}\"{}\"{!GRAY})\n", #call, name); \
-        char *cStr = string_to_c_string(extendedCallSite);                                                     \
+        char *cStr              = string_to_c_string(extendedCallSite);                                        \
         windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), cStr);                                \
         free(cStr);                                                                                            \
         free(extendedCallSite);                                                                                \
         return;                                                                                                \
     }
 
-    void os_write_shared_block(const string &name, void *data, s64 size) {
-        wchar *name16 = internal::platform_utf8_to_utf16(name, S->PersistentAlloc);
-        defer(free(name16));
+void os_write_shared_block(string name, void *data, s64 size) {
+    wchar *name16 = internal::platform_utf8_to_utf16(name, S->PersistentAlloc);
+    defer(free(name16));
 
-        CREATE_MAPPING_CHECKED(h, CreateFileMappingW(INVALID_HANDLE_VALUE, null, PAGE_READWRITE, 0, (DWORD) size, name16));
-        defer(CloseHandle(h));
+    CREATE_MAPPING_CHECKED(h, CreateFileMappingW(INVALID_HANDLE_VALUE, null, PAGE_READWRITE, 0, (DWORD) size, name16));
+    defer(CloseHandle(h));
 
-        void *result = MapViewOfFile(h, FILE_MAP_WRITE, 0, 0, size);
-        if (!result) {
-            windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "MapViewOfFile");
-            return;
-        }
-        copy_memory(result, data, size);
-        UnmapViewOfFile(result);
-    }
+    WIN_CHECK_BOOL(result, MapViewOfFile(h, FILE_MAP_WRITE, 0, 0, size));
+    if (!result) return;
 
-    void os_read_shared_block(const string &name, void *out, s64 size) {
-        wchar *name16 = internal::platform_utf8_to_utf16(name, S->PersistentAlloc);
-        defer(free(name16));
+    copy_memory(result, data, size);
+    UnmapViewOfFile(result);
+}
 
-        CREATE_MAPPING_CHECKED(h, OpenFileMappingW(FILE_MAP_READ, false, name16));
-        defer(CloseHandle(h));
+void os_read_shared_block(string name, void *out, s64 size) {
+    wchar *name16 = internal::platform_utf8_to_utf16(name, S->PersistentAlloc);
+    defer(free(name16));
 
-        void *result = MapViewOfFile(h, FILE_MAP_READ, 0, 0, size);
-        if (!result) {
-            windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), "MapViewOfFile");
-            return;
-        }
+    CREATE_MAPPING_CHECKED(h, OpenFileMappingW(FILE_MAP_READ, false, name16));
+    defer(CloseHandle(h));
 
-        copy_memory(out, result, size);
-        UnmapViewOfFile(result);
-    }
+    WIN_CHECK_BOOL(result, MapViewOfFile(h, FILE_MAP_READ, 0, 0, size));
+    if (!result) return;
 
-    void os_free_block(void *ptr) {
-        WIN_CHECKBOOL(HeapFree(GetProcessHeap(), 0, ptr));
-    }
+    copy_memory(out, result, size);
+    UnmapViewOfFile(result);
+}
+
+void os_free_block(void *ptr) {
+    WIN_CHECK_BOOL(HeapFree(GetProcessHeap(), 0, ptr));
 }
 
 LSTD_END_NAMESPACE

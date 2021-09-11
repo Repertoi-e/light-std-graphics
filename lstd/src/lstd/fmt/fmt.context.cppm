@@ -2,12 +2,12 @@ module;
 
 #include "../io.h"
 
-export module fmt.context;
+export module lstd.fmt.context;
 
-import fmt.arg;
-import fmt.specs;
-import fmt.parse_context;
-import fmt.format_float;
+import lstd.fmt.arg;
+import lstd.fmt.specs;
+import lstd.fmt.parse_context;
+import lstd.fmt.format_float;
 
 LSTD_BEGIN_NAMESPACE
 

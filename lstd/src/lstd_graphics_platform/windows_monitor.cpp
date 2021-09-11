@@ -2,12 +2,12 @@
 
 #if OS == WINDOWS
 
-#include "lstd/common/windows.h"
+#include "lstd_platform/windows.h"
 #include "lstd/fmt/fmt.h"
 #include "lstd_graphics/video/monitor.h"
 #include "lstd_graphics/video/window.h"
 
-import os;
+import lstd.os;
 
 #ifndef DPI_ENUMS_DECLARED
 typedef enum {

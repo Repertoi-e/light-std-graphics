@@ -2,7 +2,7 @@
 
 #include <intrin.h>
 
-#include "types.h"
+#include "type_info.h"
 
 // Helper macro for, e.g flag enums
 //

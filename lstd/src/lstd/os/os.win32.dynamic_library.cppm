@@ -1,6 +1,6 @@
 module;
 
-#include "lstd/common/windows.h"  // Declarations of Win32 functions
+#include "lstd_platform/windows.h"  // Declarations of Win32 functions
 
 //
 // Simple wrapper around dynamic libraries and getting addresses of procedures.
@@ -13,26 +13,34 @@ import lstd.os.win32.memory;
 LSTD_BEGIN_NAMESPACE
 
 export {
-    struct dynamic_library_t {
-    };
+    using dynamic_library = void *;
 
-    using dynamic_library = dynamic_library_t *;
+    // We expect _path_ to be valid
+    // @TODO: Perhaps we can check
+    dynamic_library os_dynamic_library_load(const string &path);
 
-    dynamic_library os_dynamic_library_load(const string &path) {
-        return (dynamic_library) LoadLibraryW(internal::platform_utf8_to_utf16(path, internal::platform_get_temporary_allocator()));
+    // Gets a symbol by an ASCII string
+    void *os_dynamic_library_get_symbol(dynamic_library library, const char *name);
+
+    // Call when done doing stuff with the dll
+    void release(dynamic_library library);
+}
+
+LSTD_MODULE_PRIVATE
+
+dynamic_library os_dynamic_library_load(const string &path) {
+    WIN_CHECK_BOOL(result, LoadLibraryW(internal::platform_utf8_to_utf16(path)));
+    return (dynamic_library) result;
+}
+
+void release(dynamic_library library) {
+    if (library) {
+        FreeLibrary((HMODULE) library);
     }
+}
 
-    // :OverloadFree: We follow the convention to overload the "free" function
-    // as a standard way to release resources (may not be just memory blocks).
-    void free(dynamic_library library) {
-        if (library) {
-            FreeLibrary((HMODULE) library);
-        }
-    }
-
-    void *os_dynamic_library_get_symbol(dynamic_library library, const char *name) {
-        return (void *) GetProcAddress((HMODULE) library, name);
-    }
+void *os_dynamic_library_get_symbol(dynamic_library library, const char *name) {
+    return (void *) GetProcAddress((HMODULE) library, name);
 }
 
 LSTD_END_NAMESPACE

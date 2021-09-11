@@ -1,12 +1,13 @@
 module;
 
-#include "../memory/string_builder.h"
+#include "../common.h"
 
-export module fmt.format_float.dragon4;
+export module lstd.fmt.format_float.dragon4;
 
-import fmt.format_float.specs;
+import lstd.fmt.format_float.specs;
 
 import lstd.big_integer;
+import lstd.string_builder;
 
 //
 // This is an implementation the Dragon4 algorithm to convert a binary number in

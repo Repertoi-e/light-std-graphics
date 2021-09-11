@@ -1,8 +1,11 @@
 module;
 
-#include "delegate.h"
+#include "../common.h"
 
 export module lstd.string_builder;
+
+export import lstd.memory;
+export import lstd.string;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -35,10 +38,10 @@ export {
     };
 
     // Don't free the buffers, just reset cursor
-    void reset(string_builder & builder);
+    void reset(string_builder * builder);
 
     // Free any memory allocated by this object and reset cursor
-    void release(string_builder * builder);
+    void free_buffers(string_builder * builder);
 
     // Append a code point to the builder
     void append(string_builder * builder, code_point codePoint);
@@ -49,8 +52,10 @@ export {
     // Append _size_ bytes from _data_ to the builder
     void append(string_builder * builder, const char *data, s64 size);
 
-    // Merges all buffers in one string
-    [[nodiscard("Leak")]] string concatenate(const string_builder &builder);
+    // Merges all buffers in one string.
+    // Maybe release the buffers as well?
+    // The most common use case is builder_to_string() and then free_buffers() -- the builder is not needed anymore.
+    [[nodiscard("Leak")]] string builder_to_string(string_builder * builder);
 }
 
 string_builder::buffer *get_current_buffer(string_builder &builder);

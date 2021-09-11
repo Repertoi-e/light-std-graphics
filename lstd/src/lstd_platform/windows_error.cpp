@@ -2,11 +2,11 @@
 
 #if OS == WINDOWS
 
+#include "lstd_platform/windows.h"  // Declarations of Win32 functions
 #include "lstd/memory/string.h"
-#include "lstd/common/windows.h" // Declarations of Win32 functions
 
-import fmt;
-import os;
+import lstd.fmt;
+import lstd.os;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -22,7 +22,7 @@ string get_error_string(HRESULT hr) {
 }
 
 void windows_report_hresult_error(u32 hresult, const char *apiFunction, source_location loc) {
-    print("\n{!}>>> An error occured while calling a Windows function returning an HRESULT.\n");
+    print("\n{!}>>> An error occured while calling a Windows function.\n");
     print("    {!GRAY}{}{!}\n", apiFunction);
     print("        ... was called at {!YELLOW}{}:{}{!} (in function: {!YELLOW}{}{!}) and returned error code {!GRAY}{:#x}\n", loc.File, loc.Line, loc.Function, hresult);
     print("        Error: {!RED}{}\n", get_error_string(hresult));

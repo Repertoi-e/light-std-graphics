@@ -1,7 +1,7 @@
 #include "common.h"
-#include "lstd/common/windows.h"
+#include "lstd_platform/windows.h"
 
-import os;
+import lstd.os;
 
 //
 // These are taken from vcruntime/utility.cpp:

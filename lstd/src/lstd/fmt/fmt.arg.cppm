@@ -1,9 +1,9 @@
 module;
 
-export module fmt.arg;
+export module lstd.fmt.arg;
 
-export import fmt.fmt_type;
-import fmt.fmt_type_constant;
+export import lstd.fmt.fmt_type;
+import lstd.fmt.fmt_type_constant;
 
 LSTD_BEGIN_NAMESPACE
 

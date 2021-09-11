@@ -2,9 +2,9 @@ module;
 
 #include "../common.h"
 
-export module fmt.format_float.dragonbox;
+export module lstd.fmt.format_float.dragonbox;
 
-import fmt.format_float.specs;
+import lstd.fmt.format_float.specs;
 
 //
 // In this file we implement the Dragonbox algorithm: https://github.com/jk-jeon/dragonbox.

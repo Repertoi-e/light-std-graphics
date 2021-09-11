@@ -1,5 +1,9 @@
 #pragma once
 
+#include "type_info.h"
+
+LSTD_BEGIN_NAMESPACE
+
 // Used in macros to get "unique" variable names
 #define LINE_NAME(name) _MACRO_CONCAT(name, __LINE__)
 #define _MACRO_DO_CONCAT(s1, s2) s1##s2
@@ -30,7 +34,7 @@ Deferrer<F> operator*(Defer_Dummy, F func) {
     return {func};
 }
 
-#define defer(x) auto LINE_NAME(LSTD_defer) = Defer_Dummy{} * [&]() { x; }
+#define defer(x) auto LINE_NAME(LSTD_defer) = LSTD_NAMESPACE::Defer_Dummy{} * [&]() { x; }
 
 #undef assert
 
@@ -97,5 +101,7 @@ constexpr auto enumerate_impl(T &&in) {
 // You can change the names of the internal
 // variables by using _For_enumerate_as_.
 //
-#define For_enumerate_as(it_index, it, in) for (auto [it_index, it] : enumerate_impl(in))
+#define For_enumerate_as(it_index, it, in) for (auto [it_index, it] : LSTD_NAMESPACE::enumerate_impl(in))
 #define For_enumerate(in) For_enumerate_as(it_index, it, in)
+
+LSTD_END_NAMESPACE

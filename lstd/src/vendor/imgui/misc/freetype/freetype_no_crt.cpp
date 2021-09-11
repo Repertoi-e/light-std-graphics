@@ -7,7 +7,7 @@
 #include "lstd_platform/windows_no_crt/common_functions.h"
 #include "vendor/stb/stb_sprintf.h"
 
-import os;
+import lstd.os;
 
 extern "C" {
 const void *ft_memchr(const void *c, int d, size_t e) { return memchr(c, d, e); }

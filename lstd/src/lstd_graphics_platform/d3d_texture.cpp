@@ -3,7 +3,7 @@
 #if OS == WINDOWS
 
 #define LSTD_JUST_DX
-#include "lstd/common/windows.h"
+#include "lstd_platform/windows.h"
 #undef LSTD_JUST_DX
 
 #include <d3d11.h>

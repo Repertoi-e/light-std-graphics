@@ -2,9 +2,9 @@ module;
 
 #include "../common.h"
 
-export module fmt.fmt_type_constant;
+export module lstd.fmt.fmt_type_constant;
 
-export import fmt.fmt_type;
+export import lstd.fmt.fmt_type;
 export import lstd.string;
 
 LSTD_BEGIN_NAMESPACE

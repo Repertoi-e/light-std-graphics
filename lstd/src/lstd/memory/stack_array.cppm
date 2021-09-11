@@ -1,16 +1,13 @@
 module;
 
-#include "../types.h"
+#include "../common.h"
 #include "qsort.h"
 
 export module lstd.stack_array;
 
-export import lstd.string.utils;
+export import lstd.string_utils;
 
 LSTD_BEGIN_NAMESPACE
-
-template <typename T>
-struct array;
 
 template <typename D, typename...>
 struct return_type_helper {
@@ -39,7 +36,7 @@ struct return_type_helper<void, Types...> : types::common_type<Types...> {
 //     ...
 // }
 //
-// Different from array<T>, because the latter supports dynamic resizing.
+// Different from array<T>, because the latter supports dynamic allocation.
 // This object contains no other member than T Data[N], _Count_ is a static member for the given type and doesn't take space,
 // which means that sizeof(stack_array<T, N>) == sizeof(T) * N.
 //
@@ -58,9 +55,6 @@ export {
 
         // To check if empty
         constexpr operator bool() { return Count; }
-
-        // Convert to an array view
-        operator array<T>() const;
 
         constexpr auto operator[](s64 index) { return get(this, index); }
         constexpr auto operator[](s64 index) const { return get(this, index); }

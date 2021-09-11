@@ -10,7 +10,7 @@
 
 #include <lstd/fmt/fmt.h>
 
-using namespace lstd;  // The library is in it's own namespace for the sake of not being too invasive. I don't really want a namespace though!
+LSTD_USING_NAMESPACE;  // The library is in it's own namespace for the sake of not being too invasive. I don't really want a namespace though!
 
 // DRIVER_API is used to export functions from the game dll
 #if OS == WINDOWS

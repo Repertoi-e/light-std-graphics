@@ -147,7 +147,7 @@ void display_ast(ast *node) {
     }
 }
 
-void determine_new_parameters(function_entry *f, hash_table<char32_t, f64> oldParams, ast *node) {
+void determine_new_parameters(function_entry *f, hash_table<code_point, f64> oldParams, ast *node) {
     if (!node) return;
 
     determine_new_parameters(f, oldParams, node->Left);
@@ -187,7 +187,7 @@ void ui_functions() {
                 clone(&it.FormulaMessage, error);
 
                 if (!it.FormulaMessage) {
-                    hash_table<char32_t, f64> oldParams;
+                    hash_table<code_point, f64> oldParams;
                     PUSH_ALLOC(Context.TempAlloc) {
                         clone(&oldParams, it.Parameters);
                     }

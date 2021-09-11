@@ -18,24 +18,20 @@ void windows_report_hresult_error(u32 hresult, const char *apiFunction, source_l
 
 LSTD_END_NAMESPACE
 
-// CHECKHR checks the return value of _call_ and if the returned HRESULT is less than zero, reports an error.
-#define WIN_CHECKHR(call)                                                            \
-    {                                                                                \
-        u32 result = call;                                                           \
-        if (result < 0) LSTD_NAMESPACE::windows_report_hresult_error(result, #call); \
-    }
+// If the returned HRESULT is less than zero, reports an error.
+#define WIN_CHECK_HR(result, call) \
+    u32 result = call;             \
+    if (result < 0) LSTD_NAMESPACE::windows_report_hresult_error(result, #call);
 
-// CHECKHR_BOOL checks the return value of _call_ and if the returned is false, reports an error.
-#define WIN_CHECKBOOL(call)                                                                                   \
-    {                                                                                                         \
-        bool result = call;                                                                                   \
-        if (!result) LSTD_NAMESPACE::windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), #call); \
-    }
+// If the returned is false, reports an error.
+#define WIN32_CHECK_BOOL(result, call) \
+    bool result = call;             \
+    if (!result) LSTD_NAMESPACE::windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), #call);
 
-// DX_CHECK is used for checking directx calls. The difference from WIN_CHECKHR is that
+// DX_CHECK is used for checking directx calls. The difference from WIN_CHECK_HR is that
 // in Release configuration, the macro expands to just the call (no error checking).
 #if !defined NDEBUG
-#define DX_CHECK(call) WIN_CHECKHR(call)
+#define DX_CHECK(call) WIN_CHECK_HR(call)
 #else
 #define DX_CHECK(call) call
 #endif

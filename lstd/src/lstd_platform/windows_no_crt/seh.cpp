@@ -1,4 +1,4 @@
-#include "lstd/common/windows.h"
+#include "lstd_platform/windows.h"
 
 extern "C" {
 // This is needed for SEH exceptions

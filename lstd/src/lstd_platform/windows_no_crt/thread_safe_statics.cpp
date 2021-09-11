@@ -7,9 +7,9 @@
 //
 
 #include "common.h"
-#include "lstd/common/windows.h"
+#include "lstd_platform/windows.h"
 
-import os;
+import lstd.os;
 
 static DWORD const xp_timeout      = 100; // ms
 static int const uninitialized     = 0;

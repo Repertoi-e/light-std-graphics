@@ -2,7 +2,7 @@
 #include "allocator.h"
 #include "string.h"
 
-import os;
+import lstd.os;
 
 LSTD_BEGIN_NAMESPACE
 

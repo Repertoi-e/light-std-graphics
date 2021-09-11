@@ -1,14 +1,14 @@
 module;
 
 #include "../parse.h"
-#include "../common/windows.h"  // Declarations of API functions
+#include "lstd_platform/windows.h"  // Declarations of Win32 functions
 
-export module path.nt;
+export module lstd.path.nt;
 
-import fmt;
-import path.general;
+import lstd.fmt;
+import lstd.path.general;
 
-import os.win64.memory;
+import lstd.os.win32.memory;
 
 //
 // This module provides facilities to work with paths and files, WindowsNT/95 version.
@@ -24,7 +24,7 @@ LSTD_BEGIN_NAMESPACE
 export {
     constexpr char OS_PATH_SEPARATOR = '\\';
 
-    always_inline constexpr bool path_is_sep(char32_t ch) { return ch == '\\' || ch == '/'; }
+    always_inline constexpr bool path_is_sep(code_point ch) { return ch == '\\' || ch == '/'; }
 
     struct path_split_drive_result {
         string DriveOrUNC, Path;
@@ -118,21 +118,6 @@ export {
     //
     // The following routines query the OS:
     //
-
-    // Reads entire file into memory (no async variant available at the moment).
-    [[nodiscard("Leak")]] path_read_entire_file_result path_read_entire_file(const string &path);
-
-    // Write content to a file.
-    // _mode_ determines if the content should be appended, overwritten entirely, or just overwritten.
-    //
-    // The difference between Overwrite_Entire and Overwrite:
-    // If the file is 50 bytes and you write 20,
-    // "Overwrite" keeps those 30 bytes at the end
-    // while "Overwrite_Entire" deletes them.
-    //
-    // Returns true on success.
-    bool path_write_to_file(const string &path, const string &contents, path_write_mode mode);
-
     bool path_exists(const string &path);  // == is_file() || is_directory()
     bool path_is_file(const string &path);
     bool path_is_directory(const string &path);
@@ -221,9 +206,10 @@ export {
     //
     // If you don't want the overhead of us building an array you can use
     // the path_walker API directly (take a look at the implementation of this function further down the file).
-    // The reason we return an array is because that's what is most useful in the general case.
     [[nodiscard("Leak")]] array<string> path_walk(const string &path, bool recursively = false);
 }
+
+LSTD_MODULE_PRIVATE
 
 #define CREATE_FILE_HANDLE_CHECKED(handleName, call, returnOnFail)                                             \
     HANDLE handleName = call;                                                                                  \
@@ -231,7 +217,7 @@ export {
         string extendedCallSite = sprint("{}\n        (the path was: {!YELLOW}\"{}\"{!GRAY})\n", #call, path); \
         char *cStr              = string_to_c_string(extendedCallSite);                                        \
         windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), cStr);                                \
-        free(extendedCallSite);                                                                                \
+        free(extendedCallSite.Data);                                                                           \
         free(cStr);                                                                                            \
         return returnOnFail;                                                                                   \
     }
@@ -595,7 +581,7 @@ void path_read_next_entry(path_walker &walker) {
             windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), #call); \
         }                                                                            \
         if (walker.Handle != INVALID_HANDLE_VALUE) {                                 \
-            WIN_CHECKBOOL(FindClose((HANDLE) walker.Handle));                        \
+            WIN_CHECK_BOOL(FindClose((HANDLE) walker.Handle));                       \
         }                                                                            \
                                                                                      \
         walker.Handle = null; /* No more files.. terminate */                        \
@@ -655,39 +641,6 @@ void path_walk_recursively_impl(const string &path, const string &first, array<s
         path_walk_recursively_impl(path, path, result);
     }
     return result;
-}
-
-[[nodiscard("Leak")]] path_read_entire_file_result path_read_entire_file(const string &path) {
-    path_read_entire_file_result fail = {array<byte>{}, false};
-    CREATE_FILE_HANDLE_CHECKED(file, CreateFileW(utf8_to_utf16(path), GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, null), fail);
-    defer(CloseHandle(file));
-
-    LARGE_INTEGER size = {0};
-    GetFileSizeEx(file, &size);
-
-    array<byte> result;
-    array_reserve(result, size.QuadPart);
-    DWORD bytesRead;
-    if (!ReadFile(file, result.Data, (u32) size.QuadPart, &bytesRead, null)) return {{}, false};
-    assert(size.QuadPart == bytesRead);
-
-    result.Count += bytesRead;
-    return {result, true};
-}
-
-bool path_write_to_file(const string &path, const string &contents, path_write_mode mode) {
-    CREATE_FILE_HANDLE_CHECKED(file, CreateFileW(utf8_to_utf16(path), GENERIC_WRITE, 0, null, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, null), false);
-    defer(CloseHandle(file));
-
-    LARGE_INTEGER pointer = {};
-    pointer.QuadPart      = 0;
-    if (mode == path_write_mode::Append) SetFilePointerEx(file, pointer, null, FILE_END);
-    if (mode == path_write_mode::Overwrite_Entire) SetEndOfFile(file);
-
-    DWORD bytesWritten;
-    if (!WriteFile(file, contents.Data, (u32) contents.Count, &bytesWritten, null)) return false;
-    if (bytesWritten != contents.Count) return false;
-    return true;
 }
 
 LSTD_END_NAMESPACE

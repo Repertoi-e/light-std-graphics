@@ -2,12 +2,12 @@ module;
 
 #include "../common.h"
 
-export module fmt.format_float.specs;
+export module lstd.fmt.format_float.specs;
 
 export import lstd.string_builder;
 
-export import fmt.specs;
-export import fmt.parse_context;
+export import lstd.fmt.specs;
+export import lstd.fmt.parse_context;
 
 LSTD_BEGIN_NAMESPACE
 

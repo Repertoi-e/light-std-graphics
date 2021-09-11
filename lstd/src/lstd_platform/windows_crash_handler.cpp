@@ -4,10 +4,10 @@
 #include "lstd/common/os_function_call.h"
 #include "lstd/io.h"
 #include "lstd/memory/hash_table.h"
-#include "lstd/common/windows.h"  // Declarations of Win32 functions
+#include "lstd_platform/windows.h"  // Declarations of Win32 functions
 
-import fmt;
-import os;
+import lstd.fmt;
+import lstd.os;
 
 LSTD_BEGIN_NAMESPACE
 

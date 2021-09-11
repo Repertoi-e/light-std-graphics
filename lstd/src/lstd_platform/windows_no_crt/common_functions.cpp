@@ -4,9 +4,7 @@
 #include "setjmp.h"
 #include "vendor/stb/stb_sprintf.h"
 
-#if defined LSTD_NAMESPACE
-using namespace LSTD_NAMESPACE;
-#endif
+LSTD_USING_NAMESPACE;
 
 //
 // Some implementations of these are taken from:

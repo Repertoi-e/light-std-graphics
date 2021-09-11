@@ -834,7 +834,7 @@ CODE
 #include <TargetConditionals.h>
 #endif
 
-import path; // :WEMODIFIEDIMGUI: Use our API
+import lstd.path; // :WEMODIFIEDIMGUI: Use our API
 
 // Visual Studio warnings
 #ifdef _MSC_VER

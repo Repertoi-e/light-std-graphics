@@ -1,12 +1,10 @@
-#include "allocator.h"
-
-#include "../common/context.h"
 #include "../io.h"
-#include "../math.h"
 
-import path;
-import fmt;
-import os;
+import lstd.context;
+import lstd.memory;
+import lstd.path;
+import lstd.fmt;
+import lstd.os;
 
 #if defined BRACE_B
 #error ""
@@ -542,9 +540,7 @@ void free_all(allocator alloc, u64 options) {
 
 LSTD_END_NAMESPACE
 
-#if defined LSTD_NAMESPACE
-using namespace LSTD_NAMESPACE;
-#endif
+LSTD_USING_NAMESPACE;
 
 extern "C" {
 
@@ -566,10 +562,6 @@ void *realloc(void *block, size_t newSize) {
 // No need to define this global function if the library was built without a namespace
 void free(void *block) { free((byte *) block); }
 }
-
-#if defined LSTD_NAMESPACE
-using namespace LSTD_NAMESPACE;
-#endif
 
 [[nodiscard]] void *operator new(size_t size) { return general_allocate(Context.Alloc, size, 0, 0); }
 [[nodiscard]] void *operator new[](size_t size) { return general_allocate(Context.Alloc, size, 0, 0); }

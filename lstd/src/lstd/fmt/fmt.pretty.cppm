@@ -1,8 +1,8 @@
 module;
 
-export module fmt.pretty;
+export module lstd.fmt.pretty;
 
-import fmt.context;
+import lstd.fmt.context;
 
 LSTD_BEGIN_NAMESPACE
 

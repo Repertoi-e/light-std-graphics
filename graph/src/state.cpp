@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "state.h"
 
-import os;
+import lstd.os;
 
 extern "C" bool lstd_init_global() { return false; }
 

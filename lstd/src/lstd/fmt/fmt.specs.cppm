@@ -2,7 +2,7 @@ module;
 
 #include "../common.h"
 
-export module fmt.specs;
+export module lstd.fmt.specs;
 
 LSTD_BEGIN_NAMESPACE
 

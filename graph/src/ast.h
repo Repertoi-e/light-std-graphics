@@ -122,7 +122,7 @@ struct ast {
 // It may also contain 0 letters (in that case it's simply a literal)
 struct ast_term : ast {
     f64 Coeff;
-    hash_table<char32_t, s32> Letters;  // Key - letter, Value - power
+    hash_table<code_point, s32> Letters;  // Key - letter, Value - power
 
     ast_term() : ast(TERM, null, null) {}
 
@@ -131,9 +131,9 @@ struct ast_term : ast {
 
 // If unary operator, only "left" node is used. "right" must always be None.
 struct ast_op : ast {
-    char32_t Op;
+    char Op;
 
-    ast_op(char32_t op = 0, ast *left = null, ast *right = null) : ast(OP, left, right), Op(op) {}
+    ast_op(char op = 0, ast *left = null, ast *right = null) : ast(OP, left, right), Op(op) {}
 };
 
 inline void free_ast(ast *node) {

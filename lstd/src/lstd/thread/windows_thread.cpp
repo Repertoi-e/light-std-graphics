@@ -2,24 +2,9 @@
 
 #if OS == WINDOWS
 
-#include "lstd/common/context.h"
-#include "lstd/common/windows.h" // Declarations of Win32 functions
-
-#if !defined LSTD_NO_CRT
-#include <process.h>
-#endif
-
-import os;
-
 LSTD_BEGIN_NAMESPACE
 
 namespace thread {
-
-// Block the calling thread until a lock on the mutex can
-// be obtained. The mutex remains locked until unlock() is called.
-void fast_mutex::lock() {
-    while (!try_lock()) sleep(0);
-}
 
 //
 // Mutexes:
@@ -168,7 +153,7 @@ u32 __stdcall thread::wrapper_function(void *data) {
         OVERRIDE_CONTEXT(newContext);
     }
 
-    ti->Function(ti->UserData); // Call the thread function with the user data
+    ti->Function(ti->UserData);  // Call the thread function with the user data
 
     // Do we need this?
     // CloseHandle(ti->ThreadPtr->Handle);
@@ -187,7 +172,7 @@ u32 __stdcall thread::wrapper_function(void *data) {
 
 void thread::init_and_launch(const delegate<void(void *)> &function, void *userData) {
     // Passed to the thread wrapper, which will eventually free it
-    // @TODO @Speed @Memory Fragmentation! We should have a dedicated pool allocator for thread_start_info 
+    // @TODO @Speed @Memory Fragmentation! We should have a dedicated pool allocator for thread_start_info
     // because threads could be created/destroyed very often.
     auto *ti       = malloc<thread_start_info>({.Alloc = internal::platform_get_persistent_allocator()});
     ti->Function   = function;
@@ -211,7 +196,7 @@ void thread::init_and_launch(const delegate<void(void *)> &function, void *userD
 }
 
 void thread::wait() {
-    assert(get_id() != Context.ThreadID); // A thread cannot wait for itself!
+    assert(get_id() != Context.ThreadID);  // A thread cannot wait for itself!
     WaitForSingleObject(Handle, INFINITE);
 }
 
@@ -222,13 +207,13 @@ void thread::terminate() {
 }
 
 // return _pthread_t_to_ID(mHandle);
-id thread::get_id() const {
+u64 thread::get_id() const {
     return id((u64) Win32ThreadId);
 }
 
 void sleep(u32 ms) { Sleep(ms); }
 
-} // namespace thread
+}  // namespace thread
 LSTD_END_NAMESPACE
 
 #endif

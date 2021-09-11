@@ -2,15 +2,17 @@
 
 //
 // This file defines some common math functions:
-//    sign_bit, sign_no_zero, sign, copy_sign, 
-//    is_nan, is_signaling_nan, is_infinite, is_finite, 
-//    cast_numeric_safe, 
+//    sign_bit, sign_no_zero, sign, copy_sign,
+//    is_nan, is_signaling_nan, is_infinite, is_finite,
+//    cast_numeric_safe,
 //    min, max, clamp,
 //    is_pow_of_2, ceil_pow_of_2, const_exp10
 //    abs
 //
 
 #include "type_info.h"
+
+LSTD_BEGIN_NAMESPACE
 
 constexpr bool sign_bit(types::is_signed_integral auto x) { return x < 0; }
 constexpr bool sign_bit(types::is_unsigned_integral auto) { return false; }
@@ -159,3 +161,5 @@ constexpr auto abs(types::is_scalar auto x) {
         }
     }
 }
+
+LSTD_END_NAMESPACE

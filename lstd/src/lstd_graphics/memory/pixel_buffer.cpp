@@ -3,7 +3,7 @@
 #include "lstd/memory/string.h"
 #include "vendor/stb/stb_image.h"
 
-import path;
+import lstd.path;
 
 LSTD_BEGIN_NAMESPACE
 

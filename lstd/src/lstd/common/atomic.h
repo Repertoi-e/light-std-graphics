@@ -2,7 +2,7 @@
 
 #include <intrin.h>
 
-#include "types.h"
+#include "type_info.h"
 
 //
 // Atomic operations:

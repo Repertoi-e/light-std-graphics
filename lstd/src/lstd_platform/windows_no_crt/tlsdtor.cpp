@@ -1,5 +1,5 @@
 #include "common.h"
-#include "lstd/common/windows.h"
+#include "lstd_platform/windows.h"
 
 /***
 *tlsdtor.cpp - Thread Local Storage dynamic destruction run-time support module

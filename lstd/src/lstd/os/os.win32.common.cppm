@@ -1,8 +1,8 @@
 module;
 
-#include "lstd/common/windows.h"  // Declarations of Win32 functions
 #include "lstd/io.h"
 #include "lstd/memory/delegate.h"
+#include "lstd_platform/windows.h"  // Declarations of Win32 functions
 #include "platform_uninit.h"
 
 //
@@ -13,13 +13,19 @@ export module lstd.os.win32.common;
 
 import lstd.os.win32.memory;
 
-import fmt;
-import path;
+import lstd.fmt;
+import lstd.path;
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 #define MODULE_HANDLE ((HMODULE) &__ImageBase)
 
 LSTD_BEGIN_NAMESPACE
+
+//
+// @Platform @Cleanup @TODO: These declarations shouldn't be specific to win32.
+// Perhaps put them in a general module?
+// This also applies to the _path_ and _thread_ modules.
+//
 
 export {
     // Exits the application with the given exit code.
@@ -46,6 +52,30 @@ export {
     // Returns a pointer so you can modify the array of scheduled functions.
     // This is exported if you want to do something very weird and hacky.
     array<delegate<void()>> *exit_get_scheduled_functions();
+
+    struct os_read_file_result {
+        string Content;
+        bool Success;
+    };
+
+    enum class file_write_mode {
+        Append = 0,
+
+        // If the file is 50 bytes and you write 20,
+        // "Overwrite" keeps those 30 bytes at the end
+        // while "Overwrite_Entire" deletes them.
+        Overwrite,
+        Overwrite_Entire,
+    };
+
+    // Reads entire file into memory (no async variant available at the moment).
+    [[nodiscard("Leak")]] os_read_file_result os_read_entire_file(string path);
+
+    // Write _contents_ to a file.
+    // _mode_ determines if the content should be appended or overwritten. See _file_write_mode_ above.
+    //
+    // Returns true on success.
+    bool os_write_to_file(string path, string contents, file_write_mode mode);
 
     // Returns a time stamp that can be used for time-interval measurements
     time_t os_get_time();
@@ -409,7 +439,7 @@ string os_get_working_dir() {
 void os_set_working_dir(const string &dir) {
     assert(path_is_absolute(dir));
 
-    WIN_CHECKBOOL(SetCurrentDirectoryW(utf8_to_utf16(dir)));
+    WIN_CHECK_BOOL(SetCurrentDirectoryW(utf8_to_utf16(dir)));
 
     S->WorkingDirMutex.lock();
     defer(S->WorkingDirMutex.unlock());
@@ -459,11 +489,11 @@ void os_set_env(const string &name, const string &value) {
         assert(false);
     }
 
-    WIN_CHECKBOOL(SetEnvironmentVariableW(utf8_to_utf16(name), utf8_to_utf16(value)));
+    WIN_CHECK_BOOL(SetEnvironmentVariableW(utf8_to_utf16(name), utf8_to_utf16(value)));
 }
 
 void os_remove_env(const string &name) {
-    WIN_CHECKBOOL(SetEnvironmentVariableW(utf8_to_utf16(name), null));
+    WIN_CHECK_BOOL(SetEnvironmentVariableW(utf8_to_utf16(name), null));
 }
 
 [[nodiscard("Leak")]] string os_get_clipboard_content() {
@@ -531,6 +561,52 @@ bytes os_read_from_console() {
     DWORD read;
     ReadFile(S->CinHandle, S->CinBuffer, (DWORD) S->CONSOLE_BUFFER_SIZE, &read, null);
     return bytes(S->CinBuffer, (s64) read);
+}
+
+// @TODO @Clarity: Print more useful message about the path
+// :CopyAndPaste from path.nt
+#define CREATE_MAPPING_CHECKED(handleName, call)                                                               \
+    HANDLE handleName = call;                                                                                  \
+    if (!handleName) {                                                                                         \
+        string extendedCallSite = sprint("{}\n        (the name was: {!YELLOW}\"{}\"{!GRAY})\n", #call, name); \
+        char *cStr              = string_to_c_string(extendedCallSite);                                        \
+        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), cStr);                                \
+        free(cStr);                                                                                            \
+        free(extendedCallSite);                                                                                \
+        return;                                                                                                \
+    }
+
+[[nodiscard("Leak")]] os_read_entire_file_result os_read_entire_file(string path) {
+    os_read_entire_file_result fail = {string(), false};
+    CREATE_FILE_HANDLE_CHECKED(file, CreateFileW(utf8_to_utf16(path), GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, null), fail);
+    defer(CloseHandle(file));
+
+    LARGE_INTEGER size = {0};
+    GetFileSizeEx(file, &size);
+
+    array<byte> result;
+    array_reserve(result, size.QuadPart);
+    DWORD bytesRead;
+    if (!ReadFile(file, result.Data, (u32) size.QuadPart, &bytesRead, null)) return {{}, false};
+    assert(size.QuadPart == bytesRead);
+
+    result.Count += bytesRead;
+    return {result, true};
+}
+
+bool os_write_to_file(string path, string contents, file_write_mode mode) {
+    CREATE_FILE_HANDLE_CHECKED(file, CreateFileW(utf8_to_utf16(path), GENERIC_WRITE, 0, null, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, null), false);
+    defer(CloseHandle(file));
+
+    LARGE_INTEGER pointer = {};
+    pointer.QuadPart      = 0;
+    if (mode == path_write_mode::Append) SetFilePointerEx(file, pointer, null, FILE_END);
+    if (mode == path_write_mode::Overwrite_Entire) SetEndOfFile(file);
+
+    DWORD bytesWritten;
+    if (!WriteFile(file, contents.Data, (u32) contents.Count, &bytesWritten, null)) return false;
+    if (bytesWritten != contents.Count) return false;
+    return true;
 }
 
 void console_writer::write(const byte *data, s64 size) {
