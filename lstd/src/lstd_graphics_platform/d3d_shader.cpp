@@ -15,7 +15,7 @@
 
 LSTD_BEGIN_NAMESPACE
 
-static ID3DBlob *compile_shader(const string &source, const char *profile, const char *main) {
+static ID3DBlob *compile_shader(string source, const char *profile, const char *main) {
     ID3DBlob *shaderBlob = null, *errorBlob = null;
     DX_CHECK(D3DCompile(source.Data, source.Count, null, null, null, main, profile, D3DCOMPILE_DEBUG, 0, &shaderBlob, &errorBlob));
     if (errorBlob) {
@@ -26,7 +26,7 @@ static ID3DBlob *compile_shader(const string &source, const char *profile, const
     return shaderBlob;
 }
 
-static gtype string_to_gtype(const string &type) {
+static gtype string_to_gtype(string type) {
     s64 digit = find_any_of(type, "0123456789");
     if (digit != -1) {
         s64 x             = find(type, 'x');

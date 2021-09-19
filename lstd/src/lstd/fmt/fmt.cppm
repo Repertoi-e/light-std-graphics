@@ -1,7 +1,6 @@
 module;
 
 #include "../common/context.h"
-#include "../io.h"
 #include "../math.h"
 #include "../memory/guid.h"
 
@@ -176,33 +175,33 @@ export {
 
     // Formats to a writer.
     template <typename... Args>
-    void fmt_to_writer(writer * out, const string &fmtString, Args &&...arguments);
+    void fmt_to_writer(writer * out, string fmtString, Args && ...arguments);
 
     // Formats to a counting writer and returns the result - how many bytes would be written with the given format string and args.
     template <typename... Args>
-    s64 fmt_calculate_length(const string &fmtString, Args &&...arguments);
+    s64 fmt_calculate_length(string fmtString, Args && ...arguments);
 
     // Formats to a string. The caller is responsible for freeing.
     template <typename... Args>
-    [[nodiscard("Leak")]] string sprint(const string &fmtString, Args &&...arguments);
+    [[nodiscard("Leak")]] string sprint(string fmtString, Args && ...arguments);
 
     // Formats to a string. Uses the temporary allocator.
     template <typename... Args>
-    string tsprint(const string &fmtString, Args &&...arguments);
+    string tsprint(string fmtString, Args && ...arguments);
 
     // Formats to a string then converts to null-terminated string. Uses the temporary allocator.
     template <typename... Args>
-    char *mprint(const string &fmtString, Args &&...arguments);
+    char *mprint(string fmtString, Args && ...arguments);
 
     // Calls fmt_to_writer on Context.Log - which is pointing to the console by default, but that can be changed to redirect the output.
     template <typename... Args>
-    void print(const string &fmtString, Args &&...arguments);
+    void print(string fmtString, Args && ...arguments);
 
     // Same as print, but the format string is expected to contain standard printf syntax.
     // Type-safety, custom-formatters, etc. work here. You don't get all features, b
     // ut this is designed as a drop-in replacement for printf.
     template <typename... Args>
-    void printf(const string &fmtString, Args &&...arguments) {
+    void printf(string fmtString, Args && ...arguments) {
         // @TODO
         assert(false);
     }
@@ -217,8 +216,7 @@ fmt_type get_type(fmt_args ars, s64 index) {
     return (fmt_type) ((ars.Types & (0xfull << shift)) >> shift);
 }
 
-template <typename FC>
-fmt_arg<FC> get_arg(fmt_args ars, s64 index) {
+fmt_arg get_arg(fmt_args ars, s64 index) {
     if (index >= ars.Count) return {};
 
     if (!(ars.Types & IS_UNPACKED_BIT)) {
@@ -227,12 +225,12 @@ fmt_arg<FC> get_arg(fmt_args ars, s64 index) {
         auto type = get_type(ars, index);
         if (type == fmt_type::NONE) return {};
 
-        fmt_arg<FC> result;
+        fmt_arg result;
         result.Type  = type;
-        result.Value = ((fmt_value<FC> *) ars.Data)[index];
+        result.Value = ((fmt_value *) ars.Data)[index];
         return result;
     }
-    return ((fmt_arg<FC> *) ars.Data)[index];
+    return ((fmt_arg *) ars.Data)[index];
 }
 
 struct width_checker {
@@ -277,12 +275,9 @@ struct precision_checker {
     }
 };
 
-// Returns an argument from index and reports an error if it is out of bounds.
-// Doesn't support negative indexing! (@Robustness ?)
-template <typename FC>
-fmt_arg<FC> fmt_get_arg_from_index(FC *f, s64 index) {
+fmt_arg fmt_get_arg_from_index(fmt_context *f, s64 index) {
     if (index < f->Args.Count) {
-        return get_arg<FC>(f->Args, index);
+        return get_arg(f->Args, index);
     }
     f->on_error("Argument index out of range");
     return {};
@@ -426,7 +421,7 @@ void fmt_parse_and_format(fmt_context *f) {
 }
 
 template <typename... Args>
-void fmt_to_writer(writer *out, const string &fmtString, Args &&...arguments) {
+void fmt_to_writer(writer *out, string fmtString, Args &&...arguments) {
     // @TODO: Can we remove this? (the fmt_context{})
     auto args = fmt_args_on_the_stack(fmt_context{}, ((types::remove_reference_t<Args> &&) arguments)...);  // This needs to outlive _parse_fmt_string_
     auto f    = fmt_context(out, fmtString, args);
@@ -435,17 +430,15 @@ void fmt_to_writer(writer *out, const string &fmtString, Args &&...arguments) {
     f.flush();
 }
 
-// Formats to a counting writer and returns the result - how many bytes would be written with the given format string and args.
 template <typename... Args>
-s64 fmt_calculate_length(const string &fmtString, Args &&...arguments) {
+s64 fmt_calculate_length(string fmtString, Args &&...arguments) {
     counting_writer writer;
     fmt_to_writer(&writer, fmtString, ((Args &&) arguments)...);
     return writer.Count;
 }
 
-// Formats to a string. The caller is responsible for freeing.
 template <typename... Args>
-[[nodiscard("Leak")]] string sprint(const string &fmtString, Args &&...arguments) {
+[[nodiscard("Leak")]] string sprint(string fmtString, Args &&...arguments) {
     auto writer = string_builder_writer();
     fmt_to_writer(&writer, fmtString, ((Args &&) arguments)...);
 
@@ -455,25 +448,22 @@ template <typename... Args>
     return combined;
 }
 
-// Formats to a string. Uses the temporary allocator.
 template <typename... Args>
-string tsprint(const string &fmtString, Args &&...arguments) {
-    PUSH_ALLOC(Context.TempAlloc) {
+string tsprint(string fmtString, Args &&...arguments) {
+    PUSH_ALLOC(TemporaryAllocator) {
         return sprint(fmtString, ((Args &&) arguments)...);
     }
 }
 
-// Formats to a string. Uses the temporary allocator.
 template <typename... Args>
-char *mprint(const string &fmtString, Args &&...arguments) {
-    PUSH_ALLOC(Context.TempAlloc) {
+char *mprint(string fmtString, Args &&...arguments) {
+    PUSH_ALLOC(TemporaryAllocator) {
         return string_to_c_string(sprint(fmtString, ((Args &&) arguments)...));
     }
 }
 
-// Calls fmt_to_writer on Context.Log - which is usually pointing to the console
 template <typename... Args>
-void print(const string &fmtString, Args &&...arguments) {
+void print(string fmtString, Args &&...arguments) {
     assert(Context.Log && "Context log was null. By default it points to cout.");
     fmt_to_writer(Context.Log, fmtString, ((Args &&) arguments)...);
 }
@@ -579,15 +569,10 @@ struct formatter<stack_array<T, N>> {
     void format(const stack_array<T, N> &src, fmt_context *f) { format_list(f).entries(src.Data, src.Count)->finish(); }
 };
 
-template <>
-struct formatter<thread::id> {
-    void format(thread::id src, fmt_context *f) { write(f, src.Value); }
-};
-
 //
 // Formatters for math types:
 //
-
+/*
 // Formats vector in the following way: [1, 2, ...]
 template <typename T, s32 Dim, bool Packed>
 struct formatter<vec<T, Dim, Packed>> {
@@ -679,8 +664,9 @@ struct formatter<tquat<T, Packed>> {
         }
     }
 };
+*/
 
-export static void fmt_default_parse_error_handler(const string &message, const string &formatString, s64 position) {
+export static void fmt_default_parse_error_handler(string message, string formatString, s64 position) {
     // An error during formatting occured.
     // If you are running a debugger it has now hit a breakpoint.
     //

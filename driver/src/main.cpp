@@ -88,21 +88,21 @@ void imgui_for_our_windows_new_frame();
 // @TODO: Provide a library construct for parsing arguments automatically
 file_scope void parse_arguments() {
     array<string> usage;
-    array_append(usage, string("Usage:\n"));
-    array_append(usage,
+    add(usage, string("Usage:\n"));
+    add(usage,
                  string("    {!YELLOW}-dll <name>{!GRAY}    "
                         "Specifies which dll to hot load in the engine. By default it searches for cars.dll{!}\n\n"));
-    array_append(usage,
+    add(usage,
                  string("    {!YELLOW}-memory <amount>{!GRAY}    "
                         "Specifies the amount of memory (in MiB) which gets reserved for the app (default is 128 MiB)."
                         "Usage must never cross this.{!}\n\n"));
-    array_append(usage,
+    add(usage,
                  string("    {!YELLOW}-width <value>{!GRAY}    "
                         "Specifies the width of the app window (default is 1200).{!}\n\n"));
-    array_append(usage,
+    add(usage,
                  string("    {!YELLOW}-heigth <value>{!GRAY}    "
                         "Specifies the height of the app window (default is 600).\n\n"));
-    array_append(usage,
+    add(usage,
                  string("    {!YELLOW}-fps <value>{!GRAY}    "
                         "Specifies the target fps (default is 60).\n\n"));
     defer(free(usage));
@@ -230,8 +230,8 @@ s32 main() {
 
     m->PersistentAlloc = PersistentAlloc;
 
-    allocator_add_pool(Context.TempAlloc, os_allocate_block(1_MiB), 1_MiB);
-    m->TemporaryAlloc = Context.TempAlloc;
+    allocator_add_pool(TemporaryAllocator, os_allocate_block(1_MiB), 1_MiB);
+    m->TemporaryAlloc = TemporaryAllocator;
 
     parse_arguments();
     setup_paths();
@@ -244,7 +244,7 @@ s32 main() {
 
     auto icon = pixel_buffer("data/calc.png", false, pixel_format::RGBA);
     array<pixel_buffer> icons;
-    array_append(icons, icon);
+    add(icons, icon);
     m->MainWindow.set_icon(icons);
     free(icons);
 
@@ -253,7 +253,7 @@ s32 main() {
         return false;
     }));
 
-    m->GetStateImpl = [](const string &name, s64 size, bool *created) {
+    m->GetStateImpl = [](string name, s64 size, bool *created) {
         string identifier = name;
         string_append(identifier, "Ident");
 

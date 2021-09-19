@@ -20,7 +20,7 @@ void graphics::init(graphics_api api) {
     Impl.Init(this);
 
     auto predicate = [](auto x) { return !x.Window; };
-    if (find(TargetWindows, &predicate) == -1) array_append(TargetWindows);  // Add a null target
+    if (find(TargetWindows, &predicate) == -1) add(TargetWindows);  // Add a null target
     set_target_window({});
 }
 
@@ -34,7 +34,7 @@ void graphics::set_target_window(window win) {
 
     target_window *targetWindow;
     if (index == -1) {
-        targetWindow         = array_append(TargetWindows);
+        targetWindow         = add(TargetWindows);
         targetWindow->Window = win;
         if (win) {
             targetWindow->CallbackID = win.connect_event({this, &graphics::window_event_handler});

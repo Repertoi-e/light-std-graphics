@@ -17,7 +17,7 @@ enum : u32 {
 };
 
 // Convert a mouse button from it's name to code
-inline u32 mouse_button_code_from_name(const string &name) {
+inline u32 mouse_button_code_from_name(string name) {
     if (name == "Left") {
         return Mouse_Button_Left;
     } else if (name == "Right") {
@@ -34,7 +34,7 @@ inline u32 mouse_button_code_from_name(const string &name) {
 }
 
 // Convert a mouse button from it's code to name
-inline const string &mouse_button_name_from_code(u32 code) {
+inline string mouse_button_name_from_code(u32 code) {
     if (code == Mouse_Button_Left) {
         return "Left";
     } else if (code == Mouse_Button_Right) {
@@ -187,7 +187,7 @@ enum : u32 {
 };
 
 // Returns 0 on error
-inline u32 key_code_from_name(const string &name);
+inline u32 key_code_from_name(string name);
 inline string key_name_from_code(u32 code);
 
 namespace internal {

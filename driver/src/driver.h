@@ -68,13 +68,13 @@ struct memory {
 
     // We need states to be allocated in the .exe, since the .exe is gonna free them in the end.
     // @Cleanup Why does this function need to be in the exe?
-    void *(*GetStateImpl)(const string &name, s64 size, bool *created);
+    void *(*GetStateImpl)(string name, s64 size, bool *created);
 
     // Call this function to manage a global pointer using our table of states above.
     // If the thing with type T doesn't exist in the table, we allocate it and insert it
     // otherwise we return whatever is stored with that name.
     template <typename T>
-    T *get_state(const string &name) {
+    T *get_state(string name) {
         bool created = false;
         auto *result = (T *) GetStateImpl(name, sizeof(T), &created);
         if (created) new (result) T;  // initialize

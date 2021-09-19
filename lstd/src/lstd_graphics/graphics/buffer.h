@@ -24,7 +24,7 @@ struct buffer_layout {
     s64 TotalSize = 0;  // Calculated in bytes (1-bit values add 7 bits of packing),
                         // generally used internally to calculate the offset for the next element
 
-    void add(const string &name, gtype type, s64 count = 1, bool normalized = false);
+    void add(string name, gtype type, s64 count = 1, bool normalized = false);
     void add_padding(s64 bytes);
 
     void release() { free(Elements); }

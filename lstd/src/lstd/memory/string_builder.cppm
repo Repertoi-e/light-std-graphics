@@ -33,8 +33,6 @@ export {
         // This value is null until this object allocates memory (in which case it sets
         // it to the Context's allocator) or the user sets it manually.
         allocator Alloc;
-
-        string_builder() {}
     };
 
     // Don't free the buffers, just reset cursor
@@ -58,6 +56,6 @@ export {
     [[nodiscard("Leak")]] string builder_to_string(string_builder * builder);
 }
 
-string_builder::buffer *get_current_buffer(string_builder &builder);
+string_builder::buffer *get_current_buffer(string_builder *builder);
 
 LSTD_END_NAMESPACE

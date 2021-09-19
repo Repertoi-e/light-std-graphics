@@ -59,8 +59,8 @@ struct shader : public asset, non_copyable, non_movable {
 
     shader() {}
 
-    void init_from_file(graphics *g, const string &file);
-    void init_from_source(graphics *g, const string &source);
+    void init_from_file(graphics *g, string file);
+    void init_from_source(graphics *g, string source);
 
     void bind();
     void unbind();

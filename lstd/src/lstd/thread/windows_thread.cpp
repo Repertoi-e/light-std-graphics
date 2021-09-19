@@ -149,7 +149,7 @@ u32 __stdcall thread::wrapper_function(void *data) {
     // but it needs to point to its own temp data (otherwise we are not thread-safe).
     if (ti->ContextPtr->Alloc == ti->ContextPtr->TempAlloc) {
         auto newContext  = Context;
-        newContext.Alloc = Context.TempAlloc;
+        newContext.Alloc = TemporaryAllocator;
         OVERRIDE_CONTEXT(newContext);
     }
 

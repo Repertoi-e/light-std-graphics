@@ -7,7 +7,7 @@ import lstd.path;
 LSTD_BEGIN_NAMESPACE
 
 extern shader::impl g_D3DShaderImpl;  // Defined in d3d_shader.cpp
-void shader::init_from_file(graphics *g, const string &file) {
+void shader::init_from_file(graphics *g, string file) {
     clone(&FilePath, file);
 
     auto [source, sucess] = path_read_entire_file(file);
@@ -24,7 +24,7 @@ void shader::init_from_file(graphics *g, const string &file) {
     Impl.Init(this);
 }
 
-void shader::init_from_source(graphics *g, const string &source) {
+void shader::init_from_source(graphics *g, string source) {
     Graphics = g;
 
     clone(&Source, source);

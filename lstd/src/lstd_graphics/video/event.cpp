@@ -40,7 +40,7 @@ static s32 KEY_ID_ORDER[] = {39, 30, 31, 32, 33, 34, 35, 36, 37, 38, 4, 5, 49, 6
                              100, 18, 19, 78, 75, 72, 55, 70, 20, 52, 21, 158, 79, 230, 48, 228, 231, 229,
                              22, 71, 51, 56, 44, 154, 23, 43, 24, 82, 25, 26, 27, 28, 29};
 
-u32 key_code_from_name(const string &name) {
+u32 key_code_from_name(string name) {
     char buffer[14];
 
     s32 n;

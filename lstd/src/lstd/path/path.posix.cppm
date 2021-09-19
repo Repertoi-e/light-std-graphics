@@ -30,24 +30,24 @@ export {
     //    ./data/myData       -> false
     //    ../data/myData      -> false
     //    data/myData         -> false
-    constexpr bool path_is_absolute(const string &path) { return path_is_sep(path[0]); }
+    constexpr bool path_is_absolute(string path) { return path_is_sep(path[0]); }
 
     // Joins two or more paths.
     // Ignore the previous parts if a part is absolute.
     // This is the de facto way to build paths. Takes care of slashes automatically.
-    [[nodiscard("Leak")]] string path_join(const array<string> &paths) {
+    [[nodiscard("Leak")]] string path_join(array<string> paths) {
         assert(false && "Not implemented");
         return "";
     }
 
-    [[nodiscard("Leak")]] always_inline string path_join(const string &one, const string &other) {
+    [[nodiscard("Leak")]] always_inline string path_join(string one, string other) {
         auto arr = make_stack_array(one, other);
         return path_join(arr);
     }
 
     // Normalize a pathname by collapsing redundant separators and up-level references so that A//B, A/B/, A/./B and A/foo/../B all become A/B.
     // This string manipulation may change the meaning of a path that contains symbolic links.
-    string path_normalize(const string &path) {
+    string path_normalize(string path) {
         assert(false && "Not implemented");
         return "";
     }
@@ -56,15 +56,15 @@ export {
     // The resulting head won't end in '/' unless it is the root.
     //
     // Note: The returned strings are substrings so they shouldn't be freed.
-    path_split_result path_split(const string &path) {
-        s64 i = find_cp_reverse(path, '/') + 1;
+    path_split_result path_split(string path) {
+        s64 i = string_find(path, '/', string_length(path), true) + 1;
 
-        string head = path[{0, i}];
-        string tail = path[{i, path.Length}];
+        string head = substring(path, 0, i);
+        string tail = substring(path, i, string_length(path));
 
         // If head exists and doesn not consist only of slashes
-        if (head && find_cp_not(head, '/') != -1) {
-            head = substring(head, 0, find_cp_not(head, '/', true) + 1);
+        if (head && string_find_not(head, '/') != -1) {
+            head = substring(head, 0, string_find_not(head, '/', string_length(path), true) + 1);
         }
 
         return {head, tail};
@@ -77,7 +77,7 @@ export {
     //    /home/user/dir     -> dir
     //
     // Note: The result is a substring and shouldn't be freed.
-    always_inline string path_base_name(const string &path) {
+    always_inline string path_base_name(string path) {
         auto [_, tail] = path_split(path);
         return tail;
     }
@@ -89,7 +89,7 @@ export {
     //    /home/user/dir     -> /home/user
     //
     // Note: The result is a substring and shouldn't be freed.
-    always_inline string path_directory(const string &path) {
+    always_inline string path_directory(string path) {
         auto [head, _] = path_split(path);
         return head;
     }
@@ -102,7 +102,7 @@ export {
     //    /home/user/me           -> { "/home/user/me",      "" }
     //
     // Note: The returned strings are substrings so they shouldn't be freed.
-    always_inline constexpr path_split_extension_result path_split_extension(const string &path) {
+    always_inline constexpr path_split_extension_result path_split_extension(string path) {
         return path_split_extension_general(path, '/', 0, '.');
     }
 }

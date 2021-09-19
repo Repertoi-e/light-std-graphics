@@ -1,7 +1,5 @@
 module;
 
-#include "lstd/io.h"
-#include "lstd/memory/delegate.h"
 #include "lstd_platform/windows.h"  // Declarations of Win32 functions
 #include "platform_uninit.h"
 
@@ -103,7 +101,7 @@ export {
     // Sets the current directory of the current process.
     // [Windows] The docs say that SetCurrentDirectory/GetCurrentDirectory
     //           are not thread-safe but we use a lock so ours are.
-    void os_set_working_dir(const string &dir);
+    void os_set_working_dir(string dir);
 
     // Get a list of parsed command line arguments excluding the first one - normally the first one
     // is the exe name - but you can get that with os_get_current_module().
@@ -130,20 +128,20 @@ export {
     // If not found and silent is false, logs warning.
     // The caller is responsible for freeing the returned string.
     // @TODO: Cache this, then we would return a string that needn't be freed and avoid allocations when calling this function multiple times.
-    [[nodiscard("Leak")]] os_get_env_result os_get_env(const string &name, bool silent = false);
+    [[nodiscard("Leak")]] os_get_env_result os_get_env(string name, bool silent = false);
 
     // Sets a variable (creates if it doesn't exist yet) in the current process' environment
-    void os_set_env(const string &name, const string &value);
+    void os_set_env(string name, string value);
 
     // Remove a variable from the current process' environment
-    void os_remove_env(const string &name);
+    void os_remove_env(string name);
 
     // Returns the content stored in the clipboard as a utf8 string.
     // The caller is responsible for freeing.
     [[nodiscard("Leak")]] string os_get_clipboard_content();
 
     // Sets the clipboard content (expects a utf8 string).
-    void os_set_clipboard_content(const string &content);
+    void os_set_clipboard_content(string content);
 }
 
 LSTD_MODULE_PRIVATE
@@ -186,7 +184,7 @@ byte State[sizeof(win64_common_state)];
 #define PERSISTENT internal::platform_get_persistent_allocator()
 #define TEMP internal::platform_get_temporary_allocator()
 
-wchar *utf8_to_utf16(const string &str, allocator alloc = {}) { return internal::platform_utf8_to_utf16(str, alloc); }
+wchar *utf8_to_utf16(string str, allocator alloc = {}) { return internal::platform_utf8_to_utf16(str, alloc); }
 string utf16_to_utf8(const wchar *str, allocator alloc = {}) { return internal::platform_utf16_to_utf8(str, alloc); }
 
 void report_warning_no_allocations(string message) {
@@ -302,7 +300,7 @@ void parse_arguments() {
     }
 
     // Loop over all arguments and add them, skip the .exe name
-    For(range(1, argc)) array_append(S->Argv, utf16_to_utf8(argv[it], PERSISTENT));
+    For(range(1, argc)) add(S->Argv, utf16_to_utf8(argv[it], PERSISTENT));
 }
 
 export namespace internal {
@@ -385,7 +383,7 @@ void exit_schedule(const delegate<void()> &function) {
     S->ExitScheduleMutex.lock();
 
     PUSH_ALLOC(PERSISTENT) {
-        array_append(S->ExitFunctions, function);
+        add(S->ExitFunctions, function);
     }
 
     S->ExitScheduleMutex.unlock();
@@ -436,7 +434,7 @@ string os_get_working_dir() {
     return S->WorkingDir;
 }
 
-void os_set_working_dir(const string &dir) {
+void os_set_working_dir(string dir) {
     assert(path_is_absolute(dir));
 
     WIN_CHECK_BOOL(SetCurrentDirectoryW(utf8_to_utf16(dir)));
@@ -455,7 +453,7 @@ constexpr u32 ERROR_ENVVAR_NOT_FOUND = 203;
 // @TODO: Cache environment variables when running the program in order to avoid allocating.
 // Store them null-terminated in the cache, to avoid callers which expect C style strings having to convert.
 //
-[[nodiscard("Leak")]] os_get_env_result os_get_env(const string &name, bool silent) {
+[[nodiscard("Leak")]] os_get_env_result os_get_env(string name, bool silent) {
     auto *name16 = utf8_to_utf16(name, PERSISTENT);
     defer(free(name16));
 
@@ -483,7 +481,7 @@ constexpr u32 ERROR_ENVVAR_NOT_FOUND = 203;
     return {utf16_to_utf8(buffer, PERSISTENT), true};
 }
 
-void os_set_env(const string &name, const string &value) {
+void os_set_env(string name, string value) {
     if (value.Length > 32767) {
         // @Cleanup: The docs say windows doesn't allow that but we should test it.
         assert(false);
@@ -492,7 +490,7 @@ void os_set_env(const string &name, const string &value) {
     WIN_CHECK_BOOL(SetEnvironmentVariableW(utf8_to_utf16(name), utf8_to_utf16(value)));
 }
 
-void os_remove_env(const string &name) {
+void os_remove_env(string name) {
     WIN_CHECK_BOOL(SetEnvironmentVariableW(utf8_to_utf16(name), null));
 }
 
@@ -519,7 +517,7 @@ void os_remove_env(const string &name) {
     return utf16_to_utf8(clipboard16, PERSISTENT);
 }
 
-void os_set_clipboard_content(const string &content) {
+void os_set_clipboard_content(string content) {
     HANDLE object = GlobalAlloc(GMEM_MOVEABLE, content.Length * 2 * sizeof(wchar));
     if (!object) {
         internal::platform_report_error("Failed to open clipboard");

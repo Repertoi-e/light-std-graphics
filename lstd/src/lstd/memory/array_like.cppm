@@ -96,38 +96,6 @@ export {
     // @Speed Optimize these functions for scalars (bit hacks and vectorization)
     //
 
-    // The following functions take a const& because a user-defined type may be large and cause unnecessary copying.
-    // This is the only place where we use references in the library.
-
-    // Overload these for your custom type if other things need to happen.
-
-    constexpr auto get(any_array_like auto &arr, s64 index) { return &arr.Data[translate_index(index, arr.Count)]; }  // This overloads for both const and non-const.
-
-    //
-    // We support Python-like negative indices.
-    //
-    // e.g. this is valid:   subarray(&arr, 2, -1)
-    //      to get everything from the second to the last element (without the last).
-    //
-    // When calling on strings, treats indices as pointing to bytes.
-    // To get a proper substring on an utf-8 string call _substring()_, defined in string.cppm.
-    //
-    // This doesn't allocate memory but just returns an array with a new data pointer and count.
-    // Overload this for your custom type if other things need to happen.
-    //
-
-    // Overloads both for const and non-const, but we cannot return a const, because we are making a new array essentially.
-    // This means that you can modify the original through the subarray regardless.
-    constexpr auto subarray(any_array_like auto &arr, s64 begin, s64 end) {
-        s64 targetBegin = translate_index(begin, arr.Count);
-        s64 targetEnd   = translate_index(end, arr.Count, true);
-
-        types::remove_cvref_t<decltype(arr)> result;
-        result.Data  = arr.Data + targetBegin;
-        result.Count = targetEnd - targetBegin + 1;
-        return result;
-    }
-
     // Find the first occurence of an element which matches the predicate and is after a specified index.
     // Predicate must take a single argument (the current element) and return if it matches.
     template <any_array_like Arr>

@@ -4,14 +4,27 @@ module;
 
 export module lstd.context;
 
-export import lstd.array;
-export import lstd.memory;
+export import lstd.string;
 
 LSTD_BEGIN_NAMESPACE
 
 struct writer;
 
 export {
+    struct os_function_call {
+        string Name;
+        string File;
+        u32 LineNumber = -1;
+    };
+
+    os_function_call clone(os_function_call src) {
+        os_function_call result;
+        result.Name       = clone(src.Name);
+        result.File       = clone(src.File);
+        result.LineNumber = src.LineNumber;
+        return result;
+    }
+
     using panic_handler_t = void (*)(string message, const array<os_function_call> &callStack);
     void default_panic_handler(string message, const array<os_function_call> &callStack);
 
@@ -32,34 +45,6 @@ export {
     //
     struct context {
         u32 ThreadID;  // The current thread's ID
-
-        //
-        // :TemporaryAllocator: Take a look at the docs of this allocator in "allocator.h"
-        // (or the allocator module if you are living in the future).
-        //
-        // We store an arena allocator in the Context that is meant to be used as temporary storage.
-        // It can be used to allocate memory that is not meant to last long (e.g. converting utf8 to wchar
-        // to pass to a windows call).
-        //
-        // If you are programming a game and you need to do some calculations each frame,
-        // using this allocator means having the freedom of dynamically allocating without
-        // compromising performance. At the end of the frame when the memory is no longer
-        // used you call free_all(Context.TempAlloc) (which is extremely cheap - bumps a single pointer).
-        //
-        // This gets initialized the first time it gets used in a thread.
-        // Each thread gets a unique temporary allocator to prevent data races and to remain fast.
-        // Default size is 8 KiB but you can increase that by adding a pool with allocator_add_pool().
-        //
-        // When out of memory, it automatically allocates a new bigger pool.
-        // We print warnings when allocating new pools. Use that as a guide to see when you need
-        // to pay more attention: perhaps increase the starting pool size or call free_all() more often.
-        //
-        // Note: This is the only variable that doesn't get copied from the parent thread.
-        // Instead each thread gets its own temporary allocator data.
-        // _TempAllocData_ is stored outside of the context, because having a member
-        // variable pointing to another member variable is dangerous.
-        //
-        allocator TempAlloc;
 
         ///////////////////////////////////////////////////////////////////////////////////////
         //
@@ -188,16 +173,40 @@ export {
     // The reason this is a const variable is that it may prevent unintended bugs.
     // A malicious author of a library can use a const_cast to change a variable and not restore
     // it in the end, but he can also do 1000 other things that completely break your program, so...
-    inline const thread_local context Context;
+    inline const thread_local context Context = {};
 
-    // We store this outside the context because having a member point to another member in the struct is dangerous.
-    // It would get invalidated the moment when the Context is copied. One of the points in our type policy says that
-    // stuff should work if it is copied byte by byte.
-    inline const thread_local arena_allocator_data TempAllocData;
+    //
+    // :TemporaryAllocator: Take a look at the docs of this allocator in "allocator.h"
+    // (or the allocator module if you are living in the future).
+    //
+    // We store an arena allocator in the Context that is meant to be used as temporary storage.
+    // It can be used to allocate memory that is not meant to last long (e.g. converting utf-8 to utf-16
+    // to pass to a windows call).
+    //
+    // If you are programming a game and you need to do some calculations each frame,
+    // using this allocator means having the freedom of dynamically allocating without
+    // compromising performance. At the end of the frame when the memory is no longer
+    // used you call free_all(TemporaryAllocator) (which is extremely cheap - bumps a single pointer).
+    //
+    // This gets initialized the first time it gets used in a thread.
+    // Each thread gets a unique temporary allocator to prevent data races and to remain fast.
+    // Default size is 8 KiB but you can increase that by adding a pool with allocator_add_pool().
+    //
+    // When out of memory, it automatically allocates a new bigger pool.
+    // We print warnings when allocating new pools. Use that as a guide to see when you need
+    // to pay more attention: perhaps increase the starting pool size or call free_all() more often.
+    //
+    // Note: This is the only variable that doesn't get copied from the parent thread.
+    // Instead each thread gets its own temporary allocator data.
+    // _TempAllocData_ is stored outside of the context, because having a member
+    // variable pointing to another member variable is dangerous.
+    //
+    inline const thread_local arena_allocator_data TemporaryAllocatorData;
+    inline const thread_local allocator TemporaryAllocator;
 
     // Allocates a buffer, copies the string's contents and also appends a zero terminator.
     // Uses the temporary allocator.
-    char *string_to_c_string_temp(string s) { return string_to_c_string(s, Context.TempAlloc); }
+    char *string_to_c_string_temp(string s) { return string_to_c_string(s, TemporaryAllocator); }
 }
 
 LSTD_END_NAMESPACE

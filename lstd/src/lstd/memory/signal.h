@@ -92,7 +92,7 @@ struct collector_array {
     result_t Array;
 
     bool operator()(Result r) {
-        array_append(Array, r);
+        add(Array, r);
         return true;
     }
 
@@ -138,7 +138,7 @@ struct signal<R(Args ...), Collector> : public non_copyable {
 
     // Connects default callback if non-null.
     signal(const callback_t &cb = null) {
-        if (cb) array_append(Callbacks, cb);
+        if (cb) add(Callbacks, cb);
     }
 
     void release() {
@@ -149,7 +149,7 @@ struct signal<R(Args ...), Collector> : public non_copyable {
     // Add a new callback, returns a handler ID which you can use to remove the callback later
     template <typename... CBArgs>
     s64 connect(const callback_t &cb) {
-        if (cb) array_append(Callbacks, cb);
+        if (cb) add(Callbacks, cb);
         return Callbacks.Count - 1;
     }
 
@@ -163,7 +163,7 @@ struct signal<R(Args ...), Collector> : public non_copyable {
             }
             return false;
         }
-        array_append(ToRemove, index);
+        add(ToRemove, index);
         return false; // We will remove the callback once we have finished emitting
     }
 

@@ -24,15 +24,15 @@ extern "C" double strtod(const char *str, char **endptr);
             auto str = substring(s, 0, end - ch);
             s = substring(s, end - ch, s.Length);
 
-            array_append(stream.Tokens, {token::NUMBER, str, fltValue});
+            add(stream.Tokens, {token::NUMBER, str, fltValue});
         } else if (is_op(s[0])) {
-            array_append(stream.Tokens, {token::OPERATOR, substring(s, 0, 1)});
+            add(stream.Tokens, {token::OPERATOR, substring(s, 0, 1)});
             s = substring(s, 1, s.Length);
         } else if (is_parenthesis(s[0])) {
-            array_append(stream.Tokens, {token::PARENTHESIS, substring(s, 0, 1)});
+            add(stream.Tokens, {token::PARENTHESIS, substring(s, 0, 1)});
             s = substring(s, 1, s.Length);
         } else if (is_alpha(s[0])) {
-            array_append(stream.Tokens, {token::VARIABLE, substring(s, 0, 1)});
+            add(stream.Tokens, {token::VARIABLE, substring(s, 0, 1)});
             s = substring(s, 1, s.Length);
         } else {
             error(stream, "Unexpected character when parsing", s.Data - stream.Expression.Data);
@@ -197,7 +197,7 @@ void pop_op(array<token> &ops, array<ast *> &operands) {
             toPush = unop;
         }
 
-        array_append(operands, toPush);
+        add(operands, toPush);
     } else {
         auto *t1 = operands[-1];
         array_remove_at(operands, -1);  // pop
@@ -264,7 +264,7 @@ void pop_op(array<token> &ops, array<ast *> &operands) {
             toPush = binop;
         }
 
-        array_append(operands, toPush);
+        add(operands, toPush);
     }
 }
 
@@ -272,7 +272,7 @@ void push_op(token op, array<token> &ops, array<ast *> &operands) {
     while (ops[-1] > op) {
         pop_op(ops, operands);
     }
-    array_append(ops, op);
+    add(ops, op);
 }
 
 void parse_e(token_stream &stream, array<token> &ops, array<ast *> &operands);
@@ -287,12 +287,12 @@ void parse_p(token_stream &stream, array<token> &ops, array<ast *> &operands) {
         } else {
             v->Coeff = next.F64Value;
         }
-        array_append(operands, (ast *) v);
+        add(operands, (ast *) v);
         consume(stream);
     } else if (next.Str == "(") {
         consume(stream);
 
-        array_append(ops, OP_SENTINEL);  // push sentinel
+        add(ops, OP_SENTINEL);  // push sentinel
 
         parse_e(stream, ops, operands);
         expect(stream, token(token::PARENTHESIS, ")"));
@@ -342,7 +342,7 @@ void parse_e(token_stream &stream, array<token> &ops, array<ast *> &operands) {
     array<token> ops;  // @Speed @Cleanup Make these stacks
     array<ast *> operands;
 
-    array_append(ops, OP_SENTINEL);
+    add(ops, OP_SENTINEL);
 
     parse_e(stream, ops, operands);
     expect(stream, token());

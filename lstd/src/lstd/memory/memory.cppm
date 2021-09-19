@@ -38,7 +38,7 @@ export {
     // This specifies what the signature of each allocation function should look like.
     //
     // _mode_ is what we are doing currently: adding/removing a pool, allocating, resizing, freeing a block or freeing everything
-    //      Note: * Implementing FREE_ALL is NOT a requirement, some allocators by design can't implement this
+    //      Note: * Implementing FREE_ALL is not a requirement, some allocators can't support this by design.
     //            * Allocators shouldn't request memory from the OS. They should use the pools added by the user
     //              of the allocator. See :BigPhilosophyTime: near the bottom of this file for the reasoning behind this.
     //
@@ -56,9 +56,6 @@ export {
     // I expect people to use this as a bit field anyway.
     //
     //
-    // !!! When called with FREE_ALL, a return value of null means success!
-    //     To signify that the allocator doesn't support FREE_ALL (or the operation failed) return: (void*) -1.
-    //
     // !!! When called with RESIZE, this doesn't mean "reallocate"!
     //     Only valid return here is _oldMemory_ (memory was grown/shrank in place)
     //     or null - memory can't be resized and needs to be moved.
@@ -73,7 +70,6 @@ export {
     //     the original returned pointer was (so we pass it properly when freeing or reallocating).
     //
     // We do this so custom allocator implementations can be kept as simple as possible.
-    // For examples see how we implement the arena allocator, pool allocator, tlsf (two-level segmented fit), etc.
     //
     using allocator_func_t = void *(*) (allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options);
 
@@ -224,7 +220,7 @@ export {
     //     auto *node = malloc<ast_binop>({.Alloc = AstNodeAllocator});
     //     auto *node = malloc<ast_binop>({.Options = LEAK});
     //
-    //     auto *simdType = malloc<f32v4>({.Alloc = Context.TempAlloc, .Alignment = 16});
+    //     auto *simdType = malloc<f32v4>({.Alloc = TemporaryAllocator, .Alignment = 16});
     //
     //     auto *memory = malloc<byte>({.Count = 200});
     //     auto *memory = malloc<byte>({.Count = 200, .Alloc = my_special_allocator,
@@ -565,7 +561,8 @@ export {
     // This type of allocator super fast because it basically bumps a pointer.
     // With this allocator you don't free individual allocations, but instead free
     // the entire thing (with FREE_ALL) when you are sure nobody uses the memory anymore.
-    // Note that free_all doesn't free the added pools, but instead bumps their pointers to the beginning.
+    // Note that free_all doesn't free the added pools, but instead resets their 
+    // pointers to the beginning of the buffer.
     //
     // The arena allocator doesn't handle overflows (when no pool has enough space for an allocation).
     // When out of memory, you should add another pool (with allocator_add_pool()) or provide a larger starting pool.
@@ -596,7 +593,7 @@ export {
     // If you are programming a game and you need to do some calculations each frame,
     // using this allocator means having the freedom of dynamically allocating without
     // compromising performance. At the end of the frame when the memory is no longer
-    // used you call free_all(Context.TempAlloc) (which is extremely cheap - bumps a single pointer).
+    // used you call free_all(TemporaryAllocator) (which is extremely cheap - bumps a single pointer).
     //
     // We print warnings when allocating new pools. Use that as a guide to see when you need
     // to pay more attention: perhaps increase the starting pool size or call free_all() more often.

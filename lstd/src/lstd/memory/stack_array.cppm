@@ -1,11 +1,11 @@
 module;
 
 #include "../common.h"
-#include "qsort.h"
 
 export module lstd.stack_array;
 
-export import lstd.string_utils;
+export import lstd.array;
+export import lstd.qsort;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -42,26 +42,26 @@ struct return_type_helper<void, Types...> : types::common_type<Types...> {
 //
 // :CodeReusability: This is considered array_like (take a look at array_like.h)
 export {
-    template <typename T_, s64 N>
+    template <typename T, s64 N>
     struct stack_array {
-        using T = T_;
-
         T Data[N ? N : 1];
         static constexpr s64 Count = N;
 
-        //
-        // Operators:
-        //
-
-        // To check if empty
+        constexpr T &operator[](s64 index) { return Data[index]; }
         constexpr operator bool() { return Count; }
-
-        constexpr auto operator[](s64 index) { return get(this, index); }
-        constexpr auto operator[](s64 index) const { return get(this, index); }
+        constexpr operator array<T>() { return array<T>(Data, Count); }
     };
 
+    // types::is_same_template wouldn't work because stack_array contains a s64 (and not a type) as a second template parameter.
+    // At this point I hate C++
+    template <typename>
+    constexpr bool is_stack_array = false;
+
+    template <typename T, s64 N>
+    constexpr bool is_stack_array<stack_array<T, N>> = true;
+
     template <typename T>
-    concept any_stack_array = types::is_same_template_decayed<T, stack_array<s32, 1>>;
+    concept any_stack_array = is_stack_array<types::remove_cv_t<T>>;
 
     // To make range based for loops work.
     auto begin(any_stack_array auto &arr) { return arr.Data; }

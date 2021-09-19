@@ -6,26 +6,24 @@ LSTD_BEGIN_NAMESPACE
 
 // Provides a way to write types and bytes with a simple extension API.
 // Subclasses of this stuct override the write/flush methods depending on the output (console, files, buffers, etc.)
-// Types are written with the _write_ overloads.
+// Types are written with the _write_ overloads outside of this struct.
 struct writer {
-    writer() {
-    }
-
-    virtual void write(const byte *data, s64 count) = 0;
-
-    virtual void flush() {
-    }
+    virtual void write(const char *data, s64 count) = 0;
+    virtual void flush() {}
 };
 
-inline void write(writer *w, const byte *data, s64 size) { w->write(data, size); }
-inline void write(writer *w, const bytes &data) { w->write(data.Data, data.Count); }
-inline void write(writer *w, const string &str) { w->write((byte *) str.Data, str.Count); }
+inline void write(writer *w, string str) { w->write(str.Data, str.Count); }
+inline void write(writer *w, const char *data, s64 size) { w->write(data, size); }
 
 inline void write(writer *w, code_point cp) {
-    utf8 data[4];
+    char data[4];
     utf8_encode_cp(data, cp);
-    w->write((byte *) data, utf8_get_size_of_cp(data));
+    w->write(data, utf8_get_size_of_cp(data));
 }
+
+//
+// For more types (including formatting) see the lstd.fmt module and the fmt_context writer.
+//
 
 inline void flush(writer *w) { w->flush(); }
 

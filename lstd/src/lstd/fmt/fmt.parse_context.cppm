@@ -4,6 +4,8 @@ module;
 
 export module lstd.fmt.parse_context;
 
+import lstd.context;
+
 import lstd.fmt.arg;
 import lstd.fmt.specs;
 import lstd.fmt.text_style;
@@ -21,7 +23,7 @@ export {
 
         s32 NextArgID = 0;
 
-        fmt_parse_context(const string &formatString = "") : FormatString(formatString), It(formatString) {}
+        fmt_parse_context(string formatString = "") : FormatString(formatString), It(formatString) {}
 
         bool check_arg_id(u32) {
             if (NextArgID > 0) {
@@ -74,7 +76,7 @@ export {
         // (We may want to pass a different position if we are in the middle of parsing and the It is not pointing at the right place).
         //
         // This is only used to provide useful error messages.
-        inline void on_error(const string &message, s64 position = -1) {
+        inline void on_error(string message, s64 position = -1) {
             if (position == -1) position = It.Data - FormatString.Data;
             Context.FmtParseErrorHandler(message, FormatString, position);
         }
@@ -98,7 +100,7 @@ export {
     fmt_parse_text_style_result fmt_parse_text_style(fmt_parse_context * p);
 }
 
-fmt_alignment get_alignment_from_char(utf8 ch) {
+fmt_alignment get_alignment_from_char(char ch) {
     if (ch == '<') {
         return fmt_alignment::LEFT;
     } else if (ch == '>') {
@@ -158,14 +160,14 @@ bool parse_fill_and_align(fmt_parse_context *p, fmt_type argType, fmt_specs *spe
 
     // First we check if the code point we parsed was an alingment specifier, if it was then there was no fill.
     // We leave it as ' ' by default and continue afterwards for error checking.
-    auto align = get_alignment_from_char((utf8) fill);
+    auto align = get_alignment_from_char((char) fill);
     if (align == fmt_alignment::NONE) {
         // If there was nothing in _rest_ then it wasn't a fill code point because there is no alignment (in rest).
         // We don't parse anything and roll back.
         if (!rest.Count) return true;
 
         // We now check if the next char in rest is an alignment specifier.
-        align = get_alignment_from_char(rest[0]);
+        align = get_alignment_from_char(rest.Data[0]);
         ++rest.Data, --rest.Count;  // Skip the align, later we advance _It_ to _rest_
     } else {
         fill = ' ';  // If we parsed an alignment but no fill then the fill must be ' ' by default
@@ -326,7 +328,7 @@ bool fmt_parse_specs(fmt_parse_context *p, fmt_type argType, fmt_dynamic_specs *
 
     // If we still haven't reached the end or a '}' we treat the byte as the type specifier.
     if (p->It.Count && p->It[0] != '}') {
-        specs->Type = (utf8) p->It[0];
+        specs->Type = (char) p->It[0];
         ++p->It.Data, --p->It.Count;
     }
 

@@ -356,12 +356,12 @@ file_scope void get_display_modes(array<display_mode> &modes, monitor *mon) {
                 continue;
             }
         }
-        array_append(modes, mode);
+        add(modes, mode);
     }
 
     if (!modes.Count) {
         // Hack: Report the current mode if no valid modes were found
-        array_append(modes, os_get_current_display_mode(mon));
+        add(modes, os_get_current_display_mode(mon));
     }
 }
 

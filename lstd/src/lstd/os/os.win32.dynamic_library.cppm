@@ -17,7 +17,7 @@ export {
 
     // We expect _path_ to be valid
     // @TODO: Perhaps we can check
-    dynamic_library os_dynamic_library_load(const string &path);
+    dynamic_library os_dynamic_library_load(string path);
 
     // Gets a symbol by an ASCII string
     void *os_dynamic_library_get_symbol(dynamic_library library, const char *name);
@@ -28,7 +28,7 @@ export {
 
 LSTD_MODULE_PRIVATE
 
-dynamic_library os_dynamic_library_load(const string &path) {
+dynamic_library os_dynamic_library_load(string path) {
     WIN_CHECK_BOOL(result, LoadLibraryW(internal::platform_utf8_to_utf16(path)));
     return (dynamic_library) result;
 }

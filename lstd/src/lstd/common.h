@@ -122,11 +122,7 @@ void static_for(Lambda &&f) {
 //
 //     append(&path, "output.txt");
 //
-//     // This is the subarray operator. Caveat: this assumes indices are pointing to bytes and not codepoints.
-//     string pathWithoutDot = path[{2, -1}];
-//
-//     // This is the proper way to handle code points: string pathWithoutDot = substring(path, 2, -1);
-//     // @Cleanup: This may change.
+//     string pathWithoutDot = substring(path, 2, -1);
 //
 // To make a deep copy of an array use clone().
 // e.g.         string newPath = clone(path); // Allocates a new buffer and copies contents in _path_

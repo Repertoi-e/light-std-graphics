@@ -9,7 +9,7 @@ DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
         reload_global_state();
 
         // Ensure at least one function entry exists
-        if (!GraphState->Functions) array_append(GraphState->Functions);
+        if (!GraphState->Functions) add(GraphState->Functions);
     }
 
     auto *cam = &GraphState->Camera;
@@ -20,7 +20,7 @@ DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
         render_viewport();
     }
 
-    free_all(Context.TempAlloc);
+    free_all(TemporaryAllocator);
 }
 
 DRIVER_API MAIN_WINDOW_EVENT(main_window_event, const event &e) {

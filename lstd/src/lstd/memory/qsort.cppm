@@ -1,6 +1,10 @@
-#pragma once
+module;
 
-#include "delegate.h"
+#include "../common.h"
+
+export module lstd.qsort;
+
+export import lstd.delegate;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -19,6 +23,55 @@ LSTD_BEGIN_NAMESPACE
 *               scratch.  Use it at your own risk.
 *
 *******************************************************************************/
+
+export {
+    template <typename T>
+    using quick_sort_comparison_func = delegate<s32(const T *, const T *)>;
+
+    //
+    // This function performs a basic Quicksort. This implementation is the
+    // in-place version of the algorithm and is done in he following way:
+    //
+    // 1. In the middle of the array, we determine a pivot that we temporarily swap to the end.
+    // 2. From the beginning to the end of the array, we swap any elements smaller
+    //    than this pivot to the start, adjacent to other elements that were
+    //    already moved.
+    // 3. We swap the pivot next to these smaller elements.
+    // 4. For both sub-arrays on sides of the pivot, we repeat this process recursively.
+    // 5. For a sub-array smaller than a certain threshold, the insertion sort algorithm takes over.
+    //
+    // As an optimization, rather than performing a real recursion, we keep a
+    // global stack to track boundaries for each recursion level.
+    //
+    // To ensure that at most O(log2 N) space is used, we recurse into the smaller
+    // partition first. The log2 of the highest unsigned value of an integer type
+    // is the number of bits needed to store that integer.
+    //
+    void quick_sort(void *array, s64 length, s64 size, quick_sort_comparison_func<void> compare);
+
+    template <typename T>
+    s32 default_comparison(const T *lhs, const T *rhs) {
+        if (*lhs > *rhs) return 1;
+        if (*lhs < *rhs) return -1;
+        return 0;
+    }
+
+    template <typename T>
+    constexpr void quick_sort(T * first, s64 count, quick_sort_comparison_func<T> compare = default_comparison<T>) {
+        auto compareVoid = [&](const void *lhs, const void *rhs) { return compare((const T *) lhs, (const T *) rhs); };
+        auto wrapper     = quick_sort_comparison_func<void>(&compareVoid);
+        quick_sort(first, count, sizeof(T), wrapper);
+    }
+
+    template <typename T>
+    constexpr void quick_sort(T * first, T * last, quick_sort_comparison_func<T> compare = default_comparison<T>) {
+        quick_sort(first, last - first + 1, compare);
+    }
+}
+
+LSTD_END_NAMESPACE
+module : private;
+LSTD_BEGIN_NAMESPACE
 
 // Swaps the elements of two arrays.
 //
@@ -51,29 +104,7 @@ LSTD_BEGIN_NAMESPACE
         *a_byte++            = swap_byte;        \
     }
 
-template <typename T>
-using quick_sort_comparison_func = delegate<s32(const T *, const T *)>;
-
-//
-// This function performs a basic Quicksort. This implementation is the
-// in-place version of the algorithm and is done in he following way:
-//
-// 1. In the middle of the array, we determine a pivot that we temporarily swap to the end.
-// 2. From the beginning to the end of the array, we swap any elements smaller
-//    than this pivot to the start, adjacent to other elements that were
-//    already moved.
-// 3. We swap the pivot next to these smaller elements.
-// 4. For both sub-arrays on sides of the pivot, we repeat this process recursively.
-// 5. For a sub-array smaller than a certain threshold, the insertion sort algorithm takes over.
-//
-// As an optimization, rather than performing a real recursion, we keep a
-// global stack to track boundaries for each recursion level.
-//
-// To ensure that at most O(log2 N) space is used, we recurse into the smaller
-// partition first. The log2 of the highest unsigned value of an integer type
-// is the number of bits needed to store that integer.
-//
-inline void quick_sort(void *array, s64 length, s64 size, quick_sort_comparison_func<void> compare) {
+void quick_sort(void *array, s64 length, s64 size, quick_sort_comparison_func<void> compare) {
     // Recursive stacks for array boundaries (both inclusive)
     struct stackframe {
         void *Left;
@@ -166,38 +197,6 @@ inline void quick_sort(void *array, s64 length, s64 size, quick_sort_comparison_
             SORT_RIGHT
         }
     } while (recursion >= stack);
-}
-
-#undef RECURSE_LEFT
-#undef RECURSE_RIGHT
-#undef INSERTION_SORT_LOOP
-#undef INSERTION_SORT_LEFT
-#undef INSERTION_SORT_RIGHT
-#undef SORT_LEFT
-#undef SORT_RIGHT
-#undef INSERTION_SORT_THRESHOLD_SHIFT
-#undef SWAP
-#undef SWAP_NEXT
-
-// We also provide template variants for ease of use.
-
-template <typename T>
-s32 default_comparison(const T *lhs, const T *rhs) {
-    if (*lhs > *rhs) return 1;
-    if (*lhs < *rhs) return -1;
-    return 0;
-}
-
-template <typename T>
-constexpr void quick_sort(T *first, s64 count, quick_sort_comparison_func<T> compare = default_comparison<T>) {
-    auto compareVoid = [&](const void *lhs, const void *rhs) { return compare((const T *) lhs, (const T *) rhs); };
-    auto wrapper     = quick_sort_comparison_func<void>(&compareVoid);
-    quick_sort(first, count, sizeof(T), wrapper);
-}
-
-template <typename T>
-constexpr void quick_sort(T *first, T *last, quick_sort_comparison_func<T> compare = default_comparison<T>) {
-    quick_sort(first, last - first + 1, compare);
 }
 
 LSTD_END_NAMESPACE

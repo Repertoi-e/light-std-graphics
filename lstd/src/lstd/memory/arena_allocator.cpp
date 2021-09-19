@@ -80,12 +80,8 @@ void *arena_allocator(allocator_mode mode, void *context, s64 size, void *oldMem
 
             data->TotalUsed = 0;
 
-            // null means successful FREE_ALL
-            // (void *) -1 means that the allocator doesn't support FREE_ALL (by design)
             return null;
         }
-        default:
-            assert(false);
     }
     return null;
 }

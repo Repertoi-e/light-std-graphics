@@ -32,7 +32,7 @@ export {
     // Colors are defined all-uppercase and this function is case-sensitive
     //   e.g. cornflower_blue doesn't return color::CORNFLOWER_BLUE
     // Returns color::NONE (with value of black) if not found.
-    inline color string_to_color(const string &str) {
+    inline color string_to_color(string str) {
 #define COLOR_DEF(x, y) \
     if (str == #x) return color::x;
 #include "colors.inl"
@@ -64,7 +64,7 @@ export {
     // Colors are defined all-uppercase and this function is case-sensitive
     //   e.g. bright_black doesn't return color::BRIGHT_BLACK
     // Returns terminal_color::NONE (invalid) if not found.
-    inline terminal_color string_to_terminal_color(const string &str) {
+    inline terminal_color string_to_terminal_color(string str) {
 #define COLOR_DEF(x, y) \
     if (str == #x) return terminal_color::x;
 #include "terminal_colors.inl"
@@ -93,7 +93,7 @@ export {
     };
 
     // Used when making ANSI escape codes for text styles
-    inline char *u8_to_esc(char *p, utf8 delimiter, u8 c) {
+    inline char *u8_to_esc(char *p, char delimiter, u8 c) {
         *p++ = '0' + c / 100;
         *p++ = '0' + c / 10 % 10;
         *p++ = '0' + c % 10;

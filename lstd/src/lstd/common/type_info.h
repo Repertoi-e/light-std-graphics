@@ -17,7 +17,7 @@
 //
 // Concepts:
 // - is_same (checks if two types are the same)
-// - is_same_template (checks if two types are the same, regardless of their template parameters - doesn't quite work if you mix types and typenames... we provide a specialization for stuff with the signature of a stack_array - typename and s64)
+// - is_same_template (checks if two types are the same, regardless of their template parameters - doesn't work if you mix types and typenames...)
 // - is_const, is_volatile, is_reference, is_rvalue_reference, is_pointer, is_function (doesn't include member functions)
 // - is_void, is_null (decltype(null))
 // - is_integral, is_signed_integral, is_unsigned_integral, is_floating_point, is_arithmetic

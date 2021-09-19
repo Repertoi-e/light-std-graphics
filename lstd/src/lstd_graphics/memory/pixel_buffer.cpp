@@ -15,7 +15,7 @@ pixel_buffer::pixel_buffer(u8 *pixels, u32 width, u32 height, pixel_format forma
     BPP = (s32) format;
 }
 
-pixel_buffer::pixel_buffer(const string &path, bool flipVertically, pixel_format format) {
+pixel_buffer::pixel_buffer(string path, bool flipVertically, pixel_format format) {
     string pathNormalized = path_normalize(path);
     defer(free(pathNormalized));
 

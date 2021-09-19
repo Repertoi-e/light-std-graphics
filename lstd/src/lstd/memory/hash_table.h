@@ -36,7 +36,7 @@ struct key_value_pair {
 // When looking up a value we perform the same process to find the correct slot.
 //
 // We use hash values to indicate whether slots are empty of removed. A hash of 0 means that slot is not used, so new
-// values an be put there. A hash of 1 means that slot used to be valid, but has been removed. A hash of 2 or h igher
+// values an be put there. A hash of 1 means that slot used to be valid, but has been removed. A hash of 2 or higher
 // (FIRST_VALID_HASH) means this is a currently used slot.
 //
 // Whether we hash a key, if the result is less than 2, we just add 2 to it to put it in the valid range.

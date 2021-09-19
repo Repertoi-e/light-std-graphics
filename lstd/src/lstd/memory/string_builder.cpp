@@ -31,7 +31,7 @@ void string_append(string_builder &builder, code_point cp) {
     string_append(builder, encoded, utf8_get_size_of_cp(cp));
 }
 
-void string_append(string_builder &builder, const string &str) { string_append(builder, str.Data, str.Count); }
+void string_append(string_builder &builder, string str) { string_append(builder, str.Data, str.Count); }
 
 void string_append(string_builder &builder, const char *data, s64 size) {
     auto *currentBuffer = string_builder_get_current_buffer(builder);
@@ -75,7 +75,7 @@ string string_builder_combine(const string_builder &builder) {
 }
 
 // @API Remove this, iterators? Literally anything else..
-void string_builder_traverse(const string_builder &builder, const delegate<void(const string &)> &func) {
+void string_builder_traverse(const string_builder &builder, const delegate<void(string )> &func) {
     auto *buffer = &builder.BaseBuffer;
     while (buffer) {
         func(string(buffer->Data, buffer->Occupied));
@@ -85,7 +85,7 @@ void string_builder_traverse(const string_builder &builder, const delegate<void(
 
 string_builder *clone(string_builder *dest, const string_builder &src) {
     *dest         = {};
-    auto appender = [&](const string &str) { string_append(*dest, str); };
+    auto appender = [&](string str) { string_append(*dest, str); };
     string_builder_traverse(src, &appender);
     return dest;
 }

@@ -100,7 +100,7 @@ struct window {
     bool is_destroying() const;
 
     [[nodiscard("Leak")]] string get_title();  // The caller is responsible for freeing
-    void set_title(const string &title);
+    void set_title(string title);
 
     void set_fullscreen(monitor *mon, s32 width, s32 height, s32 refreshRate = DONT_CARE);
     bool is_fullscreen() const;
@@ -189,7 +189,7 @@ struct window {
 //
 // You can use _DONT_CARE_ or _CENTERED_ for _x_ and _y_ if
 // you don't want to specify them explicitly.
-window os_create_window(const string &title, s32 x, s32 y, s32 width, s32 height, u32 flags);
+window os_create_window(string title, s32 x, s32 y, s32 width, s32 height, u32 flags);
 
 // Call in your main program loop. Handles messages for all windows.
 void os_update_windows();

@@ -3,6 +3,8 @@
 LSTD_BEGIN_NAMESPACE
 
 void *tlsf_allocator(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
+    assert(context);
+
     auto *data = (tlsf_allocator_data *) context;
 
     if (!data->State && mode != allocator_mode::ADD_POOL) {
@@ -12,7 +14,7 @@ void *tlsf_allocator(allocator_mode mode, void *context, s64 size, void *oldMemo
 
     switch (mode) {
         case allocator_mode::ADD_POOL: {
-            auto *pool = (allocator_pool *) oldMemory; // _oldMemory_ is the parameter which should contain the block to be added,
+            auto *pool = (allocator_pool *) oldMemory;  // _oldMemory_ is the parameter which should contain the block to be added,
             // the _size_ parameter contains the size of the block
 
             if (!data->State) {
@@ -23,7 +25,7 @@ void *tlsf_allocator(allocator_mode mode, void *context, s64 size, void *oldMemo
         }
         case allocator_mode::REMOVE_POOL: {
             auto *pool = (allocator_pool *) oldMemory;
-            tlsf_remove_pool(data->State, pool); // This function assumes the block exists, strange asserts may occur if the caller is not careful.
+            tlsf_remove_pool(data->State, pool);  // This function assumes the block exists
             return pool;
         }
         case allocator_mode::ALLOCATE: {
@@ -37,12 +39,9 @@ void *tlsf_allocator(allocator_mode mode, void *context, s64 size, void *oldMemo
             return null;
         }
         case allocator_mode::FREE_ALL: {
-            // null means successful FREE_ALL
-            // (void *) -1 means that the allocator doesn't support FREE_ALL (by design)
-            return (void *) -1;
+            assert(false);  // Some allocators can't support this by design
+            return null;
         }
-        default:
-            assert(false);
     }
     return null;
 }

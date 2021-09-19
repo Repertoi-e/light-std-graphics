@@ -27,7 +27,7 @@ struct pixel_buffer {
     //
     // If _format_ is not passed as _Unknown_, the file is loaded and converted to the requested one.
     // The _Format_ member is set at _Unknown_ if the load failed.
-    pixel_buffer(const string &path, bool flipVertically = false, pixel_format format = pixel_format::Unknown);
+    pixel_buffer(string path, bool flipVertically = false, pixel_format format = pixel_format::Unknown);
 
     void release();
 };

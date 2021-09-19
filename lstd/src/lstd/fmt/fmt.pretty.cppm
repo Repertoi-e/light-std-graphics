@@ -19,11 +19,10 @@ export {
 
     // Outputs in the following format: *name* { field1: value, field2: value, ... }
     // e.g.     vector3(x: 1.00, y: 4.00, z: 9.00)
-    template <typename FC>
     struct format_struct {
         struct field_entry {
             string Name;
-            fmt_arg<FC> Arg;
+            fmt_arg Arg;
         };
 
         fmt_context *F;
@@ -31,14 +30,14 @@ export {
         array<field_entry> Fields;
         bool NoSpecs;  // Write the result without taking into account specs for individual arguments
 
-        format_struct(fmt_context *f, const string &name, bool noSpecs = false) : F(f), Name(name), NoSpecs(noSpecs) {}
+        format_struct(fmt_context *f, string name, bool noSpecs = false) : F(f), Name(name), NoSpecs(noSpecs) {}
 
         // I know we are against hidden freeing but having this destructor is fine because it helps with code conciseness.
         ~format_struct() { free(Fields); }
 
         template <typename T>
-        format_struct *field(const string &name, const T &value) {
-            array_append(Fields, {name, fmt_make_arg<FC>(value)});
+        format_struct *field(string name, const T &value) {
+            add(Fields, {name, fmt_make_arg(value)});
             return this;
         }
 
@@ -47,21 +46,20 @@ export {
 
     // Outputs in the following format: *name*(element1, element2, ...)
     // e.g.     read_file_result("Hello world!", true)
-    template <typename FC>
     struct format_tuple {
-        FC *F;
+        fmt_context *F;
         string Name;
-        array<fmt_arg<FC>> Fields;
+        array<fmt_arg> Fields;
         bool NoSpecs;  // Write the result without taking into account specs for individual arguments
 
-        format_tuple(FC *f, const string &name, bool noSpecs = false) : F(f), Name(name), NoSpecs(noSpecs) {}
+        format_tuple(fmt_context *f, string name, bool noSpecs = false) : F(f), Name(name), NoSpecs(noSpecs) {}
 
         // I know we are against hidden freeing but having this destructor is fine because it helps with code conciseness.
         ~format_tuple() { free(Fields); }
 
         template <typename T>
         format_tuple *field(const T &value) {
-            array_append(Fields, fmt_make_arg<FC>(value));
+            add(Fields, fmt_make_arg(value));
             return this;
         }
 
@@ -70,20 +68,19 @@ export {
 
     // Outputs in the following format: [element1, element2, ...]
     // e.g.     ["This", "is", "an", "array", "of", "strings"]
-    template <typename FC>
     struct format_list {
-        FC *F;
-        array<fmt_arg<FC>> Fields;
+        fmt_context *F;
+        array<fmt_arg> Fields;
         bool NoSpecs;  // Write the result without taking into account specs for individual arguments
 
-        format_list(FC *f, bool noSpecs = false) : F(f), NoSpecs(noSpecs) {}
+        format_list(fmt_context *f, bool noSpecs = false) : F(f), NoSpecs(noSpecs) {}
 
         // I know we are against hidden freeing but having this destructor is fine because it helps with code conciseness.
         ~format_list() { free(Fields); }
 
         template <typename T>
-        format_list *entries(const array<T> &values) {
-            For(values) array_append(Fields, fmt_make_arg<FC>(it));
+        format_list *entries(array<T> values) {
+            For(values) add(Fields, fmt_make_arg(it));
             return this;
         }
 
@@ -101,8 +98,7 @@ export {
     };
 }
 
-template <typename FC>
-void format_struct<FC>::finish() {
+void format_struct::finish() {
     auto write_field = [&](field_entry *entry) {
         write_no_specs(F, entry->Name);
         write_no_specs(F, ": ");
@@ -126,8 +122,7 @@ void format_struct<FC>::finish() {
     write_no_specs(F, " }");
 }
 
-template <typename FC>
-void format_tuple<FC>::finish() {
+void format_tuple::finish() {
     write_no_specs(F, Name);
     write_no_specs(F, "(");
 
@@ -144,8 +139,7 @@ void format_tuple<FC>::finish() {
     write_no_specs(F, ")");
 }
 
-template <typename FC>
-void format_list<FC>::finish() {
+void format_list::finish() {
     write_no_specs(F, "[");
 
     auto *p = Fields.begin();

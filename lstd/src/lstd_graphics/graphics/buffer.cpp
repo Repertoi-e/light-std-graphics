@@ -4,13 +4,13 @@
 
 LSTD_BEGIN_NAMESPACE
 
-void buffer_layout::add(const string &name, gtype type, s64 count, bool normalized) {
+void buffer_layout::add(string name, gtype type, s64 count, bool normalized) {
     s64 sizeInBits = get_size_of_base_gtype_in_bits(type);
 
     count *= get_count_of_gtype(type);
 
     assert(TotalSize <= numeric_info<u32>::max());
-    array_append(Elements, {name, get_scalar_gtype(type), sizeInBits, normalized, count, (u32) TotalSize});
+    add(Elements, {name, get_scalar_gtype(type), sizeInBits, normalized, count, (u32) TotalSize});
 
     if (sizeInBits == 1) sizeInBits = 8;
     TotalSize += (sizeInBits / 8) * count;

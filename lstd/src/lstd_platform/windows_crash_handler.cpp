@@ -72,7 +72,7 @@ file_scope LONG exception_filter(LPEXCEPTION_POINTERS e) {
             call.LineNumber = lineInfo.LineNumber;
         }
 
-        array_append(callStack, call);
+        add(callStack, call);
     }
 
 #define CODE_DESCR(code) \

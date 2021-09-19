@@ -1,6 +1,6 @@
 module;
 
-#include "../io.h"
+#include "../common.h"
 
 export module lstd.fmt.context;
 
@@ -36,7 +36,7 @@ export {
         // been specified by another argument (instead of being a literal in the format string).
         fmt_dynamic_specs *Specs = null;
 
-        fmt_context(writer *out = null, const string &fmtString = "", const fmt_args &args = {}) : Out(out), Args(args), Parse(fmtString) {}
+        fmt_context(writer *out = null, string fmtString = "", const fmt_args &args = {}) : Out(out), Args(args), Parse(fmtString) {}
 
         void write(const byte *data, s64 count) override;
         void flush() override { Out->flush(); }
@@ -49,12 +49,9 @@ export {
     // parse.It is not pointing at the right place.
     //
     // This routine is used to provide useful error messages.
-    inline void on_error(fmt_context * f, const string &message, s64 position = -1) { on_error(&f->Parse, message, position); }
+    inline void on_error(fmt_context * f, string message, s64 position = -1) { on_error(&f->Parse, message, position); }
 
-    // We need this overload for fmt_context because otherwise the pointer overload
-    // of write_no_specs gets chosen (utf8* gets casted automatically to void*.. sigh!)
     void write(fmt_context * f, const char *str) { f->write((const byte *) str, c_string_length(str)); }
-    void write(fmt_context * f, const char8_t *str) { f->write((const byte *) str, c_string_length(str)); }
 
     // General formatting routimes which take specifiers into account:
     void write(fmt_context * f, types::is_integral auto value);
@@ -70,23 +67,17 @@ export {
     void write_no_specs(fmt_context * f, bool value);
     void write_no_specs(fmt_context * f, const void *value);
 
-    void write_no_specs(fmt_context * f, const string &str) { write(f->Out, *((array<byte> *) &str)); }
-
-    // We need this overload for fmt_context because otherwise the pointer overload
-    // of write_no_specs gets chosen (utf8* gets casted automatically to void*.. sigh!)
+    void write_no_specs(fmt_context * f, string str) { write(f->Out, *((array<byte> *) &str)); }
     void write_no_specs(fmt_context * f, const char *str) { write(f->Out, (const byte *) str, c_string_length(str)); }
-    void write_no_specs(fmt_context * f, const char8_t *str) { write(f->Out, (const byte *) str, c_string_length(str)); }
-
     void write_no_specs(fmt_context * f, const char *str, s64 size) { write(f->Out, (const byte *) str, size); }
     void write_no_specs(fmt_context * f, code_point cp) { write(f->Out, cp); }
 
     // Used to dispatch values to write/write_no_specs functions. Used in conjunction with fmt_visit_fmt_arg.
-    template <typename FC>
     struct fmt_context_visitor {
-        FC *F;
+        fmt_context *F;
         bool NoSpecs;
 
-        fmt_context_visitor(FC *f, bool noSpecs = false) : F(f), NoSpecs(noSpecs) {}
+        fmt_context_visitor(fmt_context *f, bool noSpecs = false) : F(f), NoSpecs(noSpecs) {}
 
         void operator()(s32 value) { NoSpecs ? write_no_specs(F, value) : write(F, value); }
         void operator()(u32 value) { NoSpecs ? write_no_specs(F, value) : write(F, value); }
@@ -95,7 +86,7 @@ export {
         void operator()(bool value) { NoSpecs ? write_no_specs(F, value) : write(F, value); }
         void operator()(f32 value) { NoSpecs ? write_no_specs(F, value) : write(F, value); }
         void operator()(f64 value) { NoSpecs ? write_no_specs(F, value) : write(F, value); }
-        void operator()(const string &value) { NoSpecs ? write_no_specs(F, value) : write(F, value); }
+        void operator()(string value) { NoSpecs ? write_no_specs(F, value) : write(F, value); }
         void operator()(const void *value) { NoSpecs ? write_no_specs(F, value) : write(F, value); }
         void operator()(const typename fmt_value<FC>::custom &custom) { custom.FormatFunc(custom.Data, F); }
 
@@ -167,7 +158,7 @@ utf8 DIGITS[] =
     "8081828384858687888990919293949596979899";
 
 template <typename UInt>
-char *format_uint_decimal(char *buffer, UInt value, s64 formattedSize, const string &thousandsSep = "") {
+char *format_uint_decimal(char *buffer, UInt value, s64 formattedSize, string thousandsSep = "") {
     u32 digitIndex = 0;
 
     buffer += formattedSize;
@@ -426,7 +417,7 @@ void write_exponent(fmt_context *f, s64 exp) {
 }
 
 // Routine to write the formatted significant including a decimalPoint if necessary
-void write_significand(fmt_context *f, const string &significand, s64 integralSize, code_point decimalPoint = 0) {
+void write_significand(fmt_context *f, string significand, s64 integralSize, code_point decimalPoint = 0) {
     if (!significand) return;  // The significand is actually empty if the value formatted is 0
 
     write_no_specs(f, significand[{0, integralSize}]);
@@ -437,7 +428,7 @@ void write_significand(fmt_context *f, const string &significand, s64 integralSi
 }
 
 // Routine to write a float in EXP format
-void write_float_exp(fmt_context *f, const string &significand, s32 exp, code_point sign, const fmt_specs &specs, const fmt_float_specs &floatSpecs) {
+void write_float_exp(fmt_context *f, string significand, s32 exp, code_point sign, const fmt_specs &specs, const fmt_float_specs &floatSpecs) {
     s64 outputSize = (sign ? 1 : 0) + significand.Count;  // Further we add the number of zeros/the size of the exponent to this tally
 
     code_point decimalPoint = '.';  // @Locale... Also if we decide to add a thousands separator?
@@ -481,7 +472,7 @@ void write_float_exp(fmt_context *f, const string &significand, s32 exp, code_po
 }
 
 // Routine to write a float in FIXED format
-void write_float_fixed(fmt_context *f, const string &significand, s32 exp, code_point sign, const fmt_specs &specs, const fmt_float_specs &floatSpecs, bool percentage) {
+void write_float_fixed(fmt_context *f, string significand, s32 exp, code_point sign, const fmt_specs &specs, const fmt_float_specs &floatSpecs, bool percentage) {
     s64 outputSize = (sign ? 1 : 0) + (percentage ? 1 : 0) + significand.Count;  // Further down we add the number of extra zeros needed and the decimal point
 
     code_point decimalPoint = '.';  // @Locale... Also if we decide to add a thousands separator?

@@ -83,7 +83,7 @@ void debug_memory::swap_header(allocation_header *o, allocation_header *n) {
 //      /home/.../game/src/some_dir/a/string.cpp ---> some_dir/a/localization.cpp
 //      /home/.../game/some_dir/string.cpp       ---> localization.cpp
 //
-constexpr string get_short_file_name(const string &str) {
+constexpr string get_short_file_name(string str) {
     char srcData[] = {'s', 'r', 'c', OS_PATH_SEPARATOR, '\0'};
     string src     = srcData;
 
@@ -534,8 +534,7 @@ void free_all(allocator alloc, u64 options) {
 
     options |= Context.AllocOptions;
 
-    auto result = alloc.Function(allocator_mode::FREE_ALL, alloc.Context, 0, 0, 0, options);
-    assert((result != (void *) -1) && "Allocator doesn't support FREE_ALL");
+    alloc.Function(allocator_mode::FREE_ALL, alloc.Context, 0, 0, 0, options);
 }
 
 LSTD_END_NAMESPACE

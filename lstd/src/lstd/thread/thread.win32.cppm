@@ -1,11 +1,10 @@
 module;
 
 #include "lstd_platform/windows.h"  // Declarations of Win32 functions
-#include "../memory/delegate.h"
-
-import lstd.os;
 
 export module lstd.thread.win32;
+
+import lstd.os;
 
 LSTD_BEGIN_NAMESPACE
 

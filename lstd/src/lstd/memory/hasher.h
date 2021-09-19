@@ -33,7 +33,7 @@ struct hasher {
         State[3] = seed - 11400714785074694791ULL;
     }
 
-    // @Speed: SIMD this shit
+    // @Speed: SIMD 
     bool add(const char *data, s64 size) {
         if (!data) return false;
 

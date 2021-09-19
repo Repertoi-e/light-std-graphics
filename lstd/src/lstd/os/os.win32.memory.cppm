@@ -202,7 +202,7 @@ void platform_init_allocators() {
 // Windows uses wchar.. Sigh...
 //
 // This function uses the platform temporary allocator if no explicit allocator was specified.
-wchar *platform_utf8_to_utf16(const string &str, allocator alloc = {}) {
+wchar *platform_utf8_to_utf16(string str, allocator alloc = {}) {
     if (!str.Length) return null;
 
     if (!alloc) alloc = S->TempAlloc;

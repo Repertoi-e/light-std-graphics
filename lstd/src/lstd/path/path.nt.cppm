@@ -45,7 +45,7 @@ export {
     //    \\host\computer/dir  -> { "\\host\computer", "/dir" }
     //
     // Paths cannot contain both a drive letter and a UNC path.
-    constexpr path_split_drive_result path_split_drive(const string &path);
+    constexpr path_split_drive_result path_split_drive(string path);
 
     // Returns whether a path is absolute.
     // Trivial in POSIX (starts with '/'), harder on Windows.
@@ -59,14 +59,14 @@ export {
     //    ./data/myData       -> false
     //    ../data/myData      -> false
     //    data/myData         -> false
-    constexpr bool path_is_absolute(const string &path);
+    constexpr bool path_is_absolute(string path);
 
     // Joins two or more paths.
     // Ignore the previous parts if a part is absolute.
     // This is the de facto way to build paths. Takes care of slashes automatically.
     [[nodiscard("Leak")]] string path_join(const array<string> &paths);
 
-    [[nodiscard("Leak")]] string path_join(const string &one, const string &other);
+    [[nodiscard("Leak")]] string path_join(string one, string other);
 
     // Normalize a pathname by collapsing redundant separators and up-level references so that A//B, A/B/, A/./B and A/foo/../B all become A/B.
     // This string manipulation may change the meaning of a path that contains symbolic links.
@@ -76,7 +76,7 @@ export {
     // There is an edge case in which the path ends with a slash, both /home/user/dir and /home/user/dir/ mean the same thing.
     // You can use other functions to check if they are really directories or files (by querying the OS).
     [[nodiscard("Leak")]] string
-    path_normalize(const string &path);
+    path_normalize(string path);
 
     // Splits path into two components: head (everything up to the last '/') and tail (the rest).
     // The resulting head won't end in '/' unless it is the root.
@@ -84,7 +84,7 @@ export {
     // The Windows version handles \ and drive letters/UNC sharepoints of course.
     //
     // Note: The returned strings are substrings so they shouldn't be freed.
-    constexpr path_split_result path_split(const string &path);
+    constexpr path_split_result path_split(string path);
 
     // Returns the final component of the path
     // e.g.
@@ -94,7 +94,7 @@ export {
     //
     // Note: The result is a substring and shouldn't be freed.
 
-    constexpr string path_base_name(const string &path);
+    constexpr string path_base_name(string path);
 
     // Returns everything before the final component of the path
     // e.g.
@@ -103,7 +103,7 @@ export {
     //    /home/user/dir     -> /home/user
     //
     // Note: The result is a substring and shouldn't be freed.
-    constexpr string path_directory(const string &path);
+    constexpr string path_directory(string path);
 
     // Split a path in root and extension.
     // The extension is everything starting at the last dot in the last pathname component; the root is everything before that.
@@ -113,50 +113,50 @@ export {
     //    /home/user/me           -> { "/home/user/me",      "" }
     //
     // Note: The returned strings are substrings so they shouldn't be freed.
-    constexpr path_split_extension_result path_split_extension(const string &path);
+    constexpr path_split_extension_result path_split_extension(string path);
 
     //
     // The following routines query the OS:
     //
-    bool path_exists(const string &path);  // == is_file() || is_directory()
-    bool path_is_file(const string &path);
-    bool path_is_directory(const string &path);
+    bool path_exists(string path);  // == is_file() || is_directory()
+    bool path_is_file(string path);
+    bool path_is_directory(string path);
 
-    bool path_is_symbolic_link(const string &path);
+    bool path_is_symbolic_link(string path);
 
-    s64 path_file_size(const string &path);
+    s64 path_file_size(string path);
 
-    time_t path_creation_time(const string &path);
-    time_t path_last_access_time(const string &path);
-    time_t path_last_modification_time(const string &path);
+    time_t path_creation_time(string path);
+    time_t path_last_access_time(string path);
+    time_t path_last_modification_time(string path);
 
-    bool path_create_directory(const string &path);
-    bool path_delete_file(const string &path);
-    bool path_delete_directory(const string &path);
+    bool path_create_directory(string path);
+    bool path_delete_file(string path);
+    bool path_delete_directory(string path);
 
     // @Robustness: We don't handle directories.
     //
     // Copies a file to destination.
     // Destination can point to another file - in which case it gets overwritten (if the parameter is true)
     // or a directory - in which case the file name is kept the same or determined by the OS (in the case of duplicate files).
-    bool path_copy(const string &path, const string &dest, bool overwrite);
+    bool path_copy(string path, string dest, bool overwrite);
 
     // @Robustness: We don't handle directories.
     //
     // Moves a file to destination.
     // Destination can point to another file - in which case it gets overwritten (if the parameter is true)
     // or a directory - in which case the file name is kept the same or determined by the OS (in the case of duplicate files).
-    bool path_move(const string &path, const string &dest, bool overwrite);
+    bool path_move(string path, string dest, bool overwrite);
 
     // Renames a file/directory
-    bool path_rename(const string &path, const string &newName);
+    bool path_rename(string path, string newName);
 
     // A hard link is a way to represent a single file by more than one path.
     // Hard links continue to work fine if you delete the source file since they use reference counting.
     // Hard links can be created to files (not directories) only on the same volume.
     //
     // Destination must exist, otherwise this function fails.
-    bool path_create_hard_link(const string &path, const string &dest);
+    bool path_create_hard_link(string path, string dest);
 
     // Symbolic links are different from hard links. Hard links do not link paths on different
     // volumes or file systems, whereas symbolic links may point to any file or directory
@@ -166,14 +166,14 @@ export {
     // arbitrary path that does not point to anything.
     //
     // Destination must exist, otherwise this function fails.
-    bool path_create_symbolic_link(const string &path, const string &dest);
+    bool path_create_symbolic_link(string path, string dest);
 
     // This is used for traversing every file in a directory.
     // This is not recursive but we define a method which does that further down.
     //
     // _Path_ needs to be a valid path before using it.
     //
-    struct path_walker : non_copyable {
+    struct path_walker {
         string Path;  // Doesn't get cloned, valid as long as the string passed in the constructor is valid
 
         string CurrentFileName;  // Gets allocated by this object, call free after use to prevent leak
@@ -184,7 +184,7 @@ export {
         s64 Index = 0;
 
         path_walker() {}
-        path_walker(const string &path) : Path(path) {}
+        path_walker(string path) : Path(path) {}
 
        private:
         wchar *Path16 = null;
@@ -206,7 +206,7 @@ export {
     //
     // If you don't want the overhead of us building an array you can use
     // the path_walker API directly (take a look at the implementation of this function further down the file).
-    [[nodiscard("Leak")]] array<string> path_walk(const string &path, bool recursively = false);
+    [[nodiscard("Leak")]] array<string> path_walk(string path, bool recursively = false);
 }
 
 LSTD_MODULE_PRIVATE
@@ -226,7 +226,7 @@ LSTD_MODULE_PRIVATE
     CREATE_FILE_HANDLE_CHECKED(x, CreateFileW(utf8_to_utf16(path), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL), fail); \
     defer(CloseHandle(x));
 
-string get_path_from_here_to(const string &here, const string &there) {
+string get_path_from_here_to(string here, string there) {
     if (find_substring(here, there) == -1) {
         return there;
     } else {
@@ -239,9 +239,9 @@ string get_path_from_here_to(const string &here, const string &there) {
     }
 }
 
-wchar *utf8_to_utf16(const string &str) { return internal::platform_utf8_to_utf16(str); }
+wchar *utf8_to_utf16(string str) { return internal::platform_utf8_to_utf16(str); }
 
-constexpr path_split_drive_result path_split_drive(const string &path) {
+constexpr path_split_drive_result path_split_drive(string path) {
     if (path.Length >= 2) {
         if (path[{0, 2}] == "\\\\" && path[2] != '\\') {
             // It is an UNC path
@@ -272,7 +272,7 @@ constexpr path_split_drive_result path_split_drive(const string &path) {
     return {"", path};
 }
 
-constexpr bool path_is_absolute(const string &path) {
+constexpr bool path_is_absolute(string path) {
     auto [_, rest] = path_split_drive(path);
     return rest && path_is_sep(rest[0]);
 }
@@ -328,12 +328,12 @@ constexpr bool path_is_absolute(const string &path) {
     return result;
 }
 
-[[nodiscard("Leak")]] string path_join(const string &one, const string &other) {
+[[nodiscard("Leak")]] string path_join(string one, string other) {
     auto arr = make_stack_array(one, other);
     return path_join(arr);
 }
 
-[[nodiscard("Leak")]] string path_normalize(const string &path) {
+[[nodiscard("Leak")]] string path_normalize(string path) {
     string result;
     string_reserve(result, path.Length);
 
@@ -394,7 +394,7 @@ constexpr bool path_is_absolute(const string &path) {
     return result;
 }
 
-constexpr path_split_result path_split(const string &path) {
+constexpr path_split_result path_split(string path) {
     auto [DriveOrUNC, rest] = path_split_drive(path);
 
     // Set i to index beyond path's last slash
@@ -411,29 +411,29 @@ constexpr path_split_result path_split(const string &path) {
     return {head, tail};
 }
 
-constexpr string path_base_name(const string &path) {
+constexpr string path_base_name(string path) {
     auto [_, tail] = path_split(path);
     return tail;
 }
 
-constexpr string path_directory(const string &path) {
+constexpr string path_directory(string path) {
     auto [head, _] = path_split(path);
     return head;
 }
 
-constexpr path_split_extension_result path_split_extension(const string &path) {
+constexpr path_split_extension_result path_split_extension(string path) {
     return path_split_extension_general(path, '/', '\\', '.');
 }
 
 // == is_file() || is_directory()
-bool path_exists(const string &path) {
+bool path_exists(string path) {
     HANDLE file = CreateFileW(utf8_to_utf16(path), GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, null);
     if (file == INVALID_HANDLE_VALUE) return false;
     CloseHandle(file);
     return true;
 }
 
-bool path_is_file(const string &path) {
+bool path_is_file(string path) {
     HANDLE file = CreateFileW(utf8_to_utf16(path), 0, 0, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, null);
     if (file == INVALID_HANDLE_VALUE) return false;
     defer(CloseHandle(file));
@@ -443,7 +443,7 @@ bool path_is_file(const string &path) {
     return (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 
-bool path_is_directory(const string &path) {
+bool path_is_directory(string path) {
     HANDLE file = CreateFileW(utf8_to_utf16(path), GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, null);
     if (file == INVALID_HANDLE_VALUE) return false;
     defer(CloseHandle(file));
@@ -453,7 +453,7 @@ bool path_is_directory(const string &path) {
     return (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
-bool path_is_symbolic_link(const string &path) {
+bool path_is_symbolic_link(string path) {
     DWORD attribs = GetFileAttributesW(utf8_to_utf16(path));
     if (attribs != INVALID_FILE_ATTRIBUTES) {
         return (attribs & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
@@ -461,7 +461,7 @@ bool path_is_symbolic_link(const string &path) {
     return false;
 }
 
-s64 path_file_size(const string &path) {
+s64 path_file_size(string path) {
     if (path_is_directory(path)) return 0;
 
     CREATE_FILE_HANDLE_CHECKED(file, CreateFileW(utf8_to_utf16(path), GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, FILE_ATTRIBUTE_READONLY, null), 0);
@@ -472,44 +472,44 @@ s64 path_file_size(const string &path) {
     return size.QuadPart;
 }
 
-time_t path_creation_time(const string &path) {
+time_t path_creation_time(string path) {
     GET_READONLY_EXISTING_HANDLE(handle, 0);
     FILETIME time;
     if (!GetFileTime(handle, &time, null, null)) return 0;
     return ((time_t) time.dwHighDateTime) << 32 | time.dwLowDateTime;
 }
 
-time_t path_last_access_time(const string &path) {
+time_t path_last_access_time(string path) {
     GET_READONLY_EXISTING_HANDLE(handle, 0);
     FILETIME time;
     if (!GetFileTime(handle, null, &time, null)) return 0;
     return ((time_t) time.dwHighDateTime) << 32 | time.dwLowDateTime;
 }
 
-time_t path_last_modification_time(const string &path) {
+time_t path_last_modification_time(string path) {
     GET_READONLY_EXISTING_HANDLE(handle, 0);
     FILETIME time;
     if (!GetFileTime(handle, null, null, &time)) return 0;
     return ((time_t) time.dwHighDateTime) << 32 | time.dwLowDateTime;
 }
 
-bool path_create_directory(const string &path) {
+bool path_create_directory(string path) {
     if (path_exists(path)) return false;
     return CreateDirectoryW(utf8_to_utf16(path), null);
 }
 
-bool path_delete_file(const string &path) {
+bool path_delete_file(string path) {
     if (!path_is_file(path)) return false;
     return DeleteFileW(utf8_to_utf16(path));
 }
 
-bool path_delete_directory(const string &path) {
+bool path_delete_directory(string path) {
     if (!path_is_directory(path)) return false;
     return RemoveDirectoryW(utf8_to_utf16(path));
 }
 
 // @Robustness: Handle directories?
-bool path_copy(const string &path, const string &dest, bool overwrite) {
+bool path_copy(string path, string dest, bool overwrite) {
     if (!path_is_file(path)) return false;
 
     auto *u16 = utf8_to_utf16(path);
@@ -524,7 +524,7 @@ bool path_copy(const string &path, const string &dest, bool overwrite) {
 }
 
 // @Robustness: Handle directories?
-bool path_move(const string &path, const string &dest, bool overwrite) {
+bool path_move(string path, string dest, bool overwrite) {
     if (!path_is_file(path)) return false;
 
     if (path_is_directory(dest)) {
@@ -536,7 +536,7 @@ bool path_move(const string &path, const string &dest, bool overwrite) {
     return MoveFileExW(utf8_to_utf16(path), utf8_to_utf16(dest), MOVEFILE_WRITE_THROUGH | MOVEFILE_COPY_ALLOWED | (overwrite ? MOVEFILE_REPLACE_EXISTING : 0));
 }
 
-bool path_rename(const string &path, const string &newName) {
+bool path_rename(string path, string newName) {
     if (!path_exists(path)) return false;
 
     auto p = path_join(path_directory(path), newName);
@@ -545,13 +545,13 @@ bool path_rename(const string &path, const string &newName) {
     return MoveFileW(utf8_to_utf16(path), utf8_to_utf16(p));
 }
 
-bool path_create_hard_link(const string &path, const string &dest) {
+bool path_create_hard_link(string path, string dest) {
     if (!path_is_directory(path)) return false;
     if (!path_is_directory(dest)) return false;
     return CreateHardLinkW(utf8_to_utf16(dest), utf8_to_utf16(path), null);
 }
 
-bool path_create_symbolic_link(const string &path, const string &dest) {
+bool path_create_symbolic_link(string path, string dest) {
     if (!path_exists(path)) return false;
     if (!path_exists(dest)) return false;
 
@@ -602,7 +602,7 @@ void path_read_next_entry(path_walker &walker) {
 }
 
 // This version appends paths to the array _result_. Copy this and modify it to suit your use case.
-void path_walk_recursively_impl(const string &path, const string &first, array<string> &result) {
+void path_walk_recursively_impl(string path, string first, array<string> &result) {
     assert(path_is_directory(path));
 
     auto walker = path_walker(path);
@@ -613,7 +613,7 @@ void path_walk_recursively_impl(const string &path, const string &first, array<s
         if (!walker.Handle) break;
 
         string p = path_join(get_path_from_here_to(first, path), walker.CurrentFileName);
-        array_append(result, p);
+        add(result, p);
 
         if (path_is_directory(p)) {
             path_walk_recursively_impl(p, first, result);
@@ -621,7 +621,7 @@ void path_walk_recursively_impl(const string &path, const string &first, array<s
     }
 }
 
-[[nodiscard("Leak")]] array<string> path_walk(const string &path, bool recursively) {
+[[nodiscard("Leak")]] array<string> path_walk(string path, bool recursively) {
     assert(path_is_directory(path));
 
     array<string> result;
@@ -635,7 +635,7 @@ void path_walk_recursively_impl(const string &path, const string &first, array<s
             if (!walker.Handle) break;
 
             string file = path_join(path, walker.CurrentFileName);
-            array_append(result, file);
+            add(result, file);
         }
     } else {
         path_walk_recursively_impl(path, path, result);

@@ -1223,7 +1223,7 @@ s64 optimized_compare_memory(const void *ptr1, const void *ptr2, u64 size) {
 
 s64 (*compare_memory)(const void *ptr1, const void *ptr2, u64 size) = optimized_compare_memory;
 
-void default_panic_handler(const string &message, const array<os_function_call> &callStack) {
+void default_panic_handler(string message, const array<os_function_call> &callStack) {
     if (Context._HandlingPanic) return;
 
     auto newContext           = Context;

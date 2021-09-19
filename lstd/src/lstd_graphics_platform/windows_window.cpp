@@ -199,7 +199,7 @@ file_scope vec2<s32> get_full_window_size(DWORD style, DWORD exStyle, s32 conten
     return {rect.right - rect.left, rect.bottom - rect.top};
 }
 
-window os_create_window(const string &title, s32 x, s32 y, s32 width, s32 height, u32 flags) {
+window os_create_window(string title, s32 x, s32 y, s32 width, s32 height, u32 flags) {
     auto *win = malloc<window_data>();
 
     if (!MonitorCallbackAdded) {
@@ -796,7 +796,7 @@ string window::get_title() {
     return internal::platform_utf16_to_utf8(titleUtf16, internal::platform_get_persistent_allocator());
 }
 
-void window::set_title(const string &title) {
+void window::set_title(string title) {
     auto *win = get_window_data(*this);
 
     // title.Length * 2 because one unicode character might take 2 wide chars.
@@ -2016,7 +2016,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 wchar *buffer = malloc<wchar>({.Count = length + 1, .Alloc = internal::platform_get_temporary_allocator()});
                 DragQueryFileW(drop, (u32) it, buffer, length + 1);
 
-                array_append(paths, internal::platform_utf16_to_utf8(buffer, internal::platform_get_persistent_allocator()));
+                add(paths, internal::platform_utf16_to_utf8(buffer, internal::platform_get_persistent_allocator()));
             }
 
             event e;
