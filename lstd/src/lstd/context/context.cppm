@@ -25,8 +25,8 @@ export {
         return result;
     }
 
-    using panic_handler_t = void (*)(string message, const array<os_function_call> &callStack);
-    void default_panic_handler(string message, const array<os_function_call> &callStack);
+    using panic_handler_t = void (*)(string message, array<os_function_call> callStack);
+    void default_panic_handler(string message, array<os_function_call> callStack);
 
     using fmt_parse_error_handler_t = void (*)(string message, string formatString, s64 position);
     void fmt_default_parse_error_handler(string message, string formatString, s64 position);
@@ -153,6 +153,11 @@ export {
         bool _HandlingPanic       = false;  // Don't set. Used to avoid infinite looping when handling panics. Don't touch!
         bool _LoggingAnAllocation = false;  // Don't set. Used to avoid infinite looping when logging allocations. Don't touch!
     };
+
+    void panic(string message) {
+        // @TODO Get callstack!
+        Context.PanicHandler(message, {});
+    }
 
     //
     // Thread local global variable to control the behavior of a piece of code from outside.

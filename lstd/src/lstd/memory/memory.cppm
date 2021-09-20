@@ -74,10 +74,11 @@ export {
     using allocator_func_t = void *(*) (allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options);
 
     struct allocator {
-        allocator_func_t Function;
-        void *Context;
+        allocator_func_t Function = null;
+        void *Context             = null;
 
-        allocator(allocator_func_t function = null, void *context = null) : Function(function), Context(context) {}
+        allocator() {}
+        allocator(allocator_func_t function, void *context) : Function(function), Context(context) {}
 
         bool operator==(allocator other) const { return Function == other.Function && Context == other.Context; }
         bool operator!=(allocator other) const { return Function != other.Function || Context != other.Context; }
@@ -561,7 +562,7 @@ export {
     // This type of allocator super fast because it basically bumps a pointer.
     // With this allocator you don't free individual allocations, but instead free
     // the entire thing (with FREE_ALL) when you are sure nobody uses the memory anymore.
-    // Note that free_all doesn't free the added pools, but instead resets their 
+    // Note that free_all doesn't free the added pools, but instead resets their
     // pointers to the beginning of the buffer.
     //
     // The arena allocator doesn't handle overflows (when no pool has enough space for an allocation).
