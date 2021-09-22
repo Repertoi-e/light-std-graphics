@@ -177,7 +177,7 @@ file_scope void verify_header_unlocked(allocation_header *header) {
 
     char freedHeader[sizeof(allocation_header)];
     fill_memory(freedHeader, DEAD_LAND_FILL, sizeof(allocation_header));
-    if (compare_memory(header, freedHeader, sizeof(allocation_header)) == -1) {
+    if (compare_memory(header, freedHeader, sizeof(allocation_header)) == 0) {
         assert(false && "Trying to access freed memory!");
     }
 
@@ -191,10 +191,10 @@ file_scope void verify_header_unlocked(allocation_header *header) {
 
     char noMansLand[NO_MANS_LAND_SIZE];
     fill_memory(noMansLand, NO_MANS_LAND_FILL, NO_MANS_LAND_SIZE);
-    assert(compare_memory((char *) user - NO_MANS_LAND_SIZE, noMansLand, NO_MANS_LAND_SIZE) == -1 &&
+    assert(compare_memory((char *) user - NO_MANS_LAND_SIZE, noMansLand, NO_MANS_LAND_SIZE) == 0 &&
            "No man's land was modified. This means that you wrote before the allocated block.");
 
-    assert(compare_memory((char *) header->DEBUG_Pointer + header->Size, noMansLand, NO_MANS_LAND_SIZE) == -1 &&
+    assert(compare_memory((char *) header->DEBUG_Pointer + header->Size, noMansLand, NO_MANS_LAND_SIZE) == 0 &&
            "No man's land was modified. This means that you wrote after the allocated block.");
 
     //

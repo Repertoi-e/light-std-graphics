@@ -20,7 +20,7 @@ export {
     // This means that you can use this to convert floats, integers, to strings by calling just write_no_specs().
     //
     // We also store a parse context (if a format string was passed), otherwise it remains unused.
-    struct fmt_context : writer {
+    struct fmt_context {
         writer *Out;  // The real output
 
         fmt_parse_context Parse;  // Holds the format string (and how much we've parsed) and some
@@ -49,7 +49,7 @@ export {
     // parse.It is not pointing at the right place.
     //
     // This routine is used to provide useful error messages.
-    inline void on_error(fmt_context * f, string message, s64 position = -1) { on_error(&f->Parse, message, position); }
+    void on_error(fmt_context * f, string message, s64 position = -1) { on_error(&f->Parse, message, position); }
 
     void write(fmt_context * f, const char *str) { f->write((const byte *) str, c_string_length(str)); }
 
@@ -642,7 +642,7 @@ void write_float(fmt_context *f, types::is_floating_point auto value, fmt_specs 
     // This routine writes the significand in the floatBuffer, then we use the returned exponent to choose how to format the final string.
     // The returned exponent is the exponent base 10 of the LAST written digit in _floatBuffer_.
     string_builder floatBuffer;
-    s32 exp = fmt_format_non_negative_float(floatBuffer, value, specs.Precision, floatSpecs);
+    s32 exp = fmt_format_non_negative_float(&floatBuffer, value, specs.Precision, floatSpecs);
 
     //
     // Assert we haven't allocated, which would be bad, because our formatting library is not supposed to allocate by itself.

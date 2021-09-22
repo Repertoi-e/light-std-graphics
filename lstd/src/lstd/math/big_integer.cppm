@@ -74,18 +74,13 @@ export {
     // Assign any integral value (s8, s16, s32, s64, u8, u16, u32, u64, s128, u128,
     // other big integers, etc.) to a big integer.
     constexpr bool assign(big_integer * b, types::is_integral auto v);
-    constexpr big_integer cast_to_big_integer(types::is_integral auto v);
+    constexpr big_integer cast_big(types::is_integral auto v);
+
+    // Save an unnecessary allocation
+    constexpr big_integer cast_big(big_integer b) { return b; }
 
     // Normalize (remove leading zeros from) from a big integer.
     constexpr void normalize(big_integer * b);
-
-    // Declare our type as an integral for type info.
-    // In our current design we can't implement numeric_info since we don't know everything at compile-time.
-    // We could make everything work with ugly templates, but meh.
-    namespace types {
-    template <>
-    struct is_integral_helper<big_integer> : types::true_t {};
-    }  // namespace types
 
     constexpr big_integer invert(big_integer b);
     constexpr big_integer lshift(big_integer lhs, s64 n);
@@ -111,7 +106,7 @@ export {
     //
     // divmod is defined in terms of divrem, but we adjust the remainder.
     // Operator % is defined in terms of divmod.
-    constexpr div_result divrem(big_integer lhs, types::is_integral auto r);
+    constexpr div_result divrem(big_integer lhs, big_integer rhs);
 
     // divmod is NOT the same as divrem.
     // divrem gives the remainder after division of |a| by |b|, with the sign of a.
@@ -128,38 +123,37 @@ export {
     //
     // divmod is defined in terms of divrem, but we adjust the remainder.
     // Operator % is defined in terms of divmod.
-    constexpr div_result divmod(big_integer lhs, types::is_integral auto r);
+    constexpr div_result divmod(big_integer lhs, big_integer rhs);
 
     // if a < b, returns -1
     // if a == b, returns 0
     // if a > b, returns 1
-    constexpr s64 compare(big_integer a, types::is_integral auto b);
+    constexpr s32 compare(big_integer a, big_integer b);
 
     // We don't support ++/-- and assignment operators.
 
-    constexpr auto operator<=>(big_integer lhs, types::is_integral auto b) { return compare(lhs, rhs); }
-    constexpr big_integer operator+(big_integer lhs, types::is_integral auto r);
+    constexpr bool operator==(big_integer lhs, big_integer rhs) { return compare(lhs, rhs) == 0; }
+    constexpr bool operator!=(big_integer lhs, big_integer rhs) { return compare(lhs, rhs) != 0; }
+    constexpr bool operator<(big_integer lhs, big_integer rhs) { return compare(lhs, rhs) < 0; }
+    constexpr bool operator<=(big_integer lhs, big_integer rhs) { return compare(lhs, rhs) <= 0; }
+    constexpr bool operator>(big_integer lhs, big_integer rhs) { return compare(lhs, rhs) > 0; }
+    constexpr bool operator>=(big_integer lhs, big_integer rhs) { return compare(lhs, rhs) >= 0; }
 
-    constexpr big_integer operator-(big_integer lhs, types::is_integral auto r);
-    constexpr big_integer operator*(big_integer lhs, types::is_integral auto r);
-    constexpr big_integer operator/(big_integer lhs, types::is_integral auto r);
-    constexpr big_integer operator%(big_integer lhs, types::is_integral auto r);
+    constexpr big_integer operator+(big_integer lhs, big_integer rhs);
+    constexpr big_integer operator-(big_integer lhs, big_integer rhs);
+    constexpr big_integer operator*(big_integer lhs, big_integer rhs);
+    constexpr big_integer operator/(big_integer lhs, big_integer rhs);
+    constexpr big_integer operator%(big_integer lhs, big_integer rhs);
 
     constexpr big_integer operator>>(big_integer lhs, s64 n) { return rshift(lhs, n); }
     constexpr big_integer operator<<(big_integer lhs, s64 n) { return lshift(lhs, n); }
 
-    constexpr big_integer operator&(big_integer lhs, types::is_integral auto r) {
-        return bitwise(lhs, '&', cast_to_big_integer(r));
-    }
-
-    constexpr big_integer operator|(big_integer lhs, types::is_integral auto r) {
-        return bitwise(lhs, '|', cast_to_big_integer(r));
-    }
-
-    constexpr big_integer operator^(big_integer lhs, types::is_integral auto r) {
-        return bitwise(lhs, '^', cast_to_big_integer(r));
-    }
+    constexpr big_integer operator&(big_integer lhs, big_integer rhs);
+    constexpr big_integer operator|(big_integer lhs, big_integer rhs);
+    constexpr big_integer operator^(big_integer lhs, big_integer rhs);
 }
+
+#if 0
 
 constexpr bool ensure_digits(big_integer *b, s64 n) {
     // @Cleanup, see note in get_allocated() in array.cppm
@@ -198,14 +192,11 @@ constexpr void normalize(big_integer *b) {
     if (i != j) b->Size = b->Size < 0 ? -i : i;
 }
 
-constexpr big_integer cast_to_big_integer(types::is_integral auto v) {
+constexpr big_integer cast_big(types::is_integral auto v) {
     big_integer b;
     assign(&b, v);
     return b;
 }
-
-// Save an unnecessary allocation
-constexpr big_integer cast_to_big_integer(big_integer b) { return b; }
 
 constexpr bool assign(big_integer *b, types::is_integral auto v) {
     if constexpr (types::is_same<big_integer, decltype(v)>) {
@@ -618,7 +609,7 @@ constexpr big_integer k_mul(big_integer *a, big_integer *b) {
     big_integer result = create_big_integer_and_set_size(sizea + sizeb);
 
     // 2. t1 <- ah*bh, and copy into high digits of result
-    big_integer t1 = k_mul(*ah, *bh);
+    big_integer t1 = k_mul(ah, bh);
 
     assert(t1.Size >= 0);
     assert(2 * shift + t1.Size <= result.Size);
@@ -629,82 +620,82 @@ constexpr big_integer k_mul(big_integer *a, big_integer *b) {
     if (i) fill_memory(result.Digits + 2 * shift + t1.Size, 0, i * sizeof(digit));
 
     // 3. t2 <- al*bl, and copy into the low digits
-    big_integer t2 = k_mul(*al, *bl);
+    big_integer t2 = k_mul(al, bl);
 
     assert(t2.Size >= 0);
     assert(t2.Size <= 2 * shift); /* no overlap with high digits */
-    copy_elements(result.Digits, t2.Digits, t2.Size);
+copy_elements(result.Digits, t2.Digits, t2.Size);
 
-    // Zero out remaining digits
-    i = 2 * shift - t2.Size;  // number of uninitialized digits
-    if (i) zero_memory(result.Digits + t2.Size, i * sizeof(digit));
+// Zero out remaining digits
+i = 2 * shift - t2.Size;  // number of uninitialized digits
+if (i) zero_memory(result.Digits + t2.Size, i * sizeof(digit));
 
-    // 4 & 5. Subtract ah*bh (t1) and al*bl (t2).
-    // We do al*bl first because it's fresher in cache.
-    i = result.Size - shift;  // # digits after shift
-    v_isub(result.Digits + shift, i, t2.Digits, t2.Size);
+// 4 & 5. Subtract ah*bh (t1) and al*bl (t2).
+// We do al*bl first because it's fresher in cache.
+i = result.Size - shift;  // # digits after shift
+v_isub(result.Digits + shift, i, t2.Digits, t2.Size);
 
-    v_isub(result.Digits + shift, i, t1.Digits, t1.Size);
+v_isub(result.Digits + shift, i, t1.Digits, t1.Size);
 
-    // 6. t3 <- (ah+al)(bh+bl), and add into result
-    t1 = x_add(*ah, *al);
-    ah = al = null;
+// 6. t3 <- (ah+al)(bh+bl), and add into result
+t1 = x_add(ah, al);
+ah = al = null;
 
-    if (*a == *b) {
-        t2 = t1;
-    } else {
-        t2 = x_add(*bh, *bl);
-    }
+if (*a == *b) {
+    t2 = t1;
+} else {
+    t2 = x_add(bh, bl);
+}
 
-    bh = bl = null;
+bh = bl = null;
 
-    T t3 = k_mul(t1, t2);
-    assert(t3.Size >= 0);
+big_integer t3 = k_mul(&t1, &t2);
+assert(t3.Size >= 0);
 
-    // Add t3. It's not obvious why we can't run out of room here.
-    // Let f(x) mean the floor of x and c(x) mean the ceiling of x.  Some facts
-    // to start with:
-    // 1. For any integer i, i = c(i/2) + f(i/2). In particular, sizeb = c(sizeb/2) + f(sizeb/2).
-    // 2. shift = f(sizeb/2)
-    // 3. sizea <= sizeb
-    // 4. Since we call k_lopsided_mul if sizea*2 <= sizeb, sizea*2 > sizeb in this
-    //    routine, so sizea > sizeb/2 >= f(sizeb/2) in this routine.
-    //
-    // We allocated sizea + sizeb result digits, and add t3 into them at an offset
-    // of shift.  This leaves sizea+sizeb-shift allocated digit positions for t3
-    // to fit into, = (by #1 and #2) sizea + f(sizeb/2) + c(sizeb/2) - f(sizeb/2) =
-    // sizea + c(sizeb/2) available digit positions.
-    //
-    // bh has c(sizeb/2) digits, and bl at most f(size/2) digits.  So bh+hl has
-    // at most c(sizeb/2) digits + 1 bit.
-    //
-    // If sizea == sizeb, ah has c(sizeb/2) digits, else ah has at most f(sizeb/2)
-    // digits, and al has at most f(sizeb/2) digits in any case.  So ah+al has at
-    // most (sizea == sizeb ? c(sizeb/2) : f(sizeb/2)) digits + 1 bit.
-    //
-    // The product (ah+al)*(bh+bl) therefore has at most
-    //     c(sizeb/2) + (sizea == sizeb ? c(sizeb/2) : f(sizeb/2)) digits + 2 bits
-    // and we have sizea + c(sizeb/2) available digit positions.  We need to show
-    // this is always enough.  An instance of c(sizeb/2) cancels out in both, so
-    // the question reduces to whether sizea digits is enough to hold
-    // (sizea == sizeb ? c(sizeb/2) : f(sizeb/2)) digits + 2 bits.
-    //
-    // If sizea < sizeb, then we're asking whether sizea digits >= f(sizeb/2) digits + 2 bits.
-    // By #4, sizea is at least f(sizeb/2)+1 digits, so this in turn reduces to whether 1
-    // digit is enough to hold 2 bits.  This is so since SHIFT=15 >= 2.
-    //
-    // If sizea == sizeb, then we're asking whether sizeb digits is enough to hold
-    // c(sizeb/2) digits + 2 bits, or equivalently (by #1) whether f(sizeb/2) digits
-    // is enough to hold 2 bits.  This is so if sizeb >= 2, which holds because
-    // sizeb >= KARATSUBA_CUTOFF >= 2.
-    //
-    // Note that since there's always enough room for (ah+al)*(bh+bl), and that's
-    // clearly >= each of ah*bh and al*bl, there's always enough room to subtract
-    // ah*bh and al*bl too.
-    v_iadd(result.Digits + shift, i, t3.Digits, t3.Size);
+// Add t3. It's not obvious why we can't run out of room here.
+// Let f(x) mean the floor of x and c(x) mean the ceiling of x.  Some facts
+// to start with:
+// 1. For any integer i, i = c(i/2) + f(i/2). In particular, sizeb = c(sizeb/2) + f(sizeb/2).
+// 2. shift = f(sizeb/2)
+// 3. sizea <= sizeb
+// 4. Since we call k_lopsided_mul if sizea*2 <= sizeb, sizea*2 > sizeb in this
+//    routine, so sizea > sizeb/2 >= f(sizeb/2) in this routine.
+//
+// We allocated sizea + sizeb result digits, and add t3 into them at an offset
+// of shift.  This leaves sizea+sizeb-shift allocated digit positions for t3
+// to fit into, = (by #1 and #2) sizea + f(sizeb/2) + c(sizeb/2) - f(sizeb/2) =
+// sizea + c(sizeb/2) available digit positions.
+//
+// bh has c(sizeb/2) digits, and bl at most f(size/2) digits.  So bh+hl has
+// at most c(sizeb/2) digits + 1 bit.
+//
+// If sizea == sizeb, ah has c(sizeb/2) digits, else ah has at most f(sizeb/2)
+// digits, and al has at most f(sizeb/2) digits in any case.  So ah+al has at
+// most (sizea == sizeb ? c(sizeb/2) : f(sizeb/2)) digits + 1 bit.
+//
+// The product (ah+al)*(bh+bl) therefore has at most
+//     c(sizeb/2) + (sizea == sizeb ? c(sizeb/2) : f(sizeb/2)) digits + 2 bits
+// and we have sizea + c(sizeb/2) available digit positions.  We need to show
+// this is always enough.  An instance of c(sizeb/2) cancels out in both, so
+// the question reduces to whether sizea digits is enough to hold
+// (sizea == sizeb ? c(sizeb/2) : f(sizeb/2)) digits + 2 bits.
+//
+// If sizea < sizeb, then we're asking whether sizea digits >= f(sizeb/2) digits + 2 bits.
+// By #4, sizea is at least f(sizeb/2)+1 digits, so this in turn reduces to whether 1
+// digit is enough to hold 2 bits.  This is so since SHIFT=15 >= 2.
+//
+// If sizea == sizeb, then we're asking whether sizeb digits is enough to hold
+// c(sizeb/2) digits + 2 bits, or equivalently (by #1) whether f(sizeb/2) digits
+// is enough to hold 2 bits.  This is so if sizeb >= 2, which holds because
+// sizeb >= KARATSUBA_CUTOFF >= 2.
+//
+// Note that since there's always enough room for (ah+al)*(bh+bl), and that's
+// clearly >= each of ah*bh and al*bl, there's always enough room to subtract
+// ah*bh and al*bl too.
+v_iadd(result.Digits + shift, i, t3.Digits, t3.Size);
 
-    normalize(&result);
-    return result;
+normalize(&result);
+return result;
 }
 
 // Divide long pin, w/ size digits, by non-zero digit n, storing quotient
@@ -966,12 +957,16 @@ big_integer bitwise(big_integer lhs, byte op, big_integer rhs) {
     return result;
 }
 
+    constexpr big_integer operator&(big_integer lhs, big_integer rhs) { return bitwise(lhs, '&', rhs); }
+    constexpr big_integer operator|(big_integer lhs, big_integer rhs) { return bitwise(lhs, '|', rhs); }
+    constexpr big_integer operator^(big_integer lhs, big_integer rhs) { return bitwise(lhs, '^', rhs); }
+
 constexpr big_integer add_one(big_integer b) {
-    if (!b.Size) return cast_to_big_integer(1);
+    if (!b.Size) return cast_big(1);
 
     s64 size = abs(b.Size);
 
-    carry = (b.Digits[size] + 1) >> SHIFT;
+    digit carry = (b.Digits[size] + 1) >> SHIFT;
     if (carry) ++size;
 
     big_integer result = create_big_integer_and_set_size(size);
@@ -994,7 +989,7 @@ constexpr big_integer invert(big_integer b) {
 
 constexpr big_integer lshift(big_integer lhs, s64 n) {
     if (n == 0) return lhs;
-    if (!lhs.Size) return cast_to_big_integer(0);
+    if (!lhs.Size) return cast_big(0);
 
     s64 wordshift = n / SHIFT;
     u32 remshift  = n % SHIFT;
@@ -1040,7 +1035,7 @@ constexpr big_integer lshift(big_integer lhs, s64 n) {
 
 constexpr big_integer rshift(big_integer lhs, s64 n) {
     if (n == 0) return lhs;
-    if (!lhs.Size) return cast_to_big_integer(0);
+    if (!lhs.Size) return cast_big(0);
 
     s64 wordshift = n / SHIFT;
     u32 remshift  = n % SHIFT;
@@ -1050,7 +1045,7 @@ constexpr big_integer rshift(big_integer lhs, s64 n) {
         return invert(rshift(invert(lhs), n));
     } else {
         s64 newSize = lhs.Size - wordshift;
-        if (newSize <= 0) return cast_to_big_integer(0);
+        if (newSize <= 0) return cast_big(0);
 
         s64 hishift  = SHIFT - remshift;
         digit lomask = (1ul << hishift) - 1;
@@ -1071,8 +1066,7 @@ constexpr big_integer rshift(big_integer lhs, s64 n) {
     }
 }
 
-constexpr div_result divrem(big_integer lhs, types::is_integral auto r) {
-    auto rhs = cast_to_big_integer(r);
+constexpr div_result divrem(big_integer lhs, big_integer rhs) {
     if (!rhs.Size) panic("Division by zero");
 
     s64 sizea = abs(lhs.Size), sizeb = abs(rhs.Size);
@@ -1110,8 +1104,7 @@ constexpr div_result divrem(big_integer lhs, types::is_integral auto r) {
     return result;
 }
 
-constexpr div_result divmod(big_integer lhs, types::is_integral auto r) {
-    auto rhs        = cast_to_big_integer(r);
+constexpr div_result divmod(big_integer lhs, big_integer rhs) {
     auto [div, mod] = divrem(lhs, rhs);
 
     // To get from rem to mod, we have to add rhs if lhs and rhs
@@ -1124,10 +1117,10 @@ constexpr div_result divmod(big_integer lhs, types::is_integral auto r) {
     }
 }
 
-constexpr s64 compare(big_integer a, big_integer b_) {
-    big_integer b = cast_to_big_integer(b_);
+constexpr s32 compare(big_integer a, big_integer b_) {
+    big_integer b = cast_big(b_);
 
-    s64 sign = a.Size - b.Size;
+    s32 sign = (s32) (a.Size - b.Size);
     if (sign == 0) {
         if (!a.Size) return 0;  // Two zeroes
 
@@ -1142,9 +1135,7 @@ constexpr s64 compare(big_integer a, big_integer b_) {
     return sign;
 }
 
-constexpr big_integer operator+(big_integer lhs, types::is_integral auto r) {
-    auto rhs = cast_to_big_integer(r);
-
+constexpr big_integer operator+(big_integer lhs, big_integer rhs) {
     if (lhs.Size < 0) {
         if (rhs.Size < 0) {
             auto z = x_add(lhs, rhs);
@@ -1162,9 +1153,7 @@ constexpr big_integer operator+(big_integer lhs, types::is_integral auto r) {
     }
 }
 
-constexpr big_integer operator-(big_integer lhs, types::is_integral auto r) {
-    auto rhs = cast_to_big_integer(r);
-
+constexpr big_integer operator-(big_integer lhs, big_integer rhs) {
     if (lhs.Size < 0) {
         if (rhs.Size < 0) {
             return x_sub(rhs, lhs);
@@ -1182,9 +1171,7 @@ constexpr big_integer operator-(big_integer lhs, types::is_integral auto r) {
     }
 }
 
-constexpr big_integer operator*(big_integer lhs, types::is_integral auto r) {
-    auto rhs = cast_to_big_integer(r);
-
+constexpr big_integer operator*(big_integer lhs, big_integer rhs) {
     big_integer result = k_mul(lhs, rhs);
     // Negate if exactly one of the inputs is negative
     if ((lhs.Size ^ rhs.Size) < 0 && result.Size) {
@@ -1194,16 +1181,15 @@ constexpr big_integer operator*(big_integer lhs, types::is_integral auto r) {
     return result;
 }
 
-constexpr big_integer operator/(big_integer lhs, types::is_integral auto r) {
-    auto rhs        = cast_to_big_integer(r);
+constexpr big_integer operator/(big_integer lhs, big_integer rhs) {
     auto [div, rem] = divrem(lhs, rhs);
     return div;
 }
 
-constexpr big_integer operator%(big_integer lhs, types::is_integral auto r) {
-    auto rhs        = cast_to_big_integer(r);
+constexpr big_integer operator%(big_integer lhs, big_integer rhs) {
     auto [div, mod] = divmod(lhs, rhs);
     return mod;
 }
+#endif
 
 LSTD_END_NAMESPACE

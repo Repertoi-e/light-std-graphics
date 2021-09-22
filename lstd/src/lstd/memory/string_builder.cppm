@@ -6,6 +6,7 @@ export module lstd.string_builder;
 
 export import lstd.memory;
 export import lstd.string;
+export import lstd.context;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -18,7 +19,7 @@ export {
         static constexpr s64 BUFFER_SIZE = 1_KiB;
 
         struct buffer {
-            u8 Data[BUFFER_SIZE]{};
+            char Data[BUFFER_SIZE]{};
             s64 Occupied = 0;
             buffer *Next = null;
         };
@@ -41,14 +42,20 @@ export {
     // Free any memory allocated by this object and reset cursor
     void free_buffers(string_builder * builder);
 
-    // Append a code point to the builder
-    void append(string_builder * builder, code_point codePoint);
-
-    // Append a string to the builder
-    void append(string_builder * builder, string str);
+    string_builder::buffer *get_current_buffer(string_builder * builder);
 
     // Append _size_ bytes from _data_ to the builder
     void append(string_builder * builder, const char *data, s64 size);
+
+    // Append a code point to the builder
+    void append(string_builder * builder, code_point cp) {
+        char encodedCp[4];
+        utf8_encode_cp(encodedCp, cp);
+        append(builder, encodedCp, utf8_get_size_of_cp(encodedCp));
+    }
+
+    // Append a string to the builder
+    void append(string_builder * builder, string str) { append(builder, str.Data, str.Count); }
 
     // Merges all buffers in one string.
     // Maybe release the buffers as well?
@@ -56,6 +63,75 @@ export {
     [[nodiscard("Leak")]] string builder_to_string(string_builder * builder);
 }
 
-string_builder::buffer *get_current_buffer(string_builder *builder);
+LSTD_END_NAMESPACE
+module : private;
+LSTD_BEGIN_NAMESPACE
+
+void reset(string_builder *builder) {
+    builder->CurrentBuffer = null;  // null means BaseBuffer
+
+    auto *b = &builder->BaseBuffer;
+    while (b) {
+        b->Occupied = 0;
+
+        b = b->Next;
+    }
+}
+
+void append(string_builder *builder, const char *data, s64 size) {
+    auto *currentBuffer = get_current_buffer(builder);
+
+    s64 availableSpace = builder->BUFFER_SIZE - currentBuffer->Occupied;
+    if (availableSpace >= size) {
+        copy_memory(currentBuffer->Data + currentBuffer->Occupied, data, size);
+        currentBuffer->Occupied += size;
+    } else {
+        copy_memory(currentBuffer->Data + currentBuffer->Occupied, data, availableSpace);
+        currentBuffer->Occupied += availableSpace;
+
+        // If the entire string doesn't fit inside the available space,
+        // allocate the next buffer and continue appending.
+        if (!builder->Alloc) builder->Alloc = Context.Alloc;
+        auto *b = malloc<string_builder::buffer>({.Alloc = builder->Alloc});
+
+        currentBuffer->Next    = b;
+        builder->CurrentBuffer = b;
+
+        builder->IndirectionCount++;
+
+        append(builder, data + availableSpace, size - availableSpace);
+    }
+}
+
+[[nodiscard("Leak")]] string builder_to_string(string_builder *builder) {
+    string result;
+    resize(&result, (builder->IndirectionCount + 1) * builder->BUFFER_SIZE);
+
+    auto *b = &builder->BaseBuffer;
+    while (b) {
+        string_append(&result, b->Data, b->Occupied);
+        b = b->Next;
+    }
+    return result;
+}
+
+string_builder::buffer *get_current_buffer(string_builder *builder) {
+    if (builder->CurrentBuffer == null) return &builder->BaseBuffer;
+    return builder->CurrentBuffer;
+}
+
+void free_buffers(string_builder *builder) {
+    // We don't need to free the base buffer, it is allocated on the stack
+    auto *b = builder->BaseBuffer.Next;
+    while (b) {
+        auto *old = b;
+
+        b = b->Next;
+        free(old);
+    }
+
+    builder->CurrentBuffer       = null;  // null means BaseBuffer
+    builder->BaseBuffer.Occupied = 0;
+}
 
 LSTD_END_NAMESPACE

@@ -85,11 +85,9 @@ import lstd.string_builder;
 LSTD_BEGIN_NAMESPACE
 
 // Assigns pow(10, exp) to a big int
-big_int_2048 bigint_pow10(s32 exp) {
+big_integer bigint_pow10(s32 exp) {
     assert(exp >= 0);
-    if (exp == 0) {
-        return 1;
-    }
+    if (exp == 0) return cast_big(1);
 
     // Find the top bit
     s32 bitmask = 1;
@@ -98,14 +96,14 @@ big_int_2048 bigint_pow10(s32 exp) {
 
     // pow(10, exp) = pow(5, exp) * pow(2, exp).
     // First compute pow(5, exp) by repeated squaring and multiplication.
-    big_int_2048 b = 5;
+    big_integer b = cast_big(5);
     bitmask >>= 1;
     while (bitmask != 0) {
         b = b * b;
-        if ((exp & bitmask) != 0) b *= 5;
+        if ((exp & bitmask) != 0) b = b * cast_big(5);
         bitmask >>= 1;
     }
-    b <<= exp;  // Multiply by pow(2, exp) by shifting.
+    b = b << exp;  // Multiply by pow(2, exp) by shifting.
 
     return b;
 }
@@ -162,8 +160,8 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
     // floating point value above/below the significand.
 
     // Lower and upper are differences between value and corresponding boundaries.
-    big_int_2048 numerator, denominator, lower, upperStore;
-    big_int_2048 *upper = null;  // Optional, may point to upperStore.
+    big_integer numerator, denominator, lower, upperStore;
+    big_integer *upper = null;  // Optional, may point to upperStore.
 
     fp value;
     bool isPredecessorCloser = fp_assign_new(value, v);  // Called "hasUnequalMargins" in the original
@@ -184,32 +182,32 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
         // 3) Set the margin value to the lowest significand bit's scale.
 
         numerator = significand;
-        numerator <<= exponent;
-        lower = 1;
-        lower <<= exponent;
+        numerator = numerator << exponent;
+        lower     = 1;
+        lower     = lower << exponent;
         if (shift != 1) {
             upperStore = 1;
-            upperStore <<= exponent + 1;
-            upper = &upperStore;
+            upperStore = upperStore << (exponent + 1);
+            upper      = &upperStore;
         }
         denominator = bigint_pow10(*outExp);
-        denominator <<= shift;
+        denominator = denominator << shift;
     } else if (*outExp < 0) {
         numerator = bigint_pow10(-(*outExp));
         lower     = numerator;
         if (shift != 1) {
             upperStore = numerator;
-            upperStore <<= 1;
-            upper = &upperStore;
+            upperStore = upperStore << 1;
+            upper      = &upperStore;
         }
         numerator *= significand;
         denominator = 1;
-        denominator <<= shift - exponent;
+        denominator = denominator << (shift - exponent);
     } else {
         numerator   = significand;
         denominator = bigint_pow10(*outExp);
-        denominator <<= shift - exponent;
-        lower = 1;
+        denominator = denominator << (shift - exponent);
+        lower       = 1;
         if (shift != 1) {
             upperStore = 2;
             upper      = &upperStore;
@@ -235,13 +233,13 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
             bool high = compare(numerator + *upper, denominator) + even > 0;
 
             // Store the output digit.
-            b[precision++] = (utf8) ('0' + outputDigit);
+            b[precision++] = '0' + outputDigit;
 
             if (low || high) {
                 if (low) {
                     ++b[precision - 1];
                 } else if (high) {
-                    s64 cmp = compare(numerator * 2, denominator);
+                    s64 cmp = compare(numerator * cast_big(2), denominator);
 
                     // Round half to even.
                     if (cmp > 0 || (cmp == 0 && (outputDigit % 2) != 0)) {
@@ -255,9 +253,9 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
                 return;
             }
 
-            numerator *= 10;
-            lower *= 10;
-            if (upper != &lower) *upper *= 10;
+            numerator = numerator * cast_big(10);
+            lower     = lower * cast_big(10);
+            if (upper != &lower) *upper = *upper * cast_big(10);
         }
     }
 
@@ -278,8 +276,8 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
     *outExp -= precision - 1;
     if (precision == 0) {
         *outWritten = 1;
-        denominator *= 10;
-        b[0] = compare(numerator * 2, denominator) > 0 ? '1' : '0';
+        denominator = denominator * cast_big(10);
+        b[0]        = compare(numerator * cast_big(2), denominator) > 0 ? '1' : '0';
         return;
     }
 
@@ -292,9 +290,9 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
         assert(digit < 10);
         u32 outputDigit = digit.Bigits[0];
 
-        b[it] = (utf8) ('0' + outputDigit);
+        b[it] = '0' + outputDigit;
 
-        numerator *= 10;
+        numerator = numerator * cast_big(10);
     }
 
     // The final one, also handle rounding..
@@ -304,10 +302,10 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
     assert(digit < 10);
     u32 outputDigit = digit.Bigits[0];
 
-    s64 cmp = compare(numerator * 2, denominator);
+    s64 cmp = compare(numerator * cast_big(2), denominator);
     if (cmp > 0 || (cmp == 0 && (outputDigit % 2) != 0)) {
         if (outputDigit == 9) {
-            utf8 overflow    = (utf8) ('0' + 10);
+            char overflow    = '0' + 10;
             b[precision - 1] = overflow;
 
             // Propagate the carry.
@@ -323,7 +321,7 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
         }
         ++outputDigit;
     }
-    b[precision - 1] = (utf8) ('0' + outputDigit);
+    b[precision - 1] = '0' + outputDigit;
 }
 
 LSTD_END_NAMESPACE

@@ -312,13 +312,13 @@ constexpr bool operator==(string one, const char *other) { return string_compare
 
 constexpr bool match_beginning(string s, string str) {
     if (str.Count > s.Count) return false;
-    return compare_memory(s.Data, str.Data, str.Count) == -1;
+    return compare_memory(s.Data, str.Data, str.Count) == 0;
 }
 
 // Returns true if _s_ ends with _str_
 constexpr bool match_end(string s, string str) {
     if (str.Count > s.Count) return false;
-    return compare_memory(s.Data + s.Count - str.Count, str.Data, str.Count) == -1;
+    return compare_memory(s.Data + s.Count - str.Count, str.Data, str.Count) == 0;
 }
 
 constexpr s64 string_find(string str, const delegate<bool(code_point)> &predicate, s64 start, bool reversed) {

@@ -932,9 +932,10 @@ constexpr DestType bit_cast(const SourceType &sourceValue) {
     } else {
         DestType destValue;
         if constexpr (is_constant_evaluated()) {
-            copy_memory(&destValue, &sourceValue, sizeof(DestType));
+            // Too bad.. undefined behavior. I hate C++.
+            // const_copy_memory(&destValue, &sourceValue, sizeof(DestType));
         } else {
-            const_copy_memory(&destValue, &sourceValue, sizeof(DestType));
+            copy_memory(&destValue, &sourceValue, sizeof(DestType));
         }
         return destValue;
     }

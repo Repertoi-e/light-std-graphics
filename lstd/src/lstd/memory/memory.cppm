@@ -285,7 +285,7 @@ export {
     // it seems like the compiler doesn't care if they are overloaded or even defined,
     // it just looks for those magic symbols.
     template <non_void T>
-    requires(!types::is_const<T>) void free(T * block, u64 options) {
+    requires(!types::is_const<T>) void free(T * block, u64 options = 0) {
         lstd_free_impl(block, options);
     }
 

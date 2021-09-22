@@ -11,6 +11,12 @@ function common_settings()
 
     rtti "Off"
     characterset "Unicode"
+	
+	-- We don't link with the runtime library but this makes certain warnings
+	-- having to do with us replacing malloc/free disappear. 
+	-- (Including certain CRT headers define those functions with 
+	-- __declspec(dllimport) which don't match with our definitions).
+	staticruntime "On"
     
     editandcontinue "Off"
     exceptionhandling "Off" -- SEH still works

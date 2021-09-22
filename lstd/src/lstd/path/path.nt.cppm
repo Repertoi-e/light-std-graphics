@@ -1,6 +1,5 @@
 module;
 
-#include "../parse.h"
 #include "lstd_platform/windows.h"  // Declarations of Win32 functions
 
 export module lstd.path.nt;

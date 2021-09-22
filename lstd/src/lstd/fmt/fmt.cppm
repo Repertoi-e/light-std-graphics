@@ -2,7 +2,6 @@ module;
 
 #include "../common/context.h"
 #include "../math.h"
-#include "../memory/guid.h"
 
 export module lstd.fmt;
 

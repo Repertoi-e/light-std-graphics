@@ -351,7 +351,7 @@ void replace_all(any_array auto *arr, any_array auto search, any_array auto repl
         auto *p = arr->Data;
         auto *e = arr->Data + arr->Count;
         while (p != e) {
-            // @Speed We can do simply compare_memory for scalar types and types that don't have overloaded ==.
+            // @Speed We can do simply memcmp for scalar types and types that don't have overloaded ==.
             if (*p == search[0]) {
                 auto *n  = p;
                 auto *sp = search.Data;

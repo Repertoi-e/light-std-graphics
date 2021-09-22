@@ -94,6 +94,7 @@ inline void *operator new[](size_t, void *p) noexcept { return p; }
 //
 
 extern "C" {
+#if COMPILER == MSVC
 // Allocates a block of a given size
 void *malloc(size_t size);
 
@@ -106,6 +107,9 @@ void *realloc(void *ptr, size_t newSize);
 
 // Frees a block allocated by malloc.
 void free(void *ptr);
+#else
+#error
+#endif
 }
 
 #if COMPILER == MSVC

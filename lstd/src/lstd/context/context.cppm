@@ -154,11 +154,6 @@ export {
         bool _LoggingAnAllocation = false;  // Don't set. Used to avoid infinite looping when logging allocations. Don't touch!
     };
 
-    void panic(string message) {
-        // @TODO Get callstack!
-        Context.PanicHandler(message, {});
-    }
-
     //
     // Thread local global variable to control the behavior of a piece of code from outside.
     // A way to store options without passing parameters to routines.
@@ -179,6 +174,11 @@ export {
     // A malicious author of a library can use a const_cast to change a variable and not restore
     // it in the end, but he can also do 1000 other things that completely break your program, so...
     inline const thread_local context Context = {};
+
+    void panic(string message) {
+        // @TODO Get callstack!
+        Context.PanicHandler(message, {});
+    }
 
     //
     // :TemporaryAllocator: Take a look at the docs of this allocator in "allocator.h"

@@ -1,10 +1,11 @@
 module;
 
-#include "../parse.h"
+#include "../common.h"
 
 export module lstd.fmt.parse_context;
 
-import lstd.context;
+export import lstd.context;
+export import lstd.parse;
 
 import lstd.fmt.arg;
 import lstd.fmt.specs;
@@ -76,7 +77,7 @@ export {
         // (We may want to pass a different position if we are in the middle of parsing and the It is not pointing at the right place).
         //
         // This is only used to provide useful error messages.
-        inline void on_error(string message, s64 position = -1) {
+        void on_error(string message, s64 position = -1) {
             if (position == -1) position = It.Data - FormatString.Data;
             Context.FmtParseErrorHandler(message, FormatString, position);
         }
@@ -100,7 +101,7 @@ export {
     fmt_parse_text_style_result fmt_parse_text_style(fmt_parse_context * p);
 }
 
-fmt_alignment get_alignment_from_char(char ch) {
+fmt_alignment get_alignment_from_char(code_point ch) {
     if (ch == '<') {
         return fmt_alignment::LEFT;
     } else if (ch == '>') {
@@ -123,7 +124,7 @@ s64 fmt_parse_arg_id(fmt_parse_context *p) {
 
     if (is_digit(ch)) {
         auto [value, status, rest] = parse_int<u32, parse_int_options{.ParseSign = false}>(p->It, 10);
-        p->It = string(rest);
+        p->It                      = string(rest);
 
         if (status == PARSE_TOO_MANY_DIGITS) {
             p->on_error("Argument index is an integer which is too large");
@@ -150,55 +151,54 @@ s64 fmt_parse_arg_id(fmt_parse_context *p) {
 }
 
 bool parse_fill_and_align(fmt_parse_context *p, fmt_type argType, fmt_specs *specs) {
-    auto [fill, status, rest] = eat_code_point(p->It);
-    if (status == PARSE_INVALID) {
-        p->on_error("Invalid UTF8 encountered in format string");
-        return false;
-    }
-
-    assert(status != PARSE_EXHAUSTED);
+    code_point fill = p->It[0];
+    advance_cp(&p->It, 1);
 
     // First we check if the code point we parsed was an alingment specifier, if it was then there was no fill.
     // We leave it as ' ' by default and continue afterwards for error checking.
-    auto align = get_alignment_from_char((char) fill);
+    auto align = get_alignment_from_char(fill);
     if (align == fmt_alignment::NONE) {
-        // If there was nothing in _rest_ then it wasn't a fill code point because there is no alignment (in rest).
-        // We don't parse anything and roll back.
-        if (!rest.Count) return true;
+        if (!p->It) {
+            // It wasn't a fill code point because there is no alignment...
+            // We don't parse anything and roll back.
+            advance_cp(&p->It, -1);
+            return true;
+        }
 
         // We now check if the next char in rest is an alignment specifier.
-        align = get_alignment_from_char(rest.Data[0]);
-        ++rest.Data, --rest.Count;  // Skip the align, later we advance _It_ to _rest_
+        align = get_alignment_from_char(p->It[0]);
+        advance_cp(&p->It, 1);  // Skip the align, later we advance _It_ to _rest_
     } else {
         fill = ' ';  // If we parsed an alignment but no fill then the fill must be ' ' by default
     }
 
     // If we got here and didn't get an alignment specifier we roll back and don't parse anything.
     if (align != fmt_alignment::NONE) {
-        s64 errorPosition = (const char *) rest.Data - p->FormatString.Data;
+        // s64 errorPosition = (const char *) p->It.Data - p->FormatString.Data;
         if (fill == '{') {
-            p->on_error("Invalid fill character \"{\"", errorPosition - 2);
+            p->on_error("Invalid fill character \"{\"");
             return false;
         }
         if (fill == '}') {
-            p->on_error("Invalid fill character \"}\"", errorPosition - 2);
+            p->on_error("Invalid fill character \"}\"");
             return false;
         }
 
-        p->It = string(rest);  // Advance forward
-
-        specs->Fill = fill;
+        specs->Fill  = fill;
         specs->Align = align;
 
-        if (align == fmt_alignment::NUMERIC) p->require_arithmetic_arg(argType, errorPosition - 1);
+        if (align == fmt_alignment::NUMERIC) p->require_arithmetic_arg(argType);
+    } else {
+        advance_cp(&p->It, -1);
     }
+
     return true;
 }
 
 bool parse_width(fmt_parse_context *p, fmt_dynamic_specs *specs) {
     if (is_digit(p->It[0])) {
         auto [value, status, rest] = parse_int<u32, parse_int_options{.ParseSign = false}>(p->It, 10);
-        p->It = string(rest);
+        p->It                      = string(rest);
 
         specs->Width = value;
 
@@ -235,7 +235,7 @@ bool parse_precision(fmt_parse_context *p, fmt_type argType, fmt_dynamic_specs *
 
     if (is_digit(p->It[0])) {
         auto [value, status, rest] = parse_int<u32, parse_int_options{.ParseSign = false}>(p->It, 10);
-        p->It = string(rest);
+        p->It                      = string(rest);
 
         specs->Precision = value;
 
@@ -313,7 +313,7 @@ bool fmt_parse_specs(fmt_parse_context *p, fmt_type argType, fmt_dynamic_specs *
     if (p->It[0] == '0') {
         p->require_arithmetic_arg(argType);
         specs->Align = fmt_alignment::NUMERIC;
-        specs->Fill = '0';
+        specs->Fill  = '0';
 
         ++p->It.Data, --p->It.Count;
         if (!p->It.Count) return true;  // No more specs to parse. Tried to parse so far: align, sign, #, 0
@@ -365,7 +365,7 @@ u32 parse_rgb_channel(fmt_parse_context *p, bool last) {
     auto [channel, status, rest] = parse_int<u8, parse_int_options{.ParseSign = false, .LookForBasePrefix = true}>(p->It);
 
     if (status == PARSE_INVALID) {
-        p->on_error("Invalid character encountered when parsing an integer channel value", (const char *) rest.Data - p->FormatString.Data);
+        p->on_error("Invalid integer channel value", (const char *) rest.Data - p->FormatString.Data);
         return (u32) -1;
     }
 
@@ -375,9 +375,7 @@ u32 parse_rgb_channel(fmt_parse_context *p, bool last) {
     }
 
     p->It = string(rest);
-    if (status == PARSE_EXHAUSTED) return (u32) -1;
-
-    if (!p->It.Count) return (u32) -1;
+    if (!p->It) return (u32) -1;
 
     if (!last) {
         if (p->It[0] != ';') {
@@ -408,7 +406,7 @@ fmt_parse_text_style_result fmt_parse_text_style(fmt_parse_context *p) {
         }
 
         const char *it = p->It.Data;
-        s64 n = p->It.Count;
+        s64 n          = p->It.Count;
         do {
             ++it, --n;
         } while (n && is_identifier_start(*it));
@@ -433,7 +431,7 @@ fmt_parse_text_style_result fmt_parse_text_style(fmt_parse_context *p) {
                 if (!handle_emphasis(p, &textStyle)) return {false, {}};
                 return {true, textStyle};
             }
-            textStyle.ColorKind = fmt_text_style::color_kind::TERMINAL;
+            textStyle.ColorKind      = fmt_text_style::color_kind::TERMINAL;
             textStyle.Color.Terminal = c;
         } else {
             color c = string_to_color(name);
@@ -472,7 +470,7 @@ fmt_parse_text_style_result fmt_parse_text_style(fmt_parse_context *p) {
     if (p->It[0] == ';') {
         ++p->It.Data, --p->It.Count;  // Skip the ;
         if (p->It.Count > 2) {
-            if (string(p->It.Data, 2) == "BG") {
+            if (string(p->It.Data, 2) == string("BG")) {
                 if (textStyle.ColorKind == fmt_text_style::color_kind::NONE) {
                     p->on_error("Color specified as background but there was no color parsed");
                     return {false, {}};

@@ -17,11 +17,11 @@ export {
 #undef COLOR_DEF
     };
 
-    inline string color_to_string(color c) {
+    string color_to_string(color c) {
         switch (c) {
 #define COLOR_DEF(x, y) \
     case color::x:      \
-        return #x;
+        return string(#x);
 #include "colors.inl"
 #undef COLOR_DEF
             default:
@@ -32,9 +32,9 @@ export {
     // Colors are defined all-uppercase and this function is case-sensitive
     //   e.g. cornflower_blue doesn't return color::CORNFLOWER_BLUE
     // Returns color::NONE (with value of black) if not found.
-    inline color string_to_color(string str) {
+    color string_to_color(string str) {
 #define COLOR_DEF(x, y) \
-    if (str == #x) return color::x;
+    if (str == string(#x)) return color::x;
 #include "colors.inl"
 #undef COLOR_DEF
         return color::NONE;
@@ -49,11 +49,11 @@ export {
 #undef COLOR_DEF
     };
 
-    inline string terminal_color_to_string(terminal_color c) {
+    string terminal_color_to_string(terminal_color c) {
         switch (c) {
 #define COLOR_DEF(x, y)     \
     case terminal_color::x: \
-        return #x;
+        return string(#x);
 #include "terminal_colors.inl"
 #undef COLOR_DEF
             default:
@@ -64,9 +64,9 @@ export {
     // Colors are defined all-uppercase and this function is case-sensitive
     //   e.g. bright_black doesn't return color::BRIGHT_BLACK
     // Returns terminal_color::NONE (invalid) if not found.
-    inline terminal_color string_to_terminal_color(string str) {
+    terminal_color string_to_terminal_color(string str) {
 #define COLOR_DEF(x, y) \
-    if (str == #x) return terminal_color::x;
+    if (str == string(#x)) return terminal_color::x;
 #include "terminal_colors.inl"
 #undef COLOR_DEF
         return terminal_color::NONE;
@@ -93,7 +93,7 @@ export {
     };
 
     // Used when making ANSI escape codes for text styles
-    inline char *u8_to_esc(char *p, char delimiter, u8 c) {
+    char *u8_to_esc(char *p, char delimiter, u8 c) {
         *p++ = '0' + c / 100;
         *p++ = '0' + c / 10 % 10;
         *p++ = '0' + c % 10;
@@ -101,7 +101,7 @@ export {
         return p;
     }
 
-    inline char *color_to_ansi(char *buffer, fmt_text_style style) {
+    char *color_to_ansi(char *buffer, fmt_text_style style) {
         char *p = buffer;
         if (style.ColorKind != fmt_text_style::color_kind::NONE) {
             if (style.ColorKind == fmt_text_style::color_kind::TERMINAL) {
@@ -135,7 +135,7 @@ export {
         return p;
     }
 
-    inline char *emphasis_to_ansi(char *buffer, u8 emphasis) {
+    char *emphasis_to_ansi(char *buffer, u8 emphasis) {
         u8 codes[4] = {};
         if (emphasis & BOLD) codes[0] = 1;
         if (emphasis & ITALIC) codes[1] = 3;

@@ -6,8 +6,7 @@
 //     definitions for the macros: assert, defer, For, For_enumerate ...
 //     static_for, range,
 // Also:
-//     copy_memory (memcpy), copy_elements, fill_memory (memset), zero_memory, compare_memory
-//   and constexpr variants: const_copy_memory, const_fill_memory, const_zero_memory, const_compare_memory
+//     copy_memory (memcpy), copy_elements, fill_memory (memset), zero_memory
 //
 //
 
@@ -145,70 +144,19 @@ constexpr void swap(T (&a)[N], T (&b)[N]) {
 // (implemenations in memory/memory.cpp)
 //
 
-// In this library, copy_memory works like memmove in the std (handles overlapping buffers)
-// @TODO: Merge these using is_constant_evaluated()
-extern void *(*copy_memory)(void *dst, const void *src, u64 size);
-constexpr void *const_copy_memory(void *dst, const void *src, u64 size) {
-    auto *d = (char *) dst;
-    auto *s = (const char *) src;
-
-    if (d <= s || d >= (s + size)) {
-        // Non-overlapping
-        while (size--) {
-            *d++ = *s++;
-        }
-    } else {
-        // Overlapping
-        d += size - 1;
-        s += size - 1;
-
-        while (size--) {
-            *d-- = *s--;
-        }
-    }
-    return dst;
+template <typename T>
+void copy_elements(T *dst, auto *src, s64 n) {
+    For(range(n)) *dst++ = *src++;
 }
+
+extern void *(*copy_memory)(void *dst, const void *src, u64 size);
+extern void *(*fill_memory)(void *dst, char value, u64 size);
+inline void *zero_memory(void *dst, u64 size) { return fill_memory(dst, 0, size); }
 
 template <typename T>
-T *copy_elements(T *dst, auto *src, s64 n) { return (T *) copy_memory(dst, src, n * sizeof(T)); }
-
-extern void *(*fill_memory)(void *dst, char value, u64 size);
-constexpr void *const_fill_memory(void *dst, char value, u64 size) {
-    u64 uValue     = (u64) value;
-    u64 largeValue = uValue << 56 | uValue << 48 | uValue << 40 | uValue << 32 | uValue << 24 | uValue << 16 | uValue << 8 | uValue;
-
-    u64 offset = ((u64) dst) % sizeof(u64);
-    byte *b    = (byte *) dst;
-    while (offset--) *b++ = value;
-
-    u64 *dstBig = (u64 *) b;
-    u64 bigNum  = (size & (~sizeof(u64) + 1)) / sizeof(u64);
-    while (bigNum--) *dstBig++ = largeValue;
-
-    size &= (sizeof(u64) - 1);
-
-    b = (byte *) dstBig;
-    while (size--) *b++ = value;
-    return dst;
-}
-
-inline void *zero_memory(void *dst, u64 size) { return fill_memory(dst, 0, size); }
-constexpr void *const_zero_memory(void *dst, u64 size) { return const_fill_memory(dst, 0, size); }
-
-// compare_memory returns the index of the first byte that is different
-// e.g: calling with
-//		*ptr1 = 0000001234
-//		*ptr1 = 0010000234
-//	returns 2
-// If the memory regions are equal, the returned value is -1
-extern s64 (*compare_memory)(const void *ptr1, const void *ptr2, u64 size);
-constexpr s64 const_compare_memory(const void *ptr1, const void *ptr2, u64 size) {
-    // @TODO: This doesn't work. Complains about casting.
-    auto *s1 = (byte *) ptr1;
-    auto *s2 = (byte *) ptr2;
-
-    For(range(size)) if (*s1++ != *s2++) return it;
-    return -1;
+constexpr s32 compare_memory(const T *s1, const T *s2, s64 n) {
+    For(range(n)) if (*s1 != *s2) return *s1 - *s2;
+    return 0;
 }
 
 LSTD_END_NAMESPACE

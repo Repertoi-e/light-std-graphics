@@ -170,7 +170,7 @@ export {
 
     // Compares this array to _arr_ and returns the index of the first element that is different.
     // If the arrays are equal, the returned value is -1.
-    // @Speed @TODO A simple compare_memory for scalars is sufficient and way faster
+    // @Speed @TODO A simple memcmp for scalars is sufficient and way faster
     template <any_array_like Arr1, any_array_like Arr2>
     requires types::is_same<array_data_t<Arr1>, array_data_t<Arr2>>
     constexpr s64 compare(const Arr1 &arr1, const Arr2 &arr2) {
