@@ -1,6 +1,4 @@
-#include "common.h"
-#include "context.h"
-#include "os_function_call.h"
+#include "../common.h"
 
 import lstd.fmt;
 

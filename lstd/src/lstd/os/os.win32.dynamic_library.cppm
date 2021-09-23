@@ -1,6 +1,6 @@
 module;
 
-#include "lstd_platform/windows.h"  // Declarations of Win32 functions
+#include "lstd/platform/windows.h"  // Declarations of Win32 functions
 
 //
 // Simple wrapper around dynamic libraries and getting addresses of procedures.
@@ -8,6 +8,7 @@ module;
 
 export module lstd.os.win32.dynamic_library;
 
+import lstd.string;
 import lstd.os.win32.memory;
 
 LSTD_BEGIN_NAMESPACE
@@ -26,10 +27,8 @@ export {
     void release(dynamic_library library);
 }
 
-LSTD_MODULE_PRIVATE
-
 dynamic_library os_dynamic_library_load(string path) {
-    WIN_CHECK_BOOL(result, LoadLibraryW(internal::platform_utf8_to_utf16(path)));
+    WIN32_CHECK_BOOL(result, LoadLibraryW(platform_utf8_to_utf16(path)));
     return (dynamic_library) result;
 }
 

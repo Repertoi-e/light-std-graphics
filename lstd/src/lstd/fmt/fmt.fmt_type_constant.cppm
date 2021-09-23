@@ -10,9 +10,6 @@ export import lstd.string;
 LSTD_BEGIN_NAMESPACE
 
 export {
-    constexpr u64 IS_UNPACKED_BIT = 1ull << 63;
-    constexpr u32 MAX_PACKED_ARGS = 15;
-
     template <typename T>
     struct type_constant : types::integral_constant<fmt_type, fmt_type::CUSTOM> {};
 

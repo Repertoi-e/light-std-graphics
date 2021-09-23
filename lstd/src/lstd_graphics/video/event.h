@@ -1,7 +1,5 @@
 #pragma once
 
-#include "lstd/math/vec.h"
-#include "lstd/memory/string.h"
 #include "window_def.h"
 
 LSTD_BEGIN_NAMESPACE

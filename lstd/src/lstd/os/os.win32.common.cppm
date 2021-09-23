@@ -1,6 +1,6 @@
 module;
 
-#include "lstd_platform/windows.h"  // Declarations of Win32 functions
+#include "lstd/platform/windows.h"  // Declarations of Win32 functions
 #include "platform_uninit.h"
 
 //
@@ -13,6 +13,9 @@ import lstd.os.win32.memory;
 
 import lstd.fmt;
 import lstd.path;
+import lstd.writer;
+import lstd.thread;
+import lstd.console;
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 #define MODULE_HANDLE ((HMODULE) &__ImageBase)
@@ -117,7 +120,7 @@ export {
     // Reads input from the console (at most 1 KiB).
     // Subsequent calls overwrite an internal buffer, so you need to save the information before that.
     // Note: Don't free the result of this function.
-    bytes os_read_from_console();
+    string os_read_from_console();
 
     struct os_get_env_result {
         string Value;
@@ -144,48 +147,43 @@ export {
     void os_set_clipboard_content(string content);
 }
 
-LSTD_MODULE_PRIVATE
-
-struct win64_common_state {
+struct win32_common_state {
     static constexpr s64 CONSOLE_BUFFER_SIZE = 1_KiB;
 
-    byte CinBuffer[CONSOLE_BUFFER_SIZE];
-    byte CoutBuffer[CONSOLE_BUFFER_SIZE];
-    byte CerrBuffer[CONSOLE_BUFFER_SIZE];
+    char CinBuffer[CONSOLE_BUFFER_SIZE];
+    char CoutBuffer[CONSOLE_BUFFER_SIZE];
+    char CerrBuffer[CONSOLE_BUFFER_SIZE];
 
     HANDLE CinHandle, CoutHandle, CerrHandle;
-    thread::mutex CoutMutex, CinMutex;
+    mutex CoutMutex, CinMutex;
 
     array<delegate<void()>> ExitFunctions;  // Stores any functions to be called before the program terminates (naturally or by os_exit(exitCode))
-    thread::mutex ExitScheduleMutex;        // Used when modifying the ExitFunctions array
+    mutex ExitScheduleMutex;                // Used when modifying the ExitFunctions array
 
     LARGE_INTEGER PerformanceFrequency;  // Used to time stuff
 
     string ModuleName;  // Caches the module name (retrieve this with os_get_current_module())
 
     string WorkingDir;  // Caches the working dir (query/modify this with os_get_working_dir(), os_set_working_dir())
-    thread::mutex WorkingDirMutex;
+    mutex WorkingDirMutex;
 
     array<string> Argv;
 };
 
 // :GlobalStateNoConstructors:
-// We create a byte array which large enough to hold all global variables because
-// that avoids C++ constructors erasing the state we initialize before any C++ constructors are called.
-// Some further explanation... We need to initialize this before main is run. We need to initialize this
-// before even constructors for global variables (refered to as C++ constructors) are called (which may
-// rely on e.g. the Context being initialized). This is analogous to the stuff CRT runs before main is called.
-// Except that we don't link against the CRT (that's why we even have to "call" the constructors ourselves,
-// using linker magic - take a look at the exe_main.cpp in no_crt).
-byte State[sizeof(win64_common_state)];
+// We create a byte array which is large enough to hold all global variables because
+// that avoids the C++ default constructor erasing the state of the struct.
+// We initialize it before we call any C++ constructors in the linker table
+// (see some stuff we do in exe_main.cpp in lstd/platform/windows_no_crt).
+byte State[sizeof(win32_common_state)];
 
 // Short-hand macro for sanity
-#define S ((win64_common_state *) &State[0])
-#define PERSISTENT internal::platform_get_persistent_allocator()
-#define TEMP internal::platform_get_temporary_allocator()
+#define S ((win32_common_state *) &State[0])
+#define PERSISTENT platform_get_persistent_allocator()
+#define TEMP platform_get_temporary_allocator()
 
-wchar *utf8_to_utf16(string str, allocator alloc = {}) { return internal::platform_utf8_to_utf16(str, alloc); }
-string utf16_to_utf8(const wchar *str, allocator alloc = {}) { return internal::platform_utf16_to_utf8(str, alloc); }
+wchar *utf8_to_utf16(string str, allocator alloc = {}) { return platform_utf8_to_utf16(str, alloc); }
+string utf16_to_utf8(const wchar *str, allocator alloc = {}) { return platform_utf16_to_utf8(str, alloc); }
 
 void report_warning_no_allocations(string message) {
     DWORD ignored;
@@ -203,21 +201,21 @@ extern "C" bool lstd_init_global();
 
 // This zeroes out the global variables (stored in State) and initializes the mutexes
 void init_global_vars() {
-    zero_memory(&State, sizeof(win64_common_state));
+    zero_memory(&State, sizeof(win32_common_state));
 
-    internal::platform_init_allocators();
+    platform_init_allocators();
 
     // Init mutexes
-    S->CinMutex.init();
-    S->CoutMutex.init();
-    S->ExitScheduleMutex.init();
-    S->WorkingDirMutex.init();
+    S->CinMutex          = create_mutex();
+    S->CoutMutex         = create_mutex();
+    S->ExitScheduleMutex = create_mutex();
+    S->WorkingDirMutex   = create_mutex();
 #if defined DEBUG_MEMORY
     // @Cleanup
     if (lstd_init_global()) {
         DEBUG_memory = malloc<debug_memory>({.Alloc = PERSISTENT});  // @Leak This is ok
         new (DEBUG_memory) debug_memory;
-        DEBUG_memory->Mutex.init();
+        DEBUG_memory->Mutex = create_mutex();
     } else {
         DEBUG_memory = null;
     }
@@ -296,71 +294,71 @@ void parse_arguments() {
     defer(LocalFree(argv));
 
     PUSH_ALLOC(PERSISTENT) {
-        array_reserve(S->Argv, argc - 1);
+        resize(&S->Argv, argc - 1);
     }
 
     // Loop over all arguments and add them, skip the .exe name
-    For(range(1, argc)) add(S->Argv, utf16_to_utf8(argv[it], PERSISTENT));
+    For(range(1, argc)) add(&S->Argv, utf16_to_utf8(argv[it], PERSISTENT));
 }
 
-export namespace internal {
+export {
+    // This needs to be called when our program runs, but also when a new thread starts!
+    // See windows_common.cpp for implementation details.
+    // Note: You shouldn't ever call this.
+    void platform_init_context() {
+        context newContext  = {};
+        newContext.ThreadID = GetCurrentThreadId();
+        newContext.Log      = &cout;
+        OVERRIDE_CONTEXT(newContext);
 
-// This needs to be called when our program runs, but also when a new thread starts!
-// See windows_common.cpp for implementation details.
-// Note: You shouldn't ever call this.
-void platform_init_context() {
-    context newContext   = {};
-    newContext.ThreadID  = thread::id((u64) GetCurrentThreadId());
-    newContext.TempAlloc = {default_temp_allocator, (void *) &TempAllocData};
-    newContext.Log       = &cout;
-    OVERRIDE_CONTEXT(newContext);
-}
+        *const_cast<allocator *>(&TemporaryAllocator) = {default_temp_allocator, (void *) &TemporaryAllocatorData};
+    }
 
-//
-// Initializes the state we need to function.
-//
-void platform_init_global_state() {
-    init_global_vars();
+    //
+    // Initializes the state we need to function.
+    //
+    void platform_init_global_state() {
+        init_global_vars();
 
-    setup_console();
+        setup_console();
 
-    get_module_name();
+        get_module_name();
 
-    parse_arguments();
+        parse_arguments();
 
-    QueryPerformanceFrequency(&S->PerformanceFrequency);
-}
+        QueryPerformanceFrequency(&S->PerformanceFrequency);
+    }
 
-//
-// Reports leaks, uninitializes mutexes.
-//
-void platform_uninit_state() {
+    //
+    // Reports leaks, uninitializes mutexes.
+    //
+    void platform_uninit_state() {
 #if defined DEBUG_MEMORY
-    if (lstd_init_global()) {
-    } else {
-        // Now we check for memory leaks.
-        // Yes, the OS claims back all the memory the program has allocated anyway, and we are not promoting C++ style RAII
-        // which make even program termination slow, we are just providing this information to the user because they might
-        // want to load/unload DLLs during the runtime of the application, and those DLLs might use all kinds of complex
-        // cross-boundary memory stuff things, etc. This is useful for debugging crashes related to that.
-        if (DEBUG_memory->CheckForLeaksAtTermination) {
-            DEBUG_memory->report_leaks();
+        if (lstd_init_global()) {
+        } else {
+            // Now we check for memory leaks.
+            // Yes, the OS claims back all the memory the program has allocated anyway, and we are not promoting C++ style RAII
+            // which make even program termination slow, we are just providing this information to the user because they might
+            // want to load/unload DLLs during the runtime of the application, and those DLLs might use all kinds of complex
+            // cross-boundary memory stuff things, etc. This is useful for debugging crashes related to that.
+            if (DEBUG_memory->CheckForLeaksAtTermination) {
+                DEBUG_memory->report_leaks();
+            }
         }
-    }
 #endif
 
-    // Uninit mutexes
-    S->CinMutex.release();
-    S->CoutMutex.release();
-    S->ExitScheduleMutex.release();
-    S->WorkingDirMutex.release();
+        // Uninit mutexes
+        free_mutex(&S->CinMutex);
+        free_mutex(&S->CoutMutex);
+        free_mutex(&S->ExitScheduleMutex);
+        free_mutex(&S->WorkingDirMutex);
 #if defined DEBUG_MEMORY
-    if (lstd_init_global()) {
-        DEBUG_memory->Mutex.release();
-    }
+        if (lstd_init_global()) {
+            free_mutex(&DEBUG_memory->Mutex);
+        }
 #endif
+    }
 }
-}  // namespace internal
 
 void exit(s32 exitCode) {
     // :PlatformExitTermination
@@ -368,9 +366,9 @@ void exit(s32 exitCode) {
     // We can't call this from a DLL because of ExitProcess.
     // Search for :PlatformExitTermination to see the other place we call this set of functions.
     exit_call_scheduled_functions();
-    win64_monitor_uninit();
-    win64_window_uninit();
-    internal::platform_uninit_state();
+    win32_monitor_uninit();
+    win32_window_uninit();
+    platform_uninit_state();
 
     ExitProcess(exitCode);
 }
@@ -380,21 +378,22 @@ void abort() {
 }
 
 void exit_schedule(const delegate<void()> &function) {
-    S->ExitScheduleMutex.lock();
+    lock(&S->ExitScheduleMutex);
 
+    // @Cleanup Lock-free list
     PUSH_ALLOC(PERSISTENT) {
-        add(S->ExitFunctions, function);
+        add(&S->ExitFunctions, function);
     }
 
-    S->ExitScheduleMutex.unlock();
+    unlock(&S->ExitScheduleMutex);
 }
 
 void exit_call_scheduled_functions() {
-    S->ExitScheduleMutex.lock();
+    lock(&S->ExitScheduleMutex);
 
     For(S->ExitFunctions) it();
 
-    S->ExitScheduleMutex.unlock();
+    unlock(&S->ExitScheduleMutex);
 }
 
 array<delegate<void()>> *exit_get_scheduled_functions() {
@@ -424,8 +423,8 @@ string os_get_working_dir() {
         return "";
     }
 
-    S->WorkingDirMutex.lock();
-    defer(S->WorkingDirMutex.unlock());
+    lock(&S->WorkingDirMutex);
+    defer(unlock(&S->WorkingDirMutex));
 
     string workingDir = utf16_to_utf8(dir16);
     PUSH_ALLOC(PERSISTENT) {
@@ -437,13 +436,13 @@ string os_get_working_dir() {
 void os_set_working_dir(string dir) {
     assert(path_is_absolute(dir));
 
-    WIN_CHECK_BOOL(SetCurrentDirectoryW(utf8_to_utf16(dir)));
+    WIN32_CHECK_BOOL(r, SetCurrentDirectoryW(utf8_to_utf16(dir)));
 
-    S->WorkingDirMutex.lock();
-    defer(S->WorkingDirMutex.unlock());
+    lock(&S->WorkingDirMutex);
+    defer(unlock(&S->WorkingDirMutex));
 
     PUSH_ALLOC(PERSISTENT) {
-        clone(&S->WorkingDir, dir);
+        S->WorkingDir = clone(dir);
     }
 }
 
@@ -464,7 +463,7 @@ constexpr u32 ERROR_ENVVAR_NOT_FOUND = 203;
 
     if (r == 0 && GetLastError() == ERROR_ENVVAR_NOT_FOUND) {
         if (!silent) {
-            internal::platform_report_error(tsprint("Couldn't find environment variable with value \"{}\"", name));
+            platform_report_error(tsprint("Couldn't find environment variable with value \"{}\"", name));
         }
         return {"", false};
     }
@@ -482,34 +481,34 @@ constexpr u32 ERROR_ENVVAR_NOT_FOUND = 203;
 }
 
 void os_set_env(string name, string value) {
-    if (value.Length > 32767) {
+    if (string_length(value) > 32767) {
         // @Cleanup: The docs say windows doesn't allow that but we should test it.
         assert(false);
     }
 
-    WIN_CHECK_BOOL(SetEnvironmentVariableW(utf8_to_utf16(name), utf8_to_utf16(value)));
+    WIN32_CHECK_BOOL(r, SetEnvironmentVariableW(utf8_to_utf16(name), utf8_to_utf16(value)));
 }
 
 void os_remove_env(string name) {
-    WIN_CHECK_BOOL(SetEnvironmentVariableW(utf8_to_utf16(name), null));
+    WIN32_CHECK_BOOL(r, SetEnvironmentVariableW(utf8_to_utf16(name), null));
 }
 
 [[nodiscard("Leak")]] string os_get_clipboard_content() {
     if (!OpenClipboard(null)) {
-        internal::platform_report_error("Failed to open clipboard");
+        platform_report_error("Failed to open clipboard");
         return "";
     }
     defer(CloseClipboard());
 
     HANDLE object = GetClipboardData(CF_UNICODETEXT);
     if (!object) {
-        internal::platform_report_error("Failed to convert clipboard to string");
+        platform_report_error("Failed to convert clipboard to string");
         return "";
     }
 
     auto *clipboard16 = (wchar *) GlobalLock(object);
     if (!clipboard16) {
-        internal::platform_report_error("Failed to lock global handle");
+        platform_report_error("Failed to lock global handle");
         return "";
     }
     defer(GlobalUnlock(object));
@@ -518,24 +517,24 @@ void os_remove_env(string name) {
 }
 
 void os_set_clipboard_content(string content) {
-    HANDLE object = GlobalAlloc(GMEM_MOVEABLE, content.Length * 2 * sizeof(wchar));
+    HANDLE object = GlobalAlloc(GMEM_MOVEABLE, string_length(content) * 2 * sizeof(wchar));
     if (!object) {
-        internal::platform_report_error("Failed to open clipboard");
+        platform_report_error("Failed to open clipboard");
         return;
     }
     defer(GlobalFree(object));
 
     auto *clipboard16 = (wchar *) GlobalLock(object);
     if (!clipboard16) {
-        internal::platform_report_error("Failed to lock global handle");
+        platform_report_error("Failed to lock global handle");
         return;
     }
 
-    utf8_to_utf16(content.Data, content.Length, clipboard16);
+    utf8_to_utf16(content.Data, string_length(content), clipboard16);
     GlobalUnlock(object);
 
     if (!OpenClipboard(null)) {
-        internal::platform_report_error("Failed to open clipboard.");
+        platform_report_error("Failed to open clipboard.");
         return;
     }
     defer(CloseClipboard());
@@ -555,10 +554,10 @@ u32 os_get_hardware_concurrency() {
 
 u32 os_get_pid() { return (u32) GetCurrentProcessId(); }
 
-bytes os_read_from_console() {
+string os_read_from_console() {
     DWORD read;
     ReadFile(S->CinHandle, S->CinBuffer, (DWORD) S->CONSOLE_BUFFER_SIZE, &read, null);
-    return bytes(S->CinBuffer, (s64) read);
+    return string(S->CinBuffer, (s64) read);
 }
 
 // @TODO @Clarity: Print more useful message about the path
@@ -574,21 +573,21 @@ bytes os_read_from_console() {
         return;                                                                                                \
     }
 
-[[nodiscard("Leak")]] os_read_entire_file_result os_read_entire_file(string path) {
-    os_read_entire_file_result fail = {string(), false};
+[[nodiscard("Leak")]] os_read_file_result os_read_entire_file(string path) {
+    os_read_file_result fail = {string(), false};
     CREATE_FILE_HANDLE_CHECKED(file, CreateFileW(utf8_to_utf16(path), GENERIC_READ, FILE_SHARE_READ, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, null), fail);
     defer(CloseHandle(file));
 
     LARGE_INTEGER size = {0};
     GetFileSizeEx(file, &size);
 
-    array<byte> result;
-    array_reserve(result, size.QuadPart);
+    string result;
+    resize(&result, size.QuadPart);
     DWORD bytesRead;
     if (!ReadFile(file, result.Data, (u32) size.QuadPart, &bytesRead, null)) return {{}, false};
     assert(size.QuadPart == bytesRead);
 
-    result.Count += bytesRead;
+    result.Count = bytesRead;
     return {result, true};
 }
 
@@ -598,8 +597,8 @@ bool os_write_to_file(string path, string contents, file_write_mode mode) {
 
     LARGE_INTEGER pointer = {};
     pointer.QuadPart      = 0;
-    if (mode == path_write_mode::Append) SetFilePointerEx(file, pointer, null, FILE_END);
-    if (mode == path_write_mode::Overwrite_Entire) SetEndOfFile(file);
+    if (mode == file_write_mode::Append) SetFilePointerEx(file, pointer, null, FILE_END);
+    if (mode == file_write_mode::Overwrite_Entire) SetEndOfFile(file);
 
     DWORD bytesWritten;
     if (!WriteFile(file, contents.Data, (u32) contents.Count, &bytesWritten, null)) return false;
@@ -607,8 +606,8 @@ bool os_write_to_file(string path, string contents, file_write_mode mode) {
     return true;
 }
 
-void console_writer::write(const byte *data, s64 size) {
-    if (LockMutex) S->CoutMutex.lock();
+void console::write(const char *data, s64 size) {
+    if (LockMutex) lock(&S->CoutMutex);
 
     if (size > Available) {
         flush();
@@ -619,14 +618,14 @@ void console_writer::write(const byte *data, s64 size) {
     Current += size;
     Available -= size;
 
-    if (LockMutex) S->CoutMutex.unlock();
+    if (LockMutex) unlock(&S->CoutMutex);
 }
 
-void console_writer::flush() {
-    if (LockMutex) S->CoutMutex.lock();
+void console::flush() {
+    if (LockMutex) lock(&S->CoutMutex);
 
     if (!Buffer) {
-        if (OutputType == console_writer::COUT) {
+        if (OutputType == console::COUT) {
             Buffer = Current = S->CoutBuffer;
         } else {
             Buffer = Current = S->CerrBuffer;
@@ -635,7 +634,7 @@ void console_writer::flush() {
         BufferSize = Available = S->CONSOLE_BUFFER_SIZE;
     }
 
-    HANDLE target = OutputType == console_writer::COUT ? S->CoutHandle : S->CerrHandle;
+    HANDLE target = OutputType == console::COUT ? S->CoutHandle : S->CerrHandle;
 
     DWORD ignored;
     WriteFile(target, Buffer, (DWORD) (BufferSize - Available), &ignored, null);
@@ -643,7 +642,7 @@ void console_writer::flush() {
     Current   = Buffer;
     Available = S->CONSOLE_BUFFER_SIZE;
 
-    if (LockMutex) S->CoutMutex.unlock();
+    if (LockMutex) unlock(&S->CoutMutex);
 }
 
 LSTD_END_NAMESPACE

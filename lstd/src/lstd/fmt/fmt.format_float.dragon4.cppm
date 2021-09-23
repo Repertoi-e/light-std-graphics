@@ -181,12 +181,12 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
         //    against the margin values are simplified.
         // 3) Set the margin value to the lowest significand bit's scale.
 
-        numerator = significand;
+        numerator = cast_big(significand);
         numerator = numerator << exponent;
-        lower     = 1;
+        lower     = cast_big(1);
         lower     = lower << exponent;
         if (shift != 1) {
-            upperStore = 1;
+            upperStore = cast_big(1);
             upperStore = upperStore << (exponent + 1);
             upper      = &upperStore;
         }
@@ -200,16 +200,16 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
             upperStore = upperStore << 1;
             upper      = &upperStore;
         }
-        numerator *= significand;
-        denominator = 1;
+        numerator   = numerator * cast_big(significand);
+        denominator = cast_big(1);
         denominator = denominator << (shift - exponent);
     } else {
-        numerator   = significand;
+        numerator   = cast_big(significand);
         denominator = bigint_pow10(*outExp);
         denominator = denominator << (shift - exponent);
-        lower       = 1;
+        lower       = cast_big(1);
         if (shift != 1) {
-            upperStore = 2;
+            upperStore = cast_big(2);
             upper      = &upperStore;
         }
     }
@@ -226,8 +226,9 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
             auto [digit, mod] = divmod(numerator, denominator);
             numerator         = mod;
 
-            assert(digit < 10);
-            u32 outputDigit = digit.Bigits[0];
+            // Debug uses more memory now, lmao. Hope this is fine.
+            assert(digit.Size == 1 && digit.Digits[0] < 10);
+            u32 outputDigit = digit.Digits[0];
 
             bool low  = compare(numerator, lower) - even < 0;
             bool high = compare(numerator + *upper, denominator) + even > 0;
@@ -287,8 +288,8 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
         auto [digit, mod] = divmod(numerator, denominator);
         numerator         = mod;
 
-        assert(digit < 10);
-        u32 outputDigit = digit.Bigits[0];
+        assert(digit.Size == 1 && digit.Digits[0] < 10);
+        u32 outputDigit = digit.Digits[0];
 
         b[it] = '0' + outputDigit;
 
@@ -299,8 +300,8 @@ export void dragon4_format_float(char *b, s64 *outWritten, s32 *outExp, s32 prec
     auto [digit, mod] = divmod(numerator, denominator);
     numerator         = mod;
 
-    assert(digit < 10);
-    u32 outputDigit = digit.Bigits[0];
+    assert(digit.Size == 1 && digit.Digits[0] < 10);
+    u32 outputDigit = digit.Digits[0];
 
     s64 cmp = compare(numerator * cast_big(2), denominator);
     if (cmp > 0 || (cmp == 0 && (outputDigit % 2) != 0)) {

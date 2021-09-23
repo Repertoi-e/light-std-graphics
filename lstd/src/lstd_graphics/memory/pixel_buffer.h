@@ -1,7 +1,5 @@
 #pragma once
 
-#include "lstd/memory/string.h"
-
 LSTD_BEGIN_NAMESPACE
 
 enum class pixel_format : s32 { Unknown = 0,

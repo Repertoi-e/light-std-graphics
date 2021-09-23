@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../platform.h"
+#include "../platform.h"
 
 // Replacement for the std::is_constant_evaluated
 #if COMPILER == MSVC

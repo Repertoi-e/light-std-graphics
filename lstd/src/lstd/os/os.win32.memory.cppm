@@ -1,6 +1,7 @@
 module;
 
-#include "lstd_platform/windows.h"  // Declarations of Win32 functions
+#include "../common.h"
+#include "lstd/platform/windows.h"  // Declarations of Win32 functions
 
 //
 // Platform specific memory functions.
@@ -9,6 +10,7 @@ module;
 export module lstd.os.win32.memory;
 
 import lstd.fmt;
+import lstd.thread;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -85,55 +87,60 @@ export {
     }
 }
 
-struct win64_memory_state {
-    allocator PersistentAlloc;  // Used to store global state, a tlsf allocator
-    thread::mutex PersistentAllocMutex;
+struct win32_memory_state {
+    // Used to store global state (e.g. cached command-line arguments/env variables or directories), a tlsf allocator
+    allocator PersistentAlloc;
+
+    mutex PersistentAllocMutex;
 
     // We don't use the temporary allocator bundled with the Context because we don't want to mess with the user's memory.
-    allocator TempAlloc;  // Used for temporary storage (e.g. converting strings from utf8 to wchar for windows calls).
-                          // Memory returned is only guaranteed to be valid until the next TempAlloc call, because we call free_all
-                          // if we don't have enough space for the allocation.
+    //
+    // Used for temporary storage (e.g. converting strings from utf8 to wchar for windows calls).
+    // Memory returned is only guaranteed to be valid until the next call, because we call free_all
+    // if we don't have enough space for the allocation. See note above _win32_temp_alloc()_.
+    allocator TempAlloc;
+
     void *TempStorageBlock;
     s64 TempStorageSize;
-    thread::mutex TempAllocMutex;
+
+    mutex TempAllocMutex;
 };
 
 // :GlobalStateNoConstructors:
-byte State[sizeof(win64_memory_state)];
+byte State[sizeof(win32_memory_state)];
 
 // Short-hand macro for sanity
-#define S ((win64_memory_state *) &State[0])
+#define S ((win32_memory_state *) &State[0])
 
 void create_temp_storage_block(s64);
 void create_persistent_alloc_block(s64);
 
-export namespace internal {
-// @TODO: Add option to print call stack?
-void platform_report_warning(string message, source_location loc = source_location::current()) {
-    print(">>> {!YELLOW}Platform warning{!} {}:{} (in function: {}): {}.\n", loc.File, loc.Line, loc.Function, message);
+// @TODO: Print call stack
+
+export {
+    void platform_report_warning(string message, source_location loc = source_location::current()) {
+        print(">>> {!YELLOW}Platform warning{!} {}:{} (in function: {}): {}.\n", loc.File, loc.Line, loc.Function, message);
+    }
+
+    void platform_report_error(string message, source_location loc = source_location::current()) {
+        print(">>> {!RED}Platform error{!} {}:{} (in function: {}): {}.\n", loc.File, loc.Line, loc.Function, message);
+    }
 }
 
-// @TODO: Add option to print call stack?
-void platform_report_error(string message, source_location loc = source_location::current()) {
-    print(">>> {!RED}Platform error{!} {}:{} (in function: {}): {}.\n", loc.File, loc.Line, loc.Function, message);
-}
-}  // namespace internal
-
-// An extension to the arena allocator. Calls free_all when not enough space. Because we are not running a game
+// An extension to the arena allocator. Calls free_all when not enough space. Because we are not running e.g. a game
 // there is no clear point at which to free_all the temporary allocator, that's why we assume that no allocation
 // made with TempAlloc should persist beyond the next allocation.
-void *win64_temp_alloc(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
+void *win32_temp_alloc(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
     auto *data = (arena_allocator_data *) context;
 
-    S->TempAllocMutex.lock();
-    defer(S->TempAllocMutex.unlock());
+    lock(&S->TempAllocMutex);
+    defer(unlock(&S->TempAllocMutex));
 
     auto *result = arena_allocator(mode, context, size, oldMemory, oldSize, options);
     if (mode == allocator_mode::ALLOCATE) {
         if (size > S->TempStorageSize) {
             // If we try to allocate a block with size bigger than the temporary storage block, we make a new, larger temporary storage block
-
-            internal::platform_report_warning("Not enough memory in the temporary allocator; expanding the pool");
+            platform_report_warning("Not enough memory in the temporary allocator block; allocating a new pool");
 
             allocator_remove_pool(S->TempAlloc, S->TempStorageBlock);
             os_free_block((byte *) S->TempStorageBlock - sizeof(arena_allocator_data));
@@ -153,23 +160,23 @@ void *win64_temp_alloc(allocator_mode mode, void *context, s64 size, void *oldMe
 void create_temp_storage_block(s64 size) {
     // We allocate the arena allocator data and the starting pool in one big block in order to reduce fragmentation.
     auto [data, pool] = os_allocate_packed<arena_allocator_data>(size);
-    S->TempAlloc      = {win64_temp_alloc, data};
+    S->TempAlloc      = {win32_temp_alloc, data};
     allocator_add_pool(S->TempAlloc, pool, size);
 
     S->TempStorageBlock = pool;
     S->TempStorageSize  = size;
 }
 
-void *win64_persistent_alloc(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
+void *win32_persistent_alloc(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options) {
     auto *data = (tlsf_allocator_data *) context;
 
-    S->PersistentAllocMutex.lock();
-    defer(S->PersistentAllocMutex.unlock());
+    lock(&S->PersistentAllocMutex);
+    defer(unlock(&S->PersistentAllocMutex));
 
     auto *result = tlsf_allocator(mode, context, size, oldMemory, oldSize, options);
     if (mode == allocator_mode::ALLOCATE) {
         if (!result) {
-            internal::platform_report_warning("Not enough memory in the persistent allocator; adding a pool");
+            platform_report_warning("Not enough memory in the persistent allocator; adding a pool");
 
             create_persistent_alloc_block(size * 3);
         }
@@ -181,61 +188,59 @@ void *win64_persistent_alloc(allocator_mode mode, void *context, s64 size, void 
 void create_persistent_alloc_block(s64 size) {
     // We allocate the arena allocator data and the starting pool in one big block in order to reduce fragmentation.
     auto [data, pool]  = os_allocate_packed<tlsf_allocator_data>(size);
-    S->PersistentAlloc = {win64_persistent_alloc, data};
+    S->PersistentAlloc = {win32_persistent_alloc, data};
     allocator_add_pool(S->PersistentAlloc, pool, size);
 }
 
-export namespace internal {
 // These functions are used by other windows platform files.
-// @Cleanup Move this to a more general place
-allocator platform_get_persistent_allocator() { return S->PersistentAlloc; }
-allocator platform_get_temporary_allocator() { return S->TempAlloc; }
+export {
+    allocator platform_get_persistent_allocator() { return S->PersistentAlloc; }
+    allocator platform_get_temporary_allocator() { return S->TempAlloc; }
 
-void platform_init_allocators() {
-    S->TempAllocMutex.init();
-    S->PersistentAllocMutex.init();
+    void platform_init_allocators() {
+        S->TempAllocMutex       = create_mutex();
+        S->PersistentAllocMutex = create_mutex();
 
-    create_temp_storage_block(PLATFORM_TEMPORARY_STORAGE_STARTING_SIZE);
-    create_persistent_alloc_block(PLATFORM_PERSISTENT_STORAGE_STARTING_SIZE);
-}
-
-// Windows uses wchar.. Sigh...
-//
-// This function uses the platform temporary allocator if no explicit allocator was specified.
-wchar *platform_utf8_to_utf16(string str, allocator alloc = {}) {
-    if (!str.Length) return null;
-
-    if (!alloc) alloc = S->TempAlloc;
-
-    wchar *result;
-    PUSH_ALLOC(alloc) {
-        // src.Length * 2 because one unicode character might take 2 wide chars.
-        // This is just an approximation, not all space will be used!
-        result = malloc<wchar>({.Count = str.Length * 2 + 1});
+        create_temp_storage_block(PLATFORM_TEMPORARY_STORAGE_STARTING_SIZE);
+        create_persistent_alloc_block(PLATFORM_PERSISTENT_STORAGE_STARTING_SIZE);
     }
 
-    utf8_to_utf16(str.Data, str.Length, result);
-    return result;
-}
+    // Windows uses wchar.. Sigh...
+    //
+    // This function uses the platform temporary allocator if no explicit allocator was specified.
+    wchar *platform_utf8_to_utf16(string str, allocator alloc = {}) {
+        if (!str.Count) return null;
 
-// This function uses the platform temporary allocator if no explicit allocator was specified.
-string platform_utf16_to_utf8(const wchar *str, allocator alloc = {}) {
-    string result;
+        if (!alloc) alloc = S->TempAlloc;
 
-    if (!alloc) alloc = S->TempAlloc;
+        wchar *result;
+        PUSH_ALLOC(alloc) {
+            // src.Length * 2 because one unicode character might take 2 wide chars.
+            // This is just an approximation, not all space will be used!
+            result = malloc<wchar>({.Count = string_length(str) * 2 + 1});
+        }
 
-    PUSH_ALLOC(alloc) {
-        // String length * 4 because one unicode character might take 4 bytes in utf8.
-        // This is just an approximation, not all space will be used!
-        string_reserve(result, c_string_length(str) * 4);
+        utf8_to_utf16(str.Data, string_length(str), result);
+        return result;
     }
 
-    utf16_to_utf8(str, (char *) result.Data, &result.Count);
-    result.Length = utf8_length(result.Data, result.Count);
+    // This function uses the platform temporary allocator if no explicit allocator was specified.
+    string platform_utf16_to_utf8(const wchar *str, allocator alloc = {}) {
+        string result;
 
-    return result;
+        if (!alloc) alloc = S->TempAlloc;
+
+        PUSH_ALLOC(alloc) {
+            // String length * 4 because one unicode character might take 4 bytes in utf8.
+            // This is just an approximation, not all space will be used!
+            resize(&result, c_string_length(str) * 4);
+        }
+
+        utf16_to_utf8(str, (char *) result.Data, &result.Count);
+
+        return result;
+    }
 }
-}  // namespace internal
 
 // Tests whether the allocation contraction is possible
 bool is_contraction_possible(s64 oldSize) {
@@ -292,18 +297,18 @@ s64 os_get_block_size(void *ptr) {
         char *cStr              = string_to_c_string(extendedCallSite);                                        \
         windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), cStr);                                \
         free(cStr);                                                                                            \
-        free(extendedCallSite);                                                                                \
+        free(extendedCallSite.Data);                                                                           \
         return;                                                                                                \
     }
 
 void os_write_shared_block(string name, void *data, s64 size) {
-    wchar *name16 = internal::platform_utf8_to_utf16(name, S->PersistentAlloc);
+    wchar *name16 = platform_utf8_to_utf16(name, S->PersistentAlloc);
     defer(free(name16));
 
     CREATE_MAPPING_CHECKED(h, CreateFileMappingW(INVALID_HANDLE_VALUE, null, PAGE_READWRITE, 0, (DWORD) size, name16));
     defer(CloseHandle(h));
 
-    WIN_CHECK_BOOL(result, MapViewOfFile(h, FILE_MAP_WRITE, 0, 0, size));
+    WIN32_CHECK_BOOL(result, MapViewOfFile(h, FILE_MAP_WRITE, 0, 0, size));
     if (!result) return;
 
     copy_memory(result, data, size);
@@ -311,13 +316,13 @@ void os_write_shared_block(string name, void *data, s64 size) {
 }
 
 void os_read_shared_block(string name, void *out, s64 size) {
-    wchar *name16 = internal::platform_utf8_to_utf16(name, S->PersistentAlloc);
+    wchar *name16 = platform_utf8_to_utf16(name, S->PersistentAlloc);
     defer(free(name16));
 
     CREATE_MAPPING_CHECKED(h, OpenFileMappingW(FILE_MAP_READ, false, name16));
     defer(CloseHandle(h));
 
-    WIN_CHECK_BOOL(result, MapViewOfFile(h, FILE_MAP_READ, 0, 0, size));
+    WIN32_CHECK_BOOL(result, MapViewOfFile(h, FILE_MAP_READ, 0, 0, size));
     if (!result) return;
 
     copy_memory(out, result, size);
@@ -325,7 +330,7 @@ void os_read_shared_block(string name, void *out, s64 size) {
 }
 
 void os_free_block(void *ptr) {
-    WIN_CHECK_BOOL(HeapFree(GetProcessHeap(), 0, ptr));
+    WIN32_CHECK_BOOL(r, HeapFree(GetProcessHeap(), 0, ptr));
 }
 
 LSTD_END_NAMESPACE

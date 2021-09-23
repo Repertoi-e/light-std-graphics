@@ -1,5 +1,7 @@
 module;
 
+#include "../common.h"
+
 export module lstd.fmt.pretty;
 
 import lstd.fmt.context;
@@ -33,7 +35,7 @@ export {
         format_struct(fmt_context *f, string name, bool noSpecs = false) : F(f), Name(name), NoSpecs(noSpecs) {}
 
         // I know we are against hidden freeing but having this destructor is fine because it helps with code conciseness.
-        ~format_struct() { free(Fields); }
+        ~format_struct() { if (Fields) free(Fields.Data); }
 
         template <typename T>
         format_struct *field(string name, const T &value) {
@@ -55,7 +57,7 @@ export {
         format_tuple(fmt_context *f, string name, bool noSpecs = false) : F(f), Name(name), NoSpecs(noSpecs) {}
 
         // I know we are against hidden freeing but having this destructor is fine because it helps with code conciseness.
-        ~format_tuple() { free(Fields); }
+        ~format_tuple() { if (Fields) free(Fields.Data); }
 
         template <typename T>
         format_tuple *field(const T &value) {
@@ -76,7 +78,7 @@ export {
         format_list(fmt_context *f, bool noSpecs = false) : F(f), NoSpecs(noSpecs) {}
 
         // I know we are against hidden freeing but having this destructor is fine because it helps with code conciseness.
-        ~format_list() { free(Fields); }
+        ~format_list() { if (Fields) free(Fields.Data); }
 
         template <typename T>
         format_list *entries(array<T> values) {
@@ -102,18 +104,20 @@ void format_struct::finish() {
     auto write_field = [&](field_entry *entry) {
         write_no_specs(F, entry->Name);
         write_no_specs(F, ": ");
-        fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), entry->Arg);
+        fmt_visit_arg(fmt_context_visitor(F, NoSpecs), entry->Arg);
     };
 
     write_no_specs(F, Name);
     write_no_specs(F, " {");
 
-    auto *p = Fields.begin();
-    if (p != Fields.end()) {
+    auto *p = Fields.Data;
+    auto *end = Fields.Data + Fields.Count;
+
+    if (p != end) {
         write_no_specs(F, " ");
         write_field(p);
         ++p;
-        while (p != Fields.end()) {
+        while (p != end) {
             write_no_specs(F, ", ");
             write_field(p);
             ++p;
@@ -126,13 +130,15 @@ void format_tuple::finish() {
     write_no_specs(F, Name);
     write_no_specs(F, "(");
 
-    auto *p = Fields.begin();
-    if (p != Fields.end()) {
-        fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *p);
+    auto *p = Fields.Data;
+    auto *end = Fields.Data + Fields.Count;
+
+    if (p != end) {
+        fmt_visit_arg(fmt_context_visitor(F, NoSpecs), *p);
         ++p;
-        while (p != Fields.end()) {
+        while (p != end) {
             write_no_specs(F, ", ");
-            fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *p);
+            fmt_visit_arg(fmt_context_visitor(F, NoSpecs), *p);
             ++p;
         }
     }
@@ -142,13 +148,15 @@ void format_tuple::finish() {
 void format_list::finish() {
     write_no_specs(F, "[");
 
-    auto *p = Fields.begin();
-    if (p != Fields.end()) {
-        fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *p);
+    auto *p = Fields.Data;
+    auto *end = Fields.Data + Fields.Count;
+
+    if (p != end) {
+        fmt_visit_arg(fmt_context_visitor(F, NoSpecs), *p);
         ++p;
-        while (p != Fields.end()) {
+        while (p != end) {
             write_no_specs(F, ", ");
-            fmt_visit_fmt_arg(fmt_context_visitor(F, NoSpecs), *p);
+            fmt_visit_arg(fmt_context_visitor(F, NoSpecs), *p);
             ++p;
         }
     }

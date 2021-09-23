@@ -219,13 +219,12 @@ export {
     //
     //     auto *node = malloc<ast_binop>();
     //     auto *node = malloc<ast_binop>({.Alloc = AstNodeAllocator});
-    //     auto *node = malloc<ast_binop>({.Options = LEAK});
+    //     auto *node = malloc<ast_binop>({.Options = MY_SPECIAL_FLAG | LEAK});
     //
     //     auto *simdType = malloc<f32v4>({.Alloc = TemporaryAllocator, .Alignment = 16});
     //
     //     auto *memory = malloc<byte>({.Count = 200});
-    //     auto *memory = malloc<byte>({.Count = 200, .Alloc = my_special_allocator,
-    //                                  .Alignment = 64, .Options = MY_SPECIAL_FLAG | LEAK});
+    //     auto *memory = malloc<byte>({.Count = 200, .Alloc = my_special_allocator, .Alignment = 64, .Options = LEAK});
     //
     //
     // The functions take source_location (C++20) as a final parameter.
@@ -432,7 +431,7 @@ export {
 
         // Currently this mutex should be released in the OS implementations.
         // @TODO: @Speed: Lock-free linked list!
-        thread::mutex Mutex;
+        mutex Mutex;
 
         // After every allocation we check the heap for corruption.
         // The problem is that this involves iterating over a (possibly) large linked list of every allocation made.
@@ -474,12 +473,15 @@ export {
     //
     // :BigPhilosophyTime: Read here.
     //
+    // 2007, "What Every Programmer Should Know About Memory", Ulrich Drepper
+    // https://people.freebsd.org/~lstewart/articles/cpumemory.pdf
+    //
     // We don't provide a traditional general purpose "malloc" function.
     //
     // I think the programmer should be very aware of the memory the program is using.
     // That's why we require allocators to be initted with an initial (or several) large blocks (pools)
-    // from which smaller blocks are used for allocations. This forces you to think. The hope is that
-    // faster software is produced because modern computers suffer a lot from improper memory layout (cache misses, etc.)
+    // from which smaller blocks are used for allocations. This forces you to think about the memory layout.
+    // The hope is that faster software is produced because modern computers suffer a lot from cache misses.
     //
     // C++ is a low-level language (was high-level in old days when ASM was low-level, but now we consider it low-level).
     // Usually modern high-level languages put much of the memory management behind walls of abstraction.
@@ -506,8 +508,6 @@ export {
     //
     // Not only you waste electricity by being a careless programmer, you also waste USER'S TIME!
     // If your program is used by millions of PC, 1 second to click a SIMPLE BUTTON quickly becomes hours and then days.
-    //
-    // This comment is a call out and an attempt to bring people's attention to these problems.
     //
 
     //
@@ -601,10 +601,6 @@ export {
     //
     void *default_temp_allocator(allocator_mode mode, void *context, s64 size, void *oldMemory, s64 oldSize, u64 options);
 
-    //
-    // Implemented outside private module fragment because templates
-    //
-
     // Handles populating the allocation header and alignment.
     void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options = 0, source_location loc = {});
     void *general_reallocate(void *ptr, s64 newSize, u64 options = 0, source_location loc = {});
@@ -612,113 +608,106 @@ export {
     // Calling free on a null pointer doesn't do anything.
     void general_free(void *ptr, u64 options = 0);
 
-    template <non_void T>
-    requires(!types::is_const<T>)
-        T *
-        lstd_reallocate_impl(T * block, s64 newCount, u64 options, source_location loc) {
-        if (!block) return null;
-
-        // I think the standard implementation frees in this case but we need to decide
-        // what _options_ should go there (no options or the ones passed to reallocate?),
-        // so we leave that up to the call site.
-        assert(newCount != 0);
-
-        auto *header = (allocation_header *) block - 1;
-        s64 oldCount = header->Size / sizeof(T);
-
-        if constexpr (!types::is_scalar<T>) {
-            if (newCount < oldCount) {
-                auto *p   = block + newCount;
-                auto *end = block + oldCount;
-                while (p != end) {
-                    p->~T();
-                    ++p;
-                }
-            }
-        }
-
-        s64 newSize  = newCount * sizeof(T);
-        auto *result = (T *) general_reallocate(block, newSize, options, loc);
-
-        if constexpr (!types::is_scalar<T>) {
-            if (oldCount < newCount) {
-                auto *p   = result + oldCount;
-                auto *end = result + newCount;
-                while (p != end) {
-                    new (p) T;
-                    ++p;
-                }
-            }
-        }
-        return result;
+    // Calculates the required padding in bytes which needs to be added to _ptr_ in order to be aligned
+    u16 calculate_padding_for_pointer(void *ptr, s32 alignment) {
+        assert(alignment > 0 && is_pow_of_2(alignment));
+        return (u16) (((u64) ptr + (alignment - 1) & -alignment) - (u64) ptr);
     }
 
-    template <non_void T>
-    T *lstd_allocate_impl(s64 count, allocator alloc, u32 alignment, u64 options, source_location loc) {
-        s64 size = count * sizeof(T);
+    // Like calculate_padding_for_pointer but padding must be at least the header size
+    u16 calculate_padding_for_pointer_with_header(void *ptr, s32 alignment, u32 headerSize) {
+        u16 padding = calculate_padding_for_pointer(ptr, alignment);
+        if (padding < headerSize) {
+            headerSize -= padding;
+            if (headerSize % alignment) {
+                padding += alignment * (1 + headerSize / alignment);
+            } else {
+                padding += alignment * (headerSize / alignment);
+            }
+        }
+        return padding;
+    }
+}
 
-        auto *result = (T *) general_allocate(alloc, size, alignment, options, loc);
+template <non_void T>
+requires(!types::is_const<T>) T *lstd_reallocate_impl(T *block, s64 newCount, u64 options, source_location loc) {
+    if (!block) return null;
 
-        if constexpr (!types::is_scalar<T>) {
-            auto *p   = result;
-            auto *end = result + count;
+    // I think the standard implementation frees in this case but we need to decide
+    // what _options_ should go there (no options or the ones passed to reallocate?),
+    // so we leave that up to the call site.
+    assert(newCount != 0);
+
+    auto *header = (allocation_header *) block - 1;
+    s64 oldCount = header->Size / sizeof(T);
+
+    if constexpr (!types::is_scalar<T>) {
+        if (newCount < oldCount) {
+            auto *p   = block + newCount;
+            auto *end = block + oldCount;
+            while (p != end) {
+                p->~T();
+                ++p;
+            }
+        }
+    }
+
+    s64 newSize  = newCount * sizeof(T);
+    auto *result = (T *) general_reallocate(block, newSize, options, loc);
+
+    if constexpr (!types::is_scalar<T>) {
+        if (oldCount < newCount) {
+            auto *p   = result + oldCount;
+            auto *end = result + newCount;
             while (p != end) {
                 new (p) T;
                 ++p;
             }
         }
-        return result;
     }
-
-    template <non_void T>
-    requires(!types::is_const<T>) void lstd_free_impl(T * block, u64 options) {
-        if (!block) return;
-
-        auto *header = (allocation_header *) block - 1;
-        s64 count    = header->Size / sizeof(T);
-
-        if constexpr (!types::is_scalar<T>) {
-            auto *p = block;
-            while (count--) {
-                p->~T();
-                ++p;
-            }
-        }
-
-        // @TODO
-        //if constexpr (is_constant_evaluated()) {
-        //    // Constexpr allocations in C++20 seem to just look for the magic symbol "delete".
-        //    // Doesn't care if it's defined or not.
-        //    delete block;
-        //} else {
-        general_free(block, options);
-        // }
-    }
+    return result;
 }
 
-// LSTD_MODULE_PRIVATE    Dude, idk
-LSTD_END_NAMESPACE
-module : private;
-LSTD_BEGIN_NAMESPACE
+template <non_void T>
+T *lstd_allocate_impl(s64 count, allocator alloc, u32 alignment, u64 options, source_location loc) {
+    s64 size = count * sizeof(T);
 
-// Calculates the required padding in bytes which needs to be added to _ptr_ in order to be aligned
-u16 calculate_padding_for_pointer(void *ptr, s32 alignment) {
-    assert(alignment > 0 && is_pow_of_2(alignment));
-    return (u16) (((u64) ptr + (alignment - 1) & -alignment) - (u64) ptr);
-}
+    auto *result = (T *) general_allocate(alloc, size, alignment, options, loc);
 
-// Like calculate_padding_for_pointer but padding must be at least the header size
-u16 calculate_padding_for_pointer_with_header(void *ptr, s32 alignment, u32 headerSize) {
-    u16 padding = calculate_padding_for_pointer(ptr, alignment);
-    if (padding < headerSize) {
-        headerSize -= padding;
-        if (headerSize % alignment) {
-            padding += alignment * (1 + headerSize / alignment);
-        } else {
-            padding += alignment * (headerSize / alignment);
+    if constexpr (!types::is_scalar<T>) {
+        auto *p   = result;
+        auto *end = result + count;
+        while (p != end) {
+            new (p) T;
+            ++p;
         }
     }
-    return padding;
+    return result;
+}
+
+template <non_void T>
+requires(!types::is_const<T>) void lstd_free_impl(T *block, u64 options) {
+    if (!block) return;
+
+    auto *header = (allocation_header *) block - 1;
+    s64 count    = header->Size / sizeof(T);
+
+    if constexpr (!types::is_scalar<T>) {
+        auto *p = block;
+        while (count--) {
+            p->~T();
+            ++p;
+        }
+    }
+
+    // @TODO
+    //if constexpr (is_constant_evaluated()) {
+    //    // Constexpr allocations in C++20 seem to just look for the magic symbol "delete".
+    //    // Doesn't care if it's defined or not.
+    //    delete block;
+    //} else {
+    general_free(block, options);
+    // }
 }
 
 //

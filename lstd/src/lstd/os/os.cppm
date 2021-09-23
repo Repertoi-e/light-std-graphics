@@ -1,6 +1,6 @@
 module;
 
-#include "lstd/common/context.h"
+#include "../common.h"
 
 export module lstd.os;
 

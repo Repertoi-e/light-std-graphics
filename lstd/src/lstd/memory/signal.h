@@ -131,7 +131,7 @@ struct signal<R(Args ...), Collector> : public non_copyable {
     using collector_result_t = typename Collector::result_t;
 
     array<callback_t> Callbacks;
-    internal::collector_invocation<Collector, R(Args ...)> Invoker;
+    collector_invocation<Collector, R(Args ...)> Invoker;
 
     bool CurrentlyEmitting = false;
     array<s64> ToRemove;

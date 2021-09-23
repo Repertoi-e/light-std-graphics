@@ -404,7 +404,7 @@ file_scope bool common_event_callback(const event &e) {
     return false;
 }
 
-#include <lstd_platform/windows.h>
+#include <lstd/platform/windows.h>
 
 // We provide a Win32 implementation because this is such a common issue for IME users
 #if OS == WINDOWS && !defined IMGUI_DISABLE_WIN32_FUNCTIONS && !defined IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS

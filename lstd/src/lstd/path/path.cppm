@@ -1,6 +1,6 @@
 module;
 
-#include "../platform.h"
+#include "../common.h"
 
 export module lstd.path;
 

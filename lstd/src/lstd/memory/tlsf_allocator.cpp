@@ -1,4 +1,7 @@
-#include "allocator.h"
+#include "../common.h"
+#include "vendor/tlsf/tlsf.h"
+
+import lstd.memory;
 
 LSTD_BEGIN_NAMESPACE
 

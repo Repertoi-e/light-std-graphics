@@ -26,15 +26,3 @@
 #define LSTD_END_NAMESPACE
 #define LSTD_USING_NAMESPACE
 #endif
-
-// "module : private" must be in the global namespace.
-// Any modification in the private module fragment doesn't trigger recompilation
-// of stuff that imports the module (just like .cpp files), which is awesome.
-//
-// clang-format off
-#define LSTD_MODULE_PRIVATE \
-    LSTD_END_NAMESPACE      \
-                            \
-    module :private;        \
-                            \
-    LSTD_BEGIN_NAMESPACE

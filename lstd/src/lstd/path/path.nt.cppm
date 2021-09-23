@@ -1,6 +1,6 @@
 module;
 
-#include "lstd_platform/windows.h"  // Declarations of Win32 functions
+#include "lstd/platform/windows.h"  // Declarations of Win32 functions
 
 export module lstd.path.nt;
 
@@ -63,7 +63,7 @@ export {
     // Joins two or more paths.
     // Ignore the previous parts if a part is absolute.
     // This is the de facto way to build paths. Takes care of slashes automatically.
-    [[nodiscard("Leak")]] string path_join(const array<string> &paths);
+    [[nodiscard("Leak")]] string path_join(array<string> paths);
 
     [[nodiscard("Leak")]] string path_join(string one, string other);
 
@@ -194,8 +194,9 @@ export {
         friend void path_read_next_entry(path_walker &walker);
     };
 
-    void free(path_walker & walker) {
-        free(walker.CurrentFileName);
+    // @Cleanup
+    void free_path_walker(path_walker & walker) {
+        free(walker.CurrentFileName.Data);
     }
 
     void path_read_next_entry(path_walker & walker);
@@ -208,63 +209,50 @@ export {
     [[nodiscard("Leak")]] array<string> path_walk(string path, bool recursively = false);
 }
 
-LSTD_MODULE_PRIVATE
-
-#define CREATE_FILE_HANDLE_CHECKED(handleName, call, returnOnFail)                                             \
-    HANDLE handleName = call;                                                                                  \
-    if (handleName == INVALID_HANDLE_VALUE) {                                                                  \
-        string extendedCallSite = sprint("{}\n        (the path was: {!YELLOW}\"{}\"{!GRAY})\n", #call, path); \
-        char *cStr              = string_to_c_string(extendedCallSite);                                        \
-        windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), cStr);                                \
-        free(extendedCallSite.Data);                                                                           \
-        free(cStr);                                                                                            \
-        return returnOnFail;                                                                                   \
-    }
-
 #define GET_READONLY_EXISTING_HANDLE(x, fail)                                                                                                                                  \
     CREATE_FILE_HANDLE_CHECKED(x, CreateFileW(utf8_to_utf16(path), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, null, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL), fail); \
     defer(CloseHandle(x));
 
 string get_path_from_here_to(string here, string there) {
-    if (find_substring(here, there) == -1) {
+    if (string_find(here, there) == -1) {
         return there;
     } else {
-        if (here.Length == there.Length) {
+        if (here.Count == there.Count) {
             return here;
         } else {
-            string difference = there[{here.Length, there.Length}];
+            string difference = substring(there, string_length(here), string_length(there));
             return difference;
         }
     }
 }
 
-wchar *utf8_to_utf16(string str) { return internal::platform_utf8_to_utf16(str); }
+wchar *utf8_to_utf16(string str) { return platform_utf8_to_utf16(str); }
 
 constexpr path_split_drive_result path_split_drive(string path) {
-    if (path.Length >= 2) {
-        if (path[{0, 2}] == "\\\\" && path[2] != '\\') {
+    if (string_length(path) >= 2) {
+        if (substring(path, 0, 2) == string("\\\\") && path[2] != '\\') {
             // It is an UNC path
 
             //  vvvvvvvvvvvvvvvvvvvv drive letter or UNC path
             //  \\machine\mountpoint\directory\etc\...
             //             directory ^^^^^^^^^^^^^^^
 
-            s64 index = find_any_of(path, "\\/", 2);
+            s64 index = string_find_any_of(path, "\\/", 2);
             if (index == -1) return {"", path};
 
-            s64 index2 = find_any_of(path, "\\/", index + 1);
+            s64 index2 = string_find_any_of(path, "\\/", index + 1);
 
             // A UNC path can't have two slashes in a row
             // (after the initial two)
             if (index2 == index + 1) return {"", path};
             if (index2 == -1) {
-                index2 = path.Length;
+                index2 = string_length(path);
             }
-            return {path[{0, index2}], path[{index2, path.Length}]};
+            return {substring(path, 0, index2), substring(path, index2, string_length(path))};
         }
 
         if (path[1] == ':') {
-            return {path[{0, 2}], path[{2, path.Length}]};
+            return {substring(path, 0, 2), substring(path, 2, string_length(path))};
         }
     }
 
@@ -276,13 +264,12 @@ constexpr bool path_is_absolute(string path) {
     return rest && path_is_sep(rest[0]);
 }
 
-[[nodiscard("Leak")]] string path_join(const array<string> &paths) {
+[[nodiscard("Leak")]] string path_join(array<string> paths) {
     assert(paths.Count >= 2);
 
     auto [result_drive, result_path] = path_split_drive(paths[0]);
 
-    string result;
-    clone(&result, result_path);
+    string result = clone(result_path);
 
     For(range(1, paths.Count)) {
         auto p                 = paths[it];
@@ -293,17 +280,17 @@ constexpr bool path_is_absolute(string path) {
                 result_drive = p_drive;  // These are just substrings so it's fine
             }
 
-            free(result);
-            clone(&result, p_path);
+            free(result.Data);
+            result = clone(p_path);
 
             continue;
         } else if (p_drive && p_drive != result_drive) {
-            if (compare_ignore_case(p_drive, result_drive) != -1) {
+            if (string_compare_ignore_case(p_drive, result_drive) != -1) {
                 // Different drives => ignore the first path entirely
                 result_drive = p_drive;
 
-                free(result);
-                clone(&result, p_path);
+                free(result.Data);
+                result = clone(p_path);
 
                 continue;
             }
@@ -313,16 +300,16 @@ constexpr bool path_is_absolute(string path) {
 
         // Second path is relative to the first
         if (result && !path_is_sep(result[-1])) {
-            string_append(result, '\\');
+            string_append(&result, '\\');
         }
-        string_append(result, p_path);
+        string_append(&result, p_path);
     }
 
     // Add separator between UNC and non-absolute path if needed
     if (result && !path_is_sep(result[0]) && result_drive && result_drive[-1] != ':') {
-        string_insert_at(result, 0, '\\');
+        string_insert_at_index(&result, 0, '\\');
     } else {
-        string_insert_at(result, 0, result_drive);
+        string_insert_at_index(&result, 0, result_drive);
     }
     return result;
 }
@@ -334,42 +321,43 @@ constexpr bool path_is_absolute(string path) {
 
 [[nodiscard("Leak")]] string path_normalize(string path) {
     string result;
-    string_reserve(result, path.Length);
+    resize(&result, path.Count);
 
     if (match_beginning(path, "\\\\.\\") || match_beginning(path, "\\\\?\\")) {
         // In the case of paths with these prefixes:
         // \\.\ -> device names
         // \\?\ -> literal paths
         // do not do any normalization, but return the path unchanged.
-        clone(&result, path);
+        free(result.Data);
+        result = clone(path);
         return result;
     }
 
     auto [DriveOrUNC, rest] = path_split_drive(path);
     if (DriveOrUNC) {
-        string_append(result, DriveOrUNC);
+        string_append(&result, DriveOrUNC);
     }
 
     // Collapse leading slashes
     if (path_is_sep(rest[0])) {
-        string_append(result, '\\');
+        string_append(&result, '\\');
         while (path_is_sep(rest[0])) advance_cp(&rest, 1);
     }
 
     auto components = path_split_into_components(rest);
-    defer(free(components));
+    defer(free(components.Data));
 
     s64 i = 0;
     while (i < components.Count) {
         auto it = components[i];
-        if (!it || it == ".") {
-            array_remove_at(components, i);
-        } else if (it == "..") {
-            if (i > 0 && components[i - 1] != "..") {
-                array_remove_range(components, i - 1, i + 1);
+        if (!it || it == string(".")) {
+            remove_ordered_at_index(&components, i);
+        } else if (it == string("..")) {
+            if (i > 0 && components[i - 1] != string("..")) {
+                remove_range(&components, i - 1, i + 1);
                 --i;
             } else if (i == 0 && result && path_is_sep(result[-1])) {
-                array_remove_at(components, i);
+                remove_ordered_at_index(&components, i);
             } else {
                 ++i;
             }
@@ -384,11 +372,11 @@ constexpr bool path_is_absolute(string path) {
     }
 
     For(components) {
-        string_append(result, it);
-        string_append(result, '\\');
+        string_append(&result, it);
+        string_append(&result, '\\');
     }
     // Remove the trailing slash we added in the final iteration of the loop
-    string_remove_at(result, -1);
+    string_remove_at_index(&result, -1);
 
     return result;
 }
@@ -397,15 +385,15 @@ constexpr path_split_result path_split(string path) {
     auto [DriveOrUNC, rest] = path_split_drive(path);
 
     // Set i to index beyond path's last slash
-    s64 i = find_reverse_any_of(rest, "/\\") + 1;
+    s64 i = string_find_any_of(rest, "/\\", string_length(rest), true) + 1;
 
-    string head = rest[{0, i}];
-    string tail = rest[{i, rest.Length}];
+    string head = substring(rest, 0, i);
+    string tail = substring(rest, i, string_length(rest));
 
-    string trimmed = substring(head, 0, find_reverse_not_any_of(head, "/\\") + 1);
+    string trimmed = substring(head, 0, string_find_not_any_of(head, "/\\", string_length(head), true) + 1);
     if (trimmed) head = trimmed;
 
-    head = substring(path, 0, head.Length + DriveOrUNC.Length);
+    head = substring(path, 0, string_length(head) + string_length(DriveOrUNC));
 
     return {head, tail};
 }
@@ -515,7 +503,7 @@ bool path_copy(string path, string dest, bool overwrite) {
 
     if (path_is_directory(dest)) {
         auto p = path_join(dest, path_base_name(path));
-        defer(free(p));
+        defer(free(p.Data));
 
         return CopyFileW(u16, utf8_to_utf16(p), !overwrite);
     }
@@ -528,7 +516,7 @@ bool path_move(string path, string dest, bool overwrite) {
 
     if (path_is_directory(dest)) {
         auto p = path_join(dest, path_base_name(path));
-        defer(free(p));
+        defer(free(p.Data));
 
         return MoveFileExW(utf8_to_utf16(path), utf8_to_utf16(p), MOVEFILE_WRITE_THROUGH | MOVEFILE_COPY_ALLOWED | (overwrite ? MOVEFILE_REPLACE_EXISTING : 0));
     }
@@ -539,7 +527,7 @@ bool path_rename(string path, string newName) {
     if (!path_exists(path)) return false;
 
     auto p = path_join(path_directory(path), newName);
-    defer(free(p));
+    defer(free(p.Data));
 
     return MoveFileW(utf8_to_utf16(path), utf8_to_utf16(p));
 }
@@ -563,7 +551,7 @@ void path_read_next_entry(path_walker &walker) {
         if (!walker.Handle) {
             if (!walker.Path16) {
                 string queryPath = path_join(walker.Path, "*");
-                defer(free(queryPath));
+                defer(free(queryPath.Data));
 
                 walker.Path16 = utf8_to_utf16(queryPath);
             }
@@ -580,7 +568,7 @@ void path_read_next_entry(path_walker &walker) {
             windows_report_hresult_error(HRESULT_FROM_WIN32(GetLastError()), #call); \
         }                                                                            \
         if (walker.Handle != INVALID_HANDLE_VALUE) {                                 \
-            WIN_CHECK_BOOL(FindClose((HANDLE) walker.Handle));                       \
+            WIN32_CHECK_BOOL(r, FindClose((HANDLE) walker.Handle));                  \
         }                                                                            \
                                                                                      \
         walker.Handle = null; /* No more files.. terminate */                        \
@@ -590,22 +578,22 @@ void path_read_next_entry(path_walker &walker) {
         }
         ++walker.Index;
 
-        free(walker.CurrentFileName);
+        free(walker.CurrentFileName.Data);
 
         auto *fileName = ((WIN32_FIND_DATAW *) walker.PlatformFileInfo)->cFileName;
-        string_reserve(walker.CurrentFileName, c_string_length(fileName) * 4);                         // @Cleanup
+        resize(&walker.CurrentFileName, c_string_length(fileName) * 4);                                 // @Cleanup
         utf16_to_utf8(fileName, (char *) walker.CurrentFileName.Data, &walker.CurrentFileName.Count);  // @Constcast
-        walker.CurrentFileName.Length = utf8_length(walker.CurrentFileName.Data, walker.CurrentFileName.Count);
-    } while (walker.CurrentFileName == ".." || walker.CurrentFileName == ".");
-    assert(walker.CurrentFileName != ".." && walker.CurrentFileName != ".");
+
+    } while (walker.CurrentFileName == string("..") || walker.CurrentFileName == string("."));
+    assert(walker.CurrentFileName != string("..") && walker.CurrentFileName != string("."));
 }
 
 // This version appends paths to the array _result_. Copy this and modify it to suit your use case.
-void path_walk_recursively_impl(string path, string first, array<string> &result) {
+void path_walk_recursively_impl(string path, string first, array<string> *result) {
     assert(path_is_directory(path));
 
     auto walker = path_walker(path);
-    defer(free(walker));
+    defer(free_path_walker(walker));
 
     while (true) {
         path_read_next_entry(walker);
@@ -627,17 +615,17 @@ void path_walk_recursively_impl(string path, string first, array<string> &result
 
     if (!recursively) {
         auto walker = path_walker(path);
-        defer(free(walker));
+        defer(free_path_walker(walker));
 
         while (true) {
             path_read_next_entry(walker);
             if (!walker.Handle) break;
 
             string file = path_join(path, walker.CurrentFileName);
-            add(result, file);
+            add(&result, file);
         }
     } else {
-        path_walk_recursively_impl(path, path, result);
+        path_walk_recursively_impl(path, path, &result);
     }
     return result;
 }

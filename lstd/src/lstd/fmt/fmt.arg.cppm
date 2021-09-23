@@ -10,10 +10,6 @@ import lstd.fmt.fmt_type_constant;
 LSTD_BEGIN_NAMESPACE
 
 export {
-    struct fmt_context;
-
-    void write_no_specs(fmt_context * f, string str);
-
     //
     // Specialize this for custom types.
     //
@@ -21,37 +17,27 @@ export {
     //
     // template <>
     // struct formatter<my_vector> {
-    //     void format(my_vector *value, fmt_context *f) {
-    //         fmt_to_writer(f, "v1: {}, v2: {}, ...", my_vector->A, my_vector->B);
+    //     void format(fmt_context *f, my_vector *value) {
+    //         fmt_to_writer(f, "x: {}, y: {}", value->x, value->y);
     // 		   ...
     // 	   }
     // };
     template <typename T, typename Enable = void>
     struct formatter {
-        void format(T *value, fmt_context *f) {
-            f.on_error();
-        }
+        formatter() = delete;
     };
 
     // Can T be formatted with a custom formatter
     template <typename T>
     concept formattable = requires(T) { {formatter<T>{}}; };
-}
 
-template <formattable T>
-void call_formatter_on_custom_arg(void *arg, fmt_context *f) {
-    formatter<types::remove_cvref_t<T>> formatter;
-    formatter.format((T *) (arg), f);
-}
+    struct fmt_custom_value {
+        void *Data;
+        void (*FormatFunc)(void *formatContext, void *arg);
+    };
 
-export {
     // Contains a value of any type
     struct fmt_value {
-        struct custom {
-            void *Data;
-            void (*FormatFunc)(void *arg, fmt_context *f);
-        };
-
         union {
             s64 S64;
             u64 U64;
@@ -61,7 +47,7 @@ export {
             void *Pointer;
             string String;
 
-            custom CUSTOM;
+            fmt_custom_value Custom;
         };
 
         fmt_value(s64 v = 0) : S64(v) {}
@@ -72,10 +58,16 @@ export {
         fmt_value(void *v) : Pointer(v) {}
         fmt_value(string v) : String(v) {}
 
-        template <typename T>
+        template <formattable T>
         fmt_value(T *v) {
-            CUSTOM.Data       = (void *) v;
-            CUSTOM.FormatFunc = call_formatter_on_custom_arg<T>;
+            Custom.Data       = (void *) v;
+            Custom.FormatFunc = call_formatter_on_custom_arg<T>;
+        }
+
+        template <formattable T>
+        static void call_formatter_on_custom_arg(void *formatContext, void *arg) {
+            formatter<types::remove_cvref_t<T>> formatter;
+            formatter.format(formatContext, (T *) (arg));
         }
     };
 
@@ -99,9 +91,8 @@ export {
     //   * is the type a code_point_ref? maps to u64 (we want the value in that case)
     //   * is the type an enum? calls map_arg again with the underlying type
     // Otherwise we static_assert that the argument can't be formatted
-    template <typename U>
-    auto fmt_map_arg(const U &v) {
-        using T = typename types::remove_cvref_t<U>;
+    auto fmt_map_arg(const auto &v) {
+        using T = typename types::remove_cvref_t<decltype(v)>;
 
         if constexpr (formattable<T>) {
             return &v;
@@ -123,7 +114,7 @@ export {
         } else if constexpr (types::is_enum<T>) {
             return fmt_map_arg((types::underlying_type_t<T>) v);
         } else {
-            static_assert(false, "Argument doesn't have a formatter");
+            static_assert(false, "Argument doesn't have a way to be formatted. Specialize formatter<T> for custom types.");
         }
     }
 
@@ -134,22 +125,11 @@ export {
     template <typename T>
     constexpr auto fmt_mapped_type_constant_v = type_constant_v<decltype(fmt_map_arg(types::declval<T>()))>;
 
-    template <typename T>
-    fmt_arg fmt_make_arg(const T &v) { return {fmt_mapped_type_constant_v<T>, fmt_value(fmt_map_arg(v))}; }
-
-    template <bool IsPacked, typename T>
-    auto fmt_make_arg(const T &v) {
-        if constexpr (IsPacked) {
-            return fmt_value(fmt_map_arg(v));  // We either pack values (we know their types in the fmg_args array)
-        } else {
-            return fmt_make_arg(v);  // .. or we don't have enough bits in the integer for everybody's type
-                                         // and we store an array of fmt_args instead
-        }
-    }
+    fmt_arg fmt_make_arg(const auto &v) { return {fmt_mapped_type_constant_v<decltype(v)>, fmt_value(fmt_map_arg(v))}; }
 
     // Visits an argument dispatching with the right value based on the argument type
     template <typename Visitor>
-    auto fmt_visit_fmt_arg(Visitor && visitor, fmt_arg ar)->decltype(visitor(0)) {
+    auto fmt_visit_arg(Visitor && visitor, fmt_arg ar)->decltype(visitor(0)) {
         switch (ar.Type) {
             case fmt_type::NONE:
                 break;
@@ -168,52 +148,10 @@ export {
             case fmt_type::POINTER:
                 return visitor(ar.Value.Pointer);
             case fmt_type::CUSTOM:
-                return visitor(ar.Value.CUSTOM);
+                return visitor(ar.Value.Custom);
         }
         return visitor(types::unused{});
     }
-}
-
-// Hacky template because C++
-template <typename Dummy>
-u64 get_packed_fmt_types() {
-    return 0ull;
-}
-
-// Hacky template because C++
-template <typename Dummy, typename Arg, typename... Args>
-u64 get_packed_fmt_types() {
-    return (u64) fmt_mapped_type_constant_v<Arg> | (get_packed_fmt_types<Dummy, Args...>() << 4);
-}
-
-export {
-    // We can't really combine this with _fmt_args_, ugh!
-    // Stores either an array of values or arguments on the stack (just values if number is less than MAX_PACKED_ARGS)
-    template <typename... Args>
-    struct fmt_args_on_the_stack {
-        static constexpr s64 NUM_ARGS   = sizeof...(Args);
-        static constexpr bool IS_PACKED = NUM_ARGS < MAX_PACKED_ARGS;
-
-        using T = types::select_t<IS_PACKED, fmt_value, fmt_arg>;
-        stack_array<T, NUM_ARGS> Data;
-
-        u64 Types;
-
-        fmt_args_on_the_stack(Args &&...args) : Types(IS_PACKED ? get_packed_fmt_types<types::unused, Args...>() : IS_UNPACKED_BIT | NUM_ARGS) {
-            Data = {fmt_make_arg<IS_PACKED>(args)...};
-        }
-    };
-
-    struct fmt_args {
-        void *Data;  // (fmt_value *) or (fmt_arg *) if not packed
-        s64 Count = 0;
-        u64 Types = 0;
-
-        fmt_args() {}
-
-        template <typename... Args>
-        fmt_args(fmt_args_on_the_stack<Args...> *store) : Data((void *) store->Data.Data), Types(store->Types), Count(sizeof...(Args)) {}
-    };
 }
 
 LSTD_END_NAMESPACE

@@ -4,7 +4,7 @@
 //
 
 #include "lstd/memory/string.h"
-#include "lstd_platform/windows_no_crt/common_functions.h"
+#include "lstd/platform/windows_no_crt/common_functions.h"
 #include "vendor/stb/stb_sprintf.h"
 
 import lstd.os;
@@ -32,7 +32,7 @@ char *ft_getenv(const char *var) {
     if (!success) return null;
 
     // Double @Leak
-    return LSTD_NAMESPACE::string_to_c_string(result, LSTD_NAMESPACE::internal::platform_get_persistent_allocator());
+    return LSTD_NAMESPACE::string_to_c_string(result, LSTD_NAMESPACE::platform_get_persistent_allocator());
 }
 
 int ft_sprintf(char *str, const char *format, ...) {

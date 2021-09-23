@@ -4,10 +4,11 @@ module;
 
 export module lstd.fmt.context;
 
-import lstd.fmt.arg;
-import lstd.fmt.specs;
-import lstd.fmt.parse_context;
-import lstd.fmt.format_float;
+export import lstd.fmt.arg;
+export import lstd.fmt.specs;
+export import lstd.fmt.parse_context;
+export import lstd.fmt.format_float;
+export import lstd.string_writer;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -20,12 +21,13 @@ export {
     // This means that you can use this to convert floats, integers, to strings by calling just write_no_specs().
     //
     // We also store a parse context (if a format string was passed), otherwise it remains unused.
-    struct fmt_context {
+    struct fmt_context : writer {
         writer *Out;  // The real output
 
-        fmt_parse_context Parse;  // Holds the format string (and how much we've parsed) and some
-                                  // state about the argument ids (when using automatic indexing).
-        fmt_args Args;            // Storage for the arguments (gets set by the constructor)
+        fmt_interp Parse;  // Holds the format string (and how much we've parsed) and some
+                           // state about the argument ids (when using automatic indexing).
+
+        array<fmt_arg> Args;
 
         // null if no specs were parsed.
         // When writing a custom formatter use this for checking specifiers.
@@ -36,9 +38,9 @@ export {
         // been specified by another argument (instead of being a literal in the format string).
         fmt_dynamic_specs *Specs = null;
 
-        fmt_context(writer *out = null, string fmtString = "", const fmt_args &args = {}) : Out(out), Args(args), Parse(fmtString) {}
+        fmt_context(writer *out, string fmtString, array<fmt_arg> args) : Out(out), Parse(fmtString), Args(args) {}
 
-        void write(const byte *data, s64 count) override;
+        void write(const char *data, s64 count) override;
         void flush() override { Out->flush(); }
     };
 
@@ -51,7 +53,9 @@ export {
     // This routine is used to provide useful error messages.
     void on_error(fmt_context * f, string message, s64 position = -1) { on_error(&f->Parse, message, position); }
 
-    void write(fmt_context * f, const char *str) { f->write((const byte *) str, c_string_length(str)); }
+    void write(fmt_context * f, string s) {
+        f->write(s.Data, s.Count);
+    }
 
     // General formatting routimes which take specifiers into account:
     void write(fmt_context * f, types::is_integral auto value);
@@ -67,12 +71,12 @@ export {
     void write_no_specs(fmt_context * f, bool value);
     void write_no_specs(fmt_context * f, const void *value);
 
-    void write_no_specs(fmt_context * f, string str) { write(f->Out, *((array<byte> *) &str)); }
-    void write_no_specs(fmt_context * f, const char *str) { write(f->Out, (const byte *) str, c_string_length(str)); }
-    void write_no_specs(fmt_context * f, const char *str, s64 size) { write(f->Out, (const byte *) str, size); }
+    void write_no_specs(fmt_context * f, string str) { write(f->Out, str); }
+    void write_no_specs(fmt_context * f, const char *str) { write(f->Out, str, c_string_length(str)); }
+    void write_no_specs(fmt_context * f, const char *str, s64 size) { write(f->Out, str, size); }
     void write_no_specs(fmt_context * f, code_point cp) { write(f->Out, cp); }
 
-    // Used to dispatch values to write/write_no_specs functions. Used in conjunction with fmt_visit_fmt_arg.
+    // Used to dispatch values to write/write_no_specs functions. Used in conjunction with fmt_visit_arg.
     struct fmt_context_visitor {
         fmt_context *F;
         bool NoSpecs;
@@ -88,10 +92,10 @@ export {
         void operator()(f64 value) { NoSpecs ? write_no_specs(F, value) : write(F, value); }
         void operator()(string value) { NoSpecs ? write_no_specs(F, value) : write(F, value); }
         void operator()(const void *value) { NoSpecs ? write_no_specs(F, value) : write(F, value); }
-        void operator()(const typename fmt_value<FC>::custom &custom) { custom.FormatFunc(custom.Data, F); }
+        void operator()(fmt_custom_value custom) { custom.FormatFunc(F, custom.Data); }
 
         void operator()(types::unused) {
-            F->on_error("Internal error while formatting");
+            on_error(F, "Internal error while formatting");
             assert(false);
         }
     };
@@ -150,7 +154,7 @@ void write_no_specs(fmt_context *f, const void *value) {
     f->Specs = old;
 }
 
-utf8 DIGITS[] =
+char DIGITS[] =
     "0001020304050607080910111213141516171819"
     "2021222324252627282930313233343536373839"
     "4041424344454647484950515253545556575859"
@@ -178,7 +182,7 @@ char *format_uint_decimal(char *buffer, UInt value, s64 formattedSize, string th
     }
 
     if (value < 10) {
-        *--buffer = (utf8) ('0' + value);
+        *--buffer = (char) ('0' + value);
         return buffer;
     }
 
@@ -199,10 +203,12 @@ char *format_uint_base(char *buffer, UInt value, s64 formattedSize, bool upper =
     do {
         const char *digits = upper ? "0123456789ABCDEF" : "0123456789abcdef";
         u32 digit          = (value & ((1 << BASE_BITS) - 1));
-        *--buffer          = (utf8) (BASE_BITS < 4 ? (utf8) ('0' + digit) : digits[digit]);
+        *--buffer          = (char) (BASE_BITS < 4 ? (char) ('0' + digit) : digits[digit]);
     } while ((value >>= BASE_BITS) != 0);
     return buffer;
 }
+
+// @Cleanup Replace lambda with string...
 
 // Writes pad code points and the actual contents with f(),
 // _fSize_ needs to be the size of the output from _f_ in code points (in order to calculate padding properly)
@@ -223,9 +229,9 @@ void write_padded_helper(fmt_context *f, const fmt_specs &specs, F &&func, s64 f
     }
 }
 
-void write_helper(fmt_context *f, const byte *data, s64 size) {
+void write_helper(fmt_context *f, const char *data, s64 size) {
     if (!f->Specs) {
-        write_no_specs(f, (const char *) data, size);
+        write_no_specs(f, data, size);
         return;
     }
 
@@ -235,25 +241,25 @@ void write_helper(fmt_context *f, const byte *data, s64 size) {
             return;
         }
         if (f->Specs->Type != 's') {
-            f->on_error("Invalid type specifier for a string", f->Parse.It.Data - f->Parse.FormatString.Data - 1);
+            on_error(f, "Invalid type specifier for a string", f->Parse.It.Data - f->Parse.FormatString.Data - 1);
             return;
         }
     }
 
     // 'p' wasn't specified, not treating as formatting a pointer
-    s64 length = utf8_length((const char *) data, size);
+    s64 length = utf8_length(data, size);
 
     // Adjust size for specified precision
     if (f->Specs->Precision != -1) {
         assert(f->Specs->Precision >= 0);
         length = f->Specs->Precision;
-        size   = utf8_get_cp_at_index_unsafe((const char *) data, length) - (const char *) data;
+        size   = utf8_get_pointer_to_cp_at_translated_index(data, size, length) - data;
     }
     write_padded_helper(
-        f, *f->Specs, [&]() { write_no_specs(f, (const char *) data, size); }, length);
+        f, *f->Specs, [&]() { write_no_specs(f, data, size); }, length);
 }
 
-void fmt_context::write(const byte *data, s64 count) { write_helper(this, data, count); }
+void fmt_context::write(const char *data, s64 count) { write_helper(this, data, count); }
 
 void write(fmt_context *f, bool value) {
     if (f->Specs && f->Specs->Type) {
@@ -265,7 +271,7 @@ void write(fmt_context *f, bool value) {
 
 void write(fmt_context *f, const void *value) {
     if (f->Specs && f->Specs->Type && f->Specs->Type != 'p') {
-        f->on_error("Invalid type specifier for a pointer", f->Parse.It.Data - f->Parse.FormatString.Data - 1);
+        on_error(f, "Invalid type specifier for a pointer", f->Parse.It.Data - f->Parse.FormatString.Data - 1);
         return;
     }
 
@@ -276,7 +282,7 @@ void write(fmt_context *f, const void *value) {
         write_no_specs(f, U'0');
         write_no_specs(f, U'x');
 
-        utf8 formatBuffer[numeric_info<u64>::digits / 4 + 2];
+        char formatBuffer[numeric_info<u64>::digits / 4 + 2];
         auto *p = format_uint_base<4>(formatBuffer, uptr, numDigits);
         write_no_specs(f, p, formatBuffer + numDigits - p);
     };
@@ -292,7 +298,7 @@ void write(fmt_context *f, const void *value) {
 }
 
 void write_u64(fmt_context *f, u64 value, bool negative, fmt_specs specs) {
-    utf8 type = specs.Type;
+    char type = specs.Type;
     if (!type) type = 'd';
 
     s64 numDigits;
@@ -306,7 +312,7 @@ void write_u64(fmt_context *f, u64 value, bool negative, fmt_specs specs) {
         numDigits = count_digits<4>(value);
     } else if (type == 'c') {
         if (specs.Align == fmt_alignment::NUMERIC || specs.Sign != fmt_sign::NONE || specs.Hash) {
-            f->on_error("Invalid format specifier(s) for code point - code points can't have numeric alignment, signs or #", f->Parse.It.Data - f->Parse.FormatString.Data);
+            on_error(f, "Invalid format specifier(s) for code point - code points can't have numeric alignment, signs or #", f->Parse.It.Data - f->Parse.FormatString.Data);
             return;
         }
         auto cp = (code_point) value;
@@ -314,7 +320,7 @@ void write_u64(fmt_context *f, u64 value, bool negative, fmt_specs specs) {
             f, specs, [&]() { write_no_specs(f, cp); }, 1);
         return;
     } else {
-        f->on_error("Invalid type specifier for an integer", f->Parse.It.Data - f->Parse.FormatString.Data - 1);
+        on_error(f, "Invalid type specifier for an integer", f->Parse.It.Data - f->Parse.FormatString.Data - 1);
         return;
     }
 
@@ -322,7 +328,7 @@ void write_u64(fmt_context *f, u64 value, bool negative, fmt_specs specs) {
         numDigits = 1;
     }
 
-    utf8 prefixBuffer[4];
+    char prefixBuffer[4];
     char *prefixPointer = prefixBuffer;
 
     if (negative) {
@@ -344,9 +350,10 @@ void write_u64(fmt_context *f, u64 value, bool negative, fmt_specs specs) {
         if (specs.Precision == -1 || specs.Precision > numDigits) *prefixPointer++ = '0';
     }
 
-    auto prefix = string(prefixBuffer, prefixPointer - prefixBuffer);
+    auto prefix       = string(prefixBuffer, prefixPointer - prefixBuffer);
+    auto prefixLength = string_length(prefix);
 
-    s64 formattedSize = prefix.Length + numDigits;
+    s64 formattedSize = prefixLength + numDigits;
     s64 padding       = 0;
     if (specs.Align == fmt_alignment::NUMERIC) {
         if (specs.Width > formattedSize) {
@@ -354,22 +361,22 @@ void write_u64(fmt_context *f, u64 value, bool negative, fmt_specs specs) {
             formattedSize = specs.Width;
         }
     } else if (specs.Precision > numDigits) {
-        formattedSize = (u32) prefix.Length + (u32) specs.Precision;
+        formattedSize = (u32) prefixLength + (u32) specs.Precision;
         padding       = (u32) specs.Precision - numDigits;
         specs.Fill    = '0';
     }
     if (specs.Align == fmt_alignment::NONE) specs.Align = fmt_alignment::RIGHT;
 
-    utf8 U64_FORMAT_BUFFER[numeric_info<u64>::digits + 1]{};
+    char U64_FORMAT_BUFFER[numeric_info<u64>::digits + 1]{};
 
     if (type == 'n') {
         formattedSize += ((numDigits - 1) / 3);
     }
 
-    type = (utf8) to_lower(type);
+    type = (char) to_lower(type);
     write_padded_helper(
         f, specs, [&]() {
-            if (prefix.Length) write_no_specs(f, prefix);
+            if (prefix) write_no_specs(f, prefix);
             For(range(padding)) write_no_specs(f, specs.Fill);
 
             char *p = null;
@@ -417,13 +424,20 @@ void write_exponent(fmt_context *f, s64 exp) {
 }
 
 // Routine to write the formatted significant including a decimalPoint if necessary
+//
+// @Robustness
+// We assume significand contains only ASCII 0-9 digits
+// and significand.Count == string_length(significand).
+// I'm not sure if we will ever format anything besides
+// arabic numerals so ...
+//
 void write_significand(fmt_context *f, string significand, s64 integralSize, code_point decimalPoint = 0) {
     if (!significand) return;  // The significand is actually empty if the value formatted is 0
 
-    write_no_specs(f, significand[{0, integralSize}]);
+    write_no_specs(f, substring(significand, 0, integralSize));
     if (decimalPoint) {
         write_no_specs(f, decimalPoint);
-        write_no_specs(f, significand[{integralSize, significand.Count}]);
+        write_no_specs(f, substring(significand, integralSize, significand.Count));
     }
 }
 

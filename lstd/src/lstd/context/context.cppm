@@ -5,10 +5,9 @@ module;
 export module lstd.context;
 
 export import lstd.string;
+export import lstd.writer;
 
 LSTD_BEGIN_NAMESPACE
-
-struct writer;
 
 export {
     struct os_function_call {

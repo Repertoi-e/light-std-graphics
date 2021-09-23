@@ -1,10 +1,12 @@
 module;
 
-#include "lstd_platform/windows.h"  // Declarations of Win32 functions
+#include "lstd/platform/windows.h"  // Declarations of Win32 functions
 
 export module lstd.thread.win32;
 
-import lstd.os;
+export import lstd.delegate;
+export import lstd.context;
+export import lstd.memory;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -24,7 +26,7 @@ export {
         union {
             struct alignas(64) {
                 char Handle[40]{};
-            } Win;
+            } Win32;
         } PlatformData{};
     };
 
@@ -79,7 +81,7 @@ export {
 
     // Unlock the mutex.
     // If any threads are waiting for the lock on this mutex, one of them will be unblocked.
-    void unlock(*m) {
+    void unlock(fast_mutex * m) {
         atomic_swap(&m->Lock, 0);
     }
 
@@ -131,31 +133,181 @@ export {
 
     struct thread {
         // Don't read this directly, use an atomic operation:   atomic_compare_exchange_pointer(&Handle, null, null).
-        // You probably don't want this anyway?
         void *Handle = null;
-
-        thread() {}
-
-        // This is the internal thread wrapper function.
-#if OS == WINDOWS
-        static u32 __stdcall wrapper_function(void *data);
-#else
-        static void *wrapper_function(void *data);
-#endif
+        u32 ThreadID;
     };
 
-    void create_and_launch_thread(const delegate<void(void *)> &function, void *userData = null);
+    thread create_and_launch_thread(const delegate<void(void *)> &function, void *userData = null);
 
     // Wait for the thread to finish
     void wait(thread t);
 
     // Terminate the thread without waiting
     void terminate(thread t);
-
-    // The Context also stores the current thread's ID
-    u32 get_id(thread t);
 }
 
-LSTD_MODULE_PRIVATE
+mutex create_mutex() {
+    mutex m;
+    InitializeCriticalSection((CRITICAL_SECTION *) m.PlatformData.Win32.Handle);
+    return m;
+}
+
+void free_mutex(mutex *m) {
+    auto *p = (CRITICAL_SECTION *) m->PlatformData.Win32.Handle;
+    if (p) DeleteCriticalSection(p);
+}
+
+void lock(mutex *m) {
+    EnterCriticalSection((CRITICAL_SECTION *) m->PlatformData.Win32.Handle);
+}
+
+bool try_lock(mutex *m) {
+    return TryEnterCriticalSection((CRITICAL_SECTION *) m->PlatformData.Win32.Handle);
+}
+
+void unlock(mutex *m) {
+    LeaveCriticalSection((CRITICAL_SECTION *) m->PlatformData.Win32.Handle);
+}
+
+struct CV_Data {
+    // Signal and broadcast event HANDLEs.
+    HANDLE Events[2];
+
+    // Count of the number of waiters.
+    u32 WaitersCount;
+
+    // Serialize access to mWaitersCount.
+    CRITICAL_SECTION WaitersCountLock;
+};
+
+#define _CONDITION_EVENT_ONE 0
+#define _CONDITION_EVENT_ALL 1
+
+condition_variable create_condition_variable() {
+    condition_variable c;
+
+    auto *data = (CV_Data *) c.Handle;
+
+    data->Events[_CONDITION_EVENT_ONE] = CreateEventW(null, 0, 0, null);
+    data->Events[_CONDITION_EVENT_ALL] = CreateEventW(null, 1, 0, null);
+    InitializeCriticalSection(&data->WaitersCountLock);
+
+    return c;
+}
+
+void free_condition_variable(condition_variable *c) {
+    auto *data = (CV_Data *) c->Handle;
+    if (data) {
+        CloseHandle(data->Events[_CONDITION_EVENT_ONE]);
+        CloseHandle(data->Events[_CONDITION_EVENT_ALL]);
+        DeleteCriticalSection(&data->WaitersCountLock);
+    }
+}
+
+void pre_wait(condition_variable *c) {
+    auto *data = (CV_Data *) c->Handle;
+
+    // Increment number of waiters
+    EnterCriticalSection(&data->WaitersCountLock);
+    ++data->WaitersCount;
+    LeaveCriticalSection(&data->WaitersCountLock);
+}
+
+void do_wait(condition_variable *c) {
+    auto *data = (CV_Data *) c->Handle;
+
+    // Wait for either event to become signaled due to notify_one() or notify_all() being called
+    s32 result = WaitForMultipleObjects(2, data->Events, 0, INFINITE);
+
+    // Check if we are the last waiter
+    EnterCriticalSection(&data->WaitersCountLock);
+    --data->WaitersCount;
+    bool lastWaiter = result == WAIT_OBJECT_0 + _CONDITION_EVENT_ALL && data->WaitersCount == 0;
+    LeaveCriticalSection(&data->WaitersCountLock);
+
+    // If we are the last waiter to be notified to stop waiting, reset the event
+    if (lastWaiter) ResetEvent(data->Events[_CONDITION_EVENT_ALL]);
+}
+
+void notify_one(condition_variable *c) {
+    auto *data = (CV_Data *) c->Handle;
+
+    // Are there any waiters?
+    EnterCriticalSection(&data->WaitersCountLock);
+    bool haveWaiters = data->WaitersCount > 0;
+    LeaveCriticalSection(&data->WaitersCountLock);
+
+    // If we have any waiting threads, send them a signal
+    if (haveWaiters) SetEvent(data->Events[_CONDITION_EVENT_ONE]);
+}
+
+void notify_all(condition_variable *c) {
+    auto *data = (CV_Data *) c->Handle;
+
+    // Are there any waiters?
+    EnterCriticalSection(&data->WaitersCountLock);
+    bool haveWaiters = data->WaitersCount > 0;
+    LeaveCriticalSection(&data->WaitersCountLock);
+
+    // If we have any waiting threads, send them a signal
+    if (haveWaiters) SetEvent(data->Events[_CONDITION_EVENT_ALL]);
+}
+
+// Information to pass to the new thread (what to run).
+export struct thread_start_info {
+    delegate<void(void *)> Function;
+    void *UserData = null;
+
+    // We have to make sure the module the thread is executing in
+    // doesn't get unloaded while the thread is still doing work.
+    HMODULE Module = null;
+
+    // Pointer to the implicit context in the "parent" thread.
+    // We copy its members to the newly created thread.
+    const context *ContextPtr = null;
+    bool ParentWasUsingTemporaryAllocator;
+};
+
+export u32 __stdcall thread_wrapper_function(void *data) {
+    auto *ti = (thread_start_info *) data;
+
+    // We are allowed to do this because we are the parents
+    *const_cast<allocator *>(&TemporaryAllocator) = {default_temp_allocator, (void *) &TemporaryAllocatorData};
+
+    // Copy the parent thread's context
+    auto newContext     = *ti->ContextPtr;
+    newContext.ThreadID = GetCurrentThreadId();
+    // If the parent thread was using the temporary allocator,
+    // set the new thread to also use the temporary allocator,
+    // but it needs to point to its own temp data (otherwise we are not thread-safe).
+    if (ti->ParentWasUsingTemporaryAllocator) {
+        newContext.Alloc = TemporaryAllocator;
+    }
+    OVERRIDE_CONTEXT(newContext);
+
+    ti->Function(ti->UserData);  // Call the thread function with the user data
+
+    free(ti);
+
+    ExitThread(0);
+    if (ti->Module) FreeLibrary(ti->Module);
+
+    return 0;
+}
+
+thread create_and_launch_thread(const delegate<void(void *)> &function, void *userData);
+
+void wait(thread t) {
+    assert(t.ThreadID != Context.ThreadID);  // A thread cannot wait for itself!
+    WaitForSingleObject(t.Handle, INFINITE);
+}
+
+void terminate(thread t) {
+    if (t.Handle) {
+        TerminateThread(t.Handle, 0);
+    }
+}
+
+void sleep(u32 ms) { Sleep(ms); }
 
 LSTD_END_NAMESPACE

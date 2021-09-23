@@ -1,7 +1,6 @@
 module;
 
-#include "../common/context.h"
-#include "../math.h"
+#include "../common.h"
 
 export module lstd.fmt;
 
@@ -10,7 +9,7 @@ export module lstd.fmt;
 //
 // The formatting engine in this library is similar to how python handles advanced string formatting.
 //
-// Format strings consist of characters and fields encoded in utf8.
+// Format strings consist of characters and fields encoded in utf-8.
 // Fields define how an argument gets formatted to the output while the rest of the characters get transfered unchanged.
 //
 // Fields are defined with curly braces, like so:
@@ -45,7 +44,7 @@ export module lstd.fmt;
 //
 //     The optional 'fill' code point defines the code point to be used to pad the field to the minimum width.
 //     The fill code point, if present, must be followed by an alignment flag.
-//     The fill element can be multiple bytes and must be encoded in utf8.
+//     The fill element can be multiple bytes and must be encoded in utf-8.
 //
 //     The 'sign' option is only valid for numeric types, and can be one of the following:
 //       '+'  - Indicates that a sign should be used for both positive as well as negative numbers
@@ -96,11 +95,11 @@ export module lstd.fmt;
 //
 //      C-Style string:
 //       'p' - Treats the argument as a pointer.
-//       's' - Outputs it as an utf8 encoded string.
+//       's' - Outputs it as an utf-8 encoded string.
 //       '' (NONE) - the same as 's'
 //
 //      Strings:
-//       's' - Outputs it as an utf8 encoded string.
+//       's' - Outputs it as an utf-8 encoded string.
 //       '' (NONE) - the same as 's'
 //
 //      Guid:
@@ -162,6 +161,9 @@ export import lstd.fmt.arg;
 export import lstd.fmt.parse_context;
 export import lstd.fmt.context;
 export import lstd.fmt.text_style;
+export import lstd.fmt.pretty;
+
+import lstd.fmt.fmt_type_constant;
 
 LSTD_BEGIN_NAMESPACE
 
@@ -210,28 +212,6 @@ export {
     void fmt_parse_and_format(fmt_context * f);
 }
 
-fmt_type get_type(fmt_args ars, s64 index) {
-    u64 shift = (u64) index * 4;
-    return (fmt_type) ((ars.Types & (0xfull << shift)) >> shift);
-}
-
-fmt_arg get_arg(fmt_args ars, s64 index) {
-    if (index >= ars.Count) return {};
-
-    if (!(ars.Types & IS_UNPACKED_BIT)) {
-        if (index > MAX_PACKED_ARGS) return {};
-
-        auto type = get_type(ars, index);
-        if (type == fmt_type::NONE) return {};
-
-        fmt_arg result;
-        result.Type  = type;
-        result.Value = ((fmt_value *) ars.Data)[index];
-        return result;
-    }
-    return ((fmt_arg *) ars.Data)[index];
-}
-
 struct width_checker {
     fmt_context *F;
 
@@ -239,15 +219,15 @@ struct width_checker {
     u32 operator()(T value) {
         if constexpr (types::is_integral<T>) {
             if (sign_bit(value)) {
-                F->on_error("Negative width");
+                on_error(F, "Negative width");
                 return (u32) -1;
             } else if ((u64) value > numeric_info<s32>::max()) {
-                F->on_error("Width value is too big");
+                on_error(F, "Width value is too big");
                 return (u32) -1;
             }
             return (u32) value;
         } else {
-            F->on_error("Width was not an integer");
+            on_error(F, "Width was not an integer");
             return (u32) -1;
         }
     }
@@ -260,26 +240,26 @@ struct precision_checker {
     s32 operator()(T value) {
         if constexpr (types::is_integral<T>) {
             if (sign_bit(value)) {
-                F->on_error("Negative precision");
+                on_error(F, "Negative precision");
                 return -1;
             } else if ((u64) value > numeric_info<s32>::max()) {
-                F->on_error("Precision value is too big");
+                on_error(F, "Precision value is too big");
                 return -1;
             }
             return (s32) value;
         } else {
-            F->on_error("Precision was not an integer");
+            on_error(F, "Precision was not an integer");
             return -1;
         }
     }
 };
 
 fmt_arg fmt_get_arg_from_index(fmt_context *f, s64 index) {
-    if (index < f->Args.Count) {
-        return get_arg(f->Args, index);
+    if (index >= f->Args.Count) {
+        on_error(f, "Argument index out of range");
+        return {};
     }
-    f->on_error("Argument index out of range");
-    return {};
+    return f->Args[index];
 }
 
 bool fmt_handle_dynamic_specs(fmt_context *f) {
@@ -288,14 +268,14 @@ bool fmt_handle_dynamic_specs(fmt_context *f) {
     if (f->Specs->WidthIndex != -1) {
         auto width = fmt_get_arg_from_index(f, f->Specs->WidthIndex);
         if (width.Type != fmt_type::NONE) {
-            f->Specs->Width = fmt_visit_fmt_arg(width_checker{f}, width);
+            f->Specs->Width = fmt_visit_arg(width_checker{f}, width);
             if (f->Specs->Width == (u32) -1) return false;
         }
     }
     if (f->Specs->PrecisionIndex != -1) {
         auto precision = fmt_get_arg_from_index(f, f->Specs->PrecisionIndex);
         if (precision.Type != fmt_type::NONE) {
-            f->Specs->Precision = fmt_visit_fmt_arg(precision_checker{f}, precision);
+            f->Specs->Precision = fmt_visit_arg(precision_checker{f}, precision);
             if (f->Specs->Precision == numeric_info<s32>::min()) return false;
         }
     }
@@ -304,22 +284,22 @@ bool fmt_handle_dynamic_specs(fmt_context *f) {
 }
 
 void fmt_parse_and_format(fmt_context *f) {
-    fmt_parse_context *p = &f->Parse;
+    fmt_interp *p = &f->Parse;
 
     auto write_until = [&](const char *end) {
         if (!p->It.Count) return;
         while (true) {
             auto searchString = string(p->It.Data, end - p->It.Data);
 
-            s64 bracket = find_cp(searchString, '}');
+            s64 bracket = string_find(searchString, '}');
             if (bracket == -1) {
                 write_no_specs(f, p->It.Data, end - p->It.Data);
                 return;
             }
 
-            auto *pbracket = utf8_get_cp_at_index_unsafe(searchString.Data, bracket);
+            auto *pbracket = utf8_get_pointer_to_cp_at_translated_index(searchString.Data, searchString.Count, bracket);
             if (*(pbracket + 1) != '}') {
-                f->on_error("Unmatched \"}\" in format string - if you want to print it use \"}}\" to escape", pbracket - f->Parse.FormatString.Data);
+                on_error(f, "Unmatched \"}\" in format string - if you want to print it use \"}}\" to escape", pbracket - f->Parse.FormatString.Data);
                 return;
             }
 
@@ -331,23 +311,23 @@ void fmt_parse_and_format(fmt_context *f) {
         }
     };
 
-    fmt_arg<fmt_context> currentArg;
+    fmt_arg currentArg;
 
     while (p->It.Count) {
-        s64 bracket = find_cp(p->It, '{');
+        s64 bracket = string_find(p->It, '{');
         if (bracket == -1) {
             write_until(p->It.Data + p->It.Count);
             return;
         }
 
-        auto *pbracket = utf8_get_cp_at_index_unsafe(p->It.Data, bracket);
+        auto *pbracket = utf8_get_pointer_to_cp_at_translated_index(p->It.Data, p->It.Count, bracket);
         write_until(pbracket);
 
         s64 advance = pbracket + 1 - p->It.Data;
         p->It.Data += advance, p->It.Count -= advance;
 
         if (!p->It.Count) {
-            f->on_error("Invalid format string");
+            on_error(f, "Invalid format string");
             return;
         }
         if (p->It[0] == '}') {
@@ -355,7 +335,7 @@ void fmt_parse_and_format(fmt_context *f) {
             currentArg = fmt_get_arg_from_index(f, p->next_arg_id());
             if (currentArg.Type == fmt_type::NONE) return;  // The error was reported in _f->get_arg_from_ref_
 
-            fmt_visit_fmt_arg(fmt_context_visitor(f), currentArg);
+            fmt_visit_arg(fmt_context_visitor(f), currentArg);
         } else if (p->It[0] == '{') {
             // {{ means we escaped a {.
             write_until(p->It.Data + 1);
@@ -365,12 +345,12 @@ void fmt_parse_and_format(fmt_context *f) {
             auto [success, style] = fmt_parse_text_style(p);
             if (!success) return;
             if (!p->It.Count || p->It[0] != '}') {
-                f->on_error("\"}\" expected");
+                on_error(f, "\"}\" expected");
                 return;
             }
 
             if (!Context.FmtDisableAnsiCodes) {
-                utf8 ansiBuffer[7 + 3 * 4 + 1];
+                char ansiBuffer[7 + 3 * 4 + 1];
                 auto *ansiEnd = color_to_ansi(ansiBuffer, style);
                 write_no_specs(f, ansiBuffer, ansiEnd - ansiBuffer);
 
@@ -389,9 +369,9 @@ void fmt_parse_and_format(fmt_context *f) {
             currentArg = fmt_get_arg_from_index(f, argId);
             if (currentArg.Type == fmt_type::NONE) return;  // The error was reported in _f->get_arg_from_ref_
 
-            utf8 c = p->It.Count ? p->It[0] : 0;
+            code_point c = p->It.Count ? p->It[0] : 0;
             if (c == '}') {
-                fmt_visit_fmt_arg(fmt_context_visitor(f), currentArg);
+                fmt_visit_arg(fmt_context_visitor(f), currentArg);
             } else if (c == ':') {
                 ++p->It.Data, --p->It.Count;  // Skip the :
 
@@ -399,7 +379,7 @@ void fmt_parse_and_format(fmt_context *f) {
                 bool success            = fmt_parse_specs(p, currentArg.Type, &specs);
                 if (!success) return;
                 if (!p->It.Count || p->It[0] != '}') {
-                    f->on_error("\"}\" expected");
+                    on_error(f, "\"}\" expected");
                     return;
                 }
 
@@ -407,11 +387,11 @@ void fmt_parse_and_format(fmt_context *f) {
                 success  = fmt_handle_dynamic_specs(f);
                 if (!success) return;
 
-                fmt_visit_fmt_arg(fmt_context_visitor(f), currentArg);
+                fmt_visit_arg(fmt_context_visitor(f), currentArg);
 
                 f->Specs = null;
             } else {
-                f->on_error("\"}\" expected");
+                on_error(f, "\"}\" expected");
                 return;
             }
         }
@@ -421,9 +401,11 @@ void fmt_parse_and_format(fmt_context *f) {
 
 template <typename... Args>
 void fmt_to_writer(writer *out, string fmtString, Args &&...arguments) {
-    // @TODO: Can we remove this? (the fmt_context{})
-    auto args = fmt_args_on_the_stack(fmt_context{}, ((types::remove_reference_t<Args> &&) arguments)...);  // This needs to outlive _parse_fmt_string_
-    auto f    = fmt_context(out, fmtString, args);
+    static constexpr s64 NUM_ARGS = sizeof...(Args);
+    stack_array<fmt_arg, NUM_ARGS> args;
+
+    args   = {fmt_make_arg(arguments)...};
+    auto f = fmt_context(out, fmtString, args);
 
     fmt_parse_and_format(&f);
     f.flush();
@@ -438,11 +420,14 @@ s64 fmt_calculate_length(string fmtString, Args &&...arguments) {
 
 template <typename... Args>
 [[nodiscard("Leak")]] string sprint(string fmtString, Args &&...arguments) {
-    auto writer = string_builder_writer();
+    string_builder b;
+
+    string_builder_writer writer;
+    writer.Builder = &b;
     fmt_to_writer(&writer, fmtString, ((Args &&) arguments)...);
 
-    string combined = string_builder_combine(writer.Builder);
-    free(writer);
+    string combined = builder_to_string(&b);
+    free_buffers(&b);
 
     return combined;
 }
@@ -469,8 +454,8 @@ void print(string fmtString, Args &&...arguments) {
 
 template <>
 struct formatter<string_builder> {
-    void format(const string_builder &src, fmt_context *f) {
-        auto *buffer = &src.BaseBuffer;
+    void format(fmt_context *f, string_builder *b) {
+        auto *buffer = &b->BaseBuffer;
         while (buffer) {
             write_no_specs(f, buffer->Data, buffer->Occupied);
             buffer = buffer->Next;
@@ -493,7 +478,7 @@ struct formatter<string_builder> {
 // The default format is the same as 'd'.
 template <>
 struct formatter<guid> {
-    void format(const guid &src, fmt_context *f) {
+    void format(fmt_context *f, guid *g) {
         char type = 'd';
         if (f->Specs) {
             type = f->Specs->Type;
@@ -503,7 +488,7 @@ struct formatter<guid> {
         type       = (char) to_lower(type);
 
         if (type != 'n' && type != 'd' && type != 'b' && type != 'p' && type != 'x') {
-            f->on_error("Invalid type specifier for a guid", f->Parse.It.Data - f->Parse.FormatString.Data - 1);
+            on_error(f, "Invalid type specifier for a guid", f->Parse.It.Data - f->Parse.FormatString.Data - 1);
             return;
         }
 
@@ -522,7 +507,7 @@ struct formatter<guid> {
             auto *old = f->Specs;
             f->Specs  = null;
 
-            u8 *p = (u8 *) src.Data.Data;
+            u8 *p = (u8 *) g->Data.Data;
             if (upper) {
                 fmt_to_writer(f, "{{{:#04X}{:02X}{:02X}{:02X},{:#04X}{:02X},{:#04X}{:02X},{{{:#04X},{:#04X},{:#04X},{:#04X},{:#04X},{:#04X},{:#04X},{:#04X}}}}}", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], p[16]);
             } else {
@@ -538,7 +523,7 @@ struct formatter<guid> {
         auto *old = f->Specs;
         f->Specs  = null;
 
-        const byte *p = src.Data.Data;
+        const byte *p = g->Data.Data;
         For(range(16)) {
             if (hyphen && (it == 4 || it == 6 || it == 8 || it == 10)) {
                 write_no_specs(f, (code_point) '-');
@@ -559,14 +544,16 @@ struct formatter<guid> {
 // Formatts array in the following way: [1, 2, ...]
 template <typename T>
 struct formatter<array<T>> {
-    void format(const array<T> &src, fmt_context *f) { format_list(f).entries(src.Data, src.Count)->finish(); }
+    void format(fmt_context *f, array<T> *a) { format_list(f).entries(a->Data, a->Count)->finish(); }
 };
 
 // Formatts stack array in the following way: [1, 2, ...]
 template <typename T, s64 N>
 struct formatter<stack_array<T, N>> {
-    void format(const stack_array<T, N> &src, fmt_context *f) { format_list(f).entries(src.Data, src.Count)->finish(); }
+    void format(fmt_context *f, stack_array<T, N> *a) { format_list(f).entries(a->Data, a->Count)->finish(); }
 };
+
+// @TODO: Formatter for hash table
 
 //
 // Formatters for math types:
@@ -665,36 +652,45 @@ struct formatter<tquat<T, Packed>> {
 };
 */
 
-export static void fmt_default_parse_error_handler(string message, string formatString, s64 position) {
+export void fmt_default_parse_error_handler(string message, string formatString, s64 position) {
     // An error during formatting occured.
     // If you are running a debugger it has now hit a breakpoint.
     //
-    // You can replace this error handler in the Context.
-    // e.g. a less invasive one :D
-    //
+    // You can replace this error handler in the Context with a less critical one.
+
+    string str = clone(formatString);
+    defer(free(str.Data));
 
     // Make escape characters appear as they would in a string literal
-    string str = formatString;
-    string_replace_all(str, '\"', "\\\"");
-    string_replace_all(str, '\\', "\\\\");
-    string_replace_all(str, '\a', "\\a");
-    string_replace_all(str, '\b', "\\b");
-    string_replace_all(str, '\f', "\\f");
-    string_replace_all(str, '\n', "\\n");
-    string_replace_all(str, '\r', "\\r");
-    string_replace_all(str, '\t', "\\t");
-    string_replace_all(str, '\v', "\\v");
+    replace_all(&str, '\"', "\\\"");
+    replace_all(&str, '\\', "\\\\");
+    replace_all(&str, '\a', "\\a");
+    replace_all(&str, '\b', "\\b");
+    replace_all(&str, '\f', "\\f");
+    replace_all(&str, '\n', "\\n");
+    replace_all(&str, '\r', "\\r");
+    replace_all(&str, '\t', "\\t");
+    replace_all(&str, '\v', "\\v");
+
+    string_builder b;
+    defer(free_buffers(&b));
 
     string_builder_writer output;
+    output.Builder = &b;
+
     fmt_to_writer(&output, "\n\n>>> {!GRAY}An error during formatting occured: {!YELLOW}{}{!GRAY}\n", message);
     fmt_to_writer(&output, "    ... the error happened here:\n");
     fmt_to_writer(&output, "        {!}{}{!GRAY}\n", str);
     fmt_to_writer(&output, "        {: >{}} {!} \n\n", "^", position + 1);
-#if defined NDEBUG
-    Context.PanicHandler(string_builder_combine(output.Builder), {});
-#else
-    print("{}", string_builder_combine(output.Builder));
 
+    string info = builder_to_string(&b);
+    defer(free(info.Data));
+
+    print("{}", info);
+
+#if defined NDEBUG
+    panic("Error in the lstd.fmt module");
+#else
     // More info has been printed to the console but here's the error message:
     auto errorMessage = message;
     assert(false);

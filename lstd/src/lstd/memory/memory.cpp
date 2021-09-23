@@ -1,18 +1,8 @@
-#include "../io.h"
+#include "../common.h"
 
-import lstd.context;
-import lstd.memory;
+import lstd.basic;
 import lstd.path;
 import lstd.fmt;
-import lstd.os;
-
-#if defined BRACE_B
-#error ""
-#endif
-
-#if defined BRACE_A
-#error ""
-#endif
 
 LSTD_BEGIN_NAMESPACE
 
@@ -103,7 +93,8 @@ constexpr string get_short_file_name(string str) {
 }
 
 void debug_memory::report_leaks() {
-    thread::scoped_lock<thread::mutex> _(&Mutex);
+    lock(&Mutex);
+    defer(unlock(&Mutex));
 
     // First we check their integrity of the heap
     maybe_verify_heap();
@@ -122,7 +113,7 @@ void debug_memory::report_leaks() {
     }
 
     // @Cleanup @Platform @TODO @Memory Don't use the platform allocator. In the future we should have a seperate allocator for debug info.
-    leaks = malloc<allocation_header *>({.Count = leaksCount, .Alloc = internal::platform_get_persistent_allocator()});
+    leaks = malloc<allocation_header *>({.Count = leaksCount, .Alloc = platform_get_persistent_allocator()});
     defer(free(leaks));
 
     leaksID = ((allocation_header *) leaks - 1)->ID;
@@ -205,12 +196,12 @@ file_scope void verify_header_unlocked(allocation_header *header) {
 
 void debug_memory::verify_header(allocation_header *header) {
     // We need to lock here because another thread can free a header while we are reading from it.
-    thread::scoped_lock<thread::mutex> _(&Mutex);
+    lock(&Mutex);
     verify_header_unlocked(header);
+    unlock(&Mutex);
 }
 
 void debug_memory::maybe_verify_heap() {
-    // We need to lock here because another thread can free a header while we are reading from it.
     if (AllocationCount % MemoryVerifyHeapFrequency) return;
 
     auto *it = Head;
@@ -286,7 +277,7 @@ file_scope void log_file_and_line(source_location loc) {
     write(Context.Log, loc.File);
     write(Context.Log, ":");
 
-    utf8 number[20];
+    char number[20];
 
     auto line = loc.Line;
 
@@ -299,7 +290,7 @@ file_scope void log_file_and_line(source_location loc) {
             ++numberSize;
         }
     }
-    write(Context.Log, (const byte *) numberP + 1, numberSize);
+    write(Context.Log, numberP + 1, numberSize);
 }
 
 void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options, source_location loc) {
@@ -318,9 +309,9 @@ void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options
     s64 id = -1;
 
     if (DEBUG_memory) {
-        thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
-
+        lock(&DEBUG_memory->Mutex);
         DEBUG_memory->maybe_verify_heap();
+        unlock(&DEBUG_memory->Mutex);
 
         id = DEBUG_memory->AllocationCount;
     }
@@ -361,9 +352,9 @@ void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options
     header->FileLine = loc.Line;
 
     if (DEBUG_memory) {
-        thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
-
+        lock(&DEBUG_memory->Mutex);
         DEBUG_memory->add_header(header);
+        unlock(&DEBUG_memory->Mutex);
     }
 #endif
 
@@ -379,9 +370,9 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
 
 #if defined DEBUG_MEMORY
     if (DEBUG_memory) {
-        thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
-
+        lock(&DEBUG_memory->Mutex);
         DEBUG_memory->maybe_verify_heap();
+        unlock(&DEBUG_memory->Mutex);
     }
 
     auto id = header->ID;
@@ -435,9 +426,9 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
         newHeader->RID = header->RID + 1;
 
         if (DEBUG_memory) {
-            thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
-
+            lock(&DEBUG_memory->Mutex);
             DEBUG_memory->swap_header(header, newHeader);
+            unlock(&DEBUG_memory->Mutex);
         }
 
         fill_memory(block, DEAD_LAND_FILL, oldSize);
@@ -496,9 +487,9 @@ void general_free(void *ptr, u64 options) {
 
 #if defined DEBUG_MEMORY
     if (DEBUG_memory) {
-        thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
-
+        lock(&DEBUG_memory->Mutex);
         DEBUG_memory->maybe_verify_heap();
+        unlock(&DEBUG_memory->Mutex);
     }
 
     auto id = header->ID;
@@ -506,9 +497,9 @@ void general_free(void *ptr, u64 options) {
     size += NO_MANS_LAND_SIZE;
 
     if (DEBUG_memory) {
-        thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
-
+        lock(&DEBUG_memory->Mutex);
         DEBUG_memory->unlink_header(header);
+        unlock(&DEBUG_memory->Mutex);
     }
 
     fill_memory(block, DEAD_LAND_FILL, size);
@@ -520,7 +511,8 @@ void general_free(void *ptr, u64 options) {
 void free_all(allocator alloc, u64 options) {
 #if defined DEBUG_MEMORY
     if (DEBUG_memory) {
-        thread::scoped_lock<thread::mutex> _(&DEBUG_memory->Mutex);
+        lock(&DEBUG_memory->Mutex);
+        defer(unlock(&DEBUG_memory->Mutex));
 
         // Remove allocations made with the allocator from the the linked list so we don't corrupt the heap
         auto *h = DEBUG_memory->Head;

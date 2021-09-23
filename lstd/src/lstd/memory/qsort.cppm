@@ -69,10 +69,6 @@ export {
     }
 }
 
-LSTD_END_NAMESPACE
-module : private;
-LSTD_BEGIN_NAMESPACE
-
 // Swaps the elements of two arrays.
 //
 // The length of the swap is determined by the value of "SIZE".  While both

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "lstd/types.h"
-
 LSTD_BEGIN_NAMESPACE
 
 enum class gtype {

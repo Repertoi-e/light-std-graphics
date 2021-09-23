@@ -19,7 +19,7 @@
 #include "lstd/math/vec.h"
 #include "lstd/memory/stack_array.h"
 #include "lstd/memory/string.h"
-#include "lstd_platform/windows_no_crt/common_functions.h"
+#include "lstd/platform/windows_no_crt/common_functions.h"
 
 //
 // Stuff we modified in the source code is marked with :WEMODIFIEDIMGUI:

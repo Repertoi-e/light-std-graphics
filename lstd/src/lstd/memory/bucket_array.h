@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../common/context.h"
+#include "../common.h"
 
 LSTD_BEGIN_NAMESPACE
 
