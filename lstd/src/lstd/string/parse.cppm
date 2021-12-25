@@ -57,6 +57,7 @@ export {
 
     // Unsafe, doesn't check bounds
     void advance_cp(string * p, s64 count) {
+        assert(count > 0);
         while (count--) {
             s64 c = utf8_get_size_of_cp(p->Data);
             p->Data += c;
@@ -382,15 +383,15 @@ export {
 
         if constexpr (Options.ParseWords) {
             if (p[0] == 't') {
-                parse_status status = expect_sequence<Options.ParseWordsIgnoreCase>(&p, (string) "true");
+                bool status = expect_sequence<Options.ParseWordsIgnoreCase>(&p, (string) "true");
                 if (!status) return FAIL;
                 return SUCCESS(true);
             }
 
             if (p[0] == 'f') {
-                parse_status status = expect_sequence<Options.ParseWordsIgnoreCase>(&p, (string) "false");
+                bool status = expect_sequence<Options.ParseWordsIgnoreCase>(&p, (string) "false");
                 if (!status) return FAIL;
-                return SUCCESS(true);
+                return SUCCESS(false);
             }
         }
         return FAIL;
@@ -462,7 +463,7 @@ export {
                     return FAIL;
                 }
 
-                parse_status status;
+                bool status;
 
                 auto *resultBuffer = &result.Data[0];
 
@@ -472,8 +473,8 @@ export {
         if (!status) return FAIL;                \
         *resultBuffer++ = value;                 \
     }
-#define EXPECT_SEQUENCE(sequence)                          \
-    status = expect_sequence<true>(&p, (string) sequence); \
+#define EXPECT_SEQUENCE(sequence)                         \
+    status = expect_sequence<true>(&p, string(sequence)); \
     if (!status) return FAIL;
 
                 EXPECT_SEQUENCE("0x");

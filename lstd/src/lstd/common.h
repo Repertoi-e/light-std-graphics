@@ -6,7 +6,7 @@
 //     definitions for the macros: assert, defer, For, For_enumerate ...
 //     static_for, range,
 // Also:
-//     copy_memory (memcpy), copy_elements, fill_memory (memset), zero_memory
+//     copy_memory (memcpy), copy_memory_const, fill_memory (memset), zero_memory
 //
 //
 
@@ -15,6 +15,7 @@
 #include "common/context.h"
 #include "common/debug_break.h"
 #include "common/defer_assert_for.h"
+#include "common/fmt.h"
 #include "common/math.h"
 #include "common/memory.h"
 #include "common/namespace.h"
@@ -63,7 +64,7 @@ LSTD_BEGIN_NAMESPACE
 
 // Loop that gets unrolled at compile-time
 template <s64 First, s64 Last, typename Lambda>
-void static_for(Lambda &&f) {
+void static_for(Lambda ref f) {
     if constexpr (First < Last) {
         f(types::integral_constant<s64, First>{});
         static_for<First + 1, Last>(f);
@@ -97,7 +98,7 @@ void static_for(Lambda &&f) {
 //     After that you can modify them (add/remove elements etc.)
 //
 //     You can safely pass around copies and return arrays from functions because
-//     there is no hidden destructor which will free your memory.
+//     there is no hidden destructor which will free the memory.
 //
 //     When a dynamic array is no longer needed call    free(arr.Data);
 //
@@ -109,7 +110,7 @@ void static_for(Lambda &&f) {
 //
 //     All of this allows to skip writing copy/move constructors/assignment operators.
 //
-// _string_ is just array<u8>. All of this applies to them as well.
+// _string_s are just array<char>. All of this applies to them as well.
 // They are not null-terminated, which means that taking substrings doesn't allocate memory.
 //
 //
@@ -140,23 +141,106 @@ constexpr void swap(T (&a)[N], T (&b)[N]) {
 }
 
 //
-// copy_memory, fill_memory, compare_memory and SSE optimized implementations when on x86 architecture
-// (implemenations in memory/memory.cpp)
+// Optimized implementations of copy_memory, fill_memory, compare_memory even on Debug.
+// See context/internal.cpp
+//
+// SSE implementations are available when on x86 architecture.
 //
 
+extern void *(*copy_memory_fast)(void *dst, const void *src, u64 size);
+
 template <typename T>
-void copy_elements(T *dst, auto *src, s64 n) {
-    For(range(n)) *dst++ = *src++;
+constexpr T *copy_elements(T *dst, auto *src, s64 n) {
+    assert(sizeof(*dst) == sizeof(*src));
+
+    u64 to   = (u64) dst / sizeof(*dst);
+    u64 from = (u64) src / sizeof(*src);
+
+    if (to > from && (s64) (to - from) < n) {
+        // If overlapping in this way:
+        //   [from......]
+        //         [to........]
+        // copy in reverse.
+        For(range(n - 1, -1, -1)) dst[it] = src[it];
+    } else {
+        // Otherwise copy forwards..
+        For(range(n)) dst[it] = src[it];
+    }
+    return dst;
 }
 
-extern void *(*copy_memory)(void *dst, const void *src, u64 size);
-extern void *(*fill_memory)(void *dst, char value, u64 size);
-inline void *zero_memory(void *dst, u64 size) { return fill_memory(dst, 0, size); }
+template <typename T>
+constexpr T *copy_memory(T *dst, auto *src, s64 bytes) {
+    // This applies to runtime code.
+    // Because is_constant_evaluated() is not if constexpr, code in that branch
+    // still tries to compile (even though it may never run in constexpr), which
+    // causes errors when trying to do sizeof(void)... so we have to impose
+    // this limitation to all callers.
+    static_assert(!types::is_same<T, void>, "C++ doesn't allow type pruning in constexpr context. Call with char* instead of void* to fix this.");
+    // You can also call copy_memory_fast to bypass casting...
+
+    if (is_constant_evaluated()) {
+        return copy_elements(dst, src, bytes / sizeof(T));
+    } else {
+        return (T *) copy_memory_fast(dst, src, bytes);
+    }
+}
+
+extern void *(*fill_memory_fast)(void *dst, char value, u64 size);
 
 template <typename T>
-constexpr s32 compare_memory(const T *s1, const T *s2, s64 n) {
-    For(range(n)) if (*s1 != *s2) return *s1 - *s2;
+constexpr T *fill_elements(T *dst, T value, u64 n) {
+    For(range(n)) {
+        dst[it] = value;
+    }
+    return dst;
+}
+
+constexpr char *fill_memory(char *dst, char value, u64 bytes) {
+    if (is_constant_evaluated()) {
+        return fill_elements(dst, value, bytes);
+    } else {
+        return (char *) fill_memory_fast(dst, value, bytes);
+    }
+}
+
+// Constexpr doesn't work with void* ...
+inline void *fill_memory(void *dst, char value, u64 bytes) { return fill_memory_fast(dst, value, bytes); }
+
+constexpr char *zero_memory(char *dst, u64 n) { return fill_memory(dst, 0, n); }
+
+// Constexpr doesn't work with void* ...
+inline void *zero_memory(void *dst, u64 n) { return fill_memory(dst, 0, n); }
+
+extern s32 (*compare_memory_fast)(const void *s1, const void *s2, u64 size);
+
+template <typename T>
+constexpr s32 compare_elements(const T *s1, const T *s2, s64 n) {
+    For(range(n)) {
+        if (*s1 != *s2) return *s1 - *s2;
+        ++s1, ++s2;
+    }
     return 0;
+}
+
+template <typename T>
+constexpr s32 compare_memory(const T *s1, const T *s2, s64 bytes) {
+    // This applies to runtime code.
+    // Because is_constant_evaluated() is not if constexpr, code in that branch
+    // still tries to compile (even though it may never run in constexpr), which
+    // causes errors when trying to do sizeof(void)... so we have to impose
+    // this limitation to all callers.
+    static_assert(!types::is_same<T, void>, "C++ doesn't allow type pruning in constexpr context. Call with char* instead of void* to fix this.");
+    // You can also call compare_memory_fast to bypass casting...
+
+    if (is_constant_evaluated() && !types::is_same<T, void>) {
+        return compare_elements(s1, s2, bytes / sizeof(T));
+    } else {
+        // If constexpr fails here, don't use void* for s1 and s2.
+        // C++ doesn't allow type pruning in constexpr context...
+
+        return compare_memory_fast(s1, s2, bytes);
+    }
 }
 
 LSTD_END_NAMESPACE

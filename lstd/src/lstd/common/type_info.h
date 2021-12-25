@@ -125,6 +125,9 @@ struct same_helper<T, T> : true_t {
 template <typename T, typename U>
 concept is_same = same_helper<T, U>::value;
 
+template <typename T, typename... Types>
+concept is_same_to_one_of = (is_same<T, Types> || ...);
+
 //
 // Checks if two types are the same, regardless of their template parameters.
 // Doesn't work if you mix types and typenames...
@@ -931,9 +934,9 @@ constexpr DestType bit_cast(const SourceType &sourceValue) {
         return u.destValue;
     } else {
         DestType destValue;
-        if constexpr (is_constant_evaluated()) {
+        if (is_constant_evaluated()) {
             // Too bad.. undefined behavior. I hate C++.
-            // const_copy_memory(&destValue, &sourceValue, sizeof(DestType));
+            const_copy_memory(&destValue, &sourceValue, sizeof(DestType));
         } else {
             copy_memory(&destValue, &sourceValue, sizeof(DestType));
         }

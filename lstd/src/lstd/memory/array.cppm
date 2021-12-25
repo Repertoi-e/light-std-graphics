@@ -61,9 +61,15 @@ export {
         constexpr array() {}
         constexpr array(T *data, s64 count) : Data(data), Count(count) {}
 
-        // We allow converting from const char * (we treat it as a c-style string)
-        constexpr array(const char *data) : Data((char *) data), Count(c_string_length(data)) {}
-        constexpr array(const char *data, s64 n) : Data((char *) data), Count(n) {}
+        // We allow converting from c-style strings (char* or char8_t*)
+        constexpr array(any_c_string_one_byte auto data) : Data((char *) data), Count(c_string_length(data)) {
+            static_assert(types::is_same<T, char>, "Converting c-style string to an array of type that isn't a string");
+        }
+
+        // Take data + size
+        constexpr array(any_c_string_one_byte auto data, s64 n) : Data((char *) data), Count(n) {
+            static_assert(types::is_same<T, char>, "Converting c-style string to an array of type that isn't a string");
+        }
 
         constexpr array(const initializer_list<T> &items) {
             // A bug caused by this bit me hard...
@@ -73,7 +79,7 @@ export {
         }
 
         constexpr auto operator[](s64 index) { return get_operator_square_brackets(this, index); }
-        constexpr operator bool() { return Count; }  // To check if empty
+        constexpr explicit operator bool() { return Count; }  // To check if empty
     };
 
     template <typename T>
@@ -173,23 +179,25 @@ export {
     // Removes all occurences of a subarray from an array.
     void remove_all(any_array auto *arr, any_array auto search) { replace_all(arr, search, {}); }
 
+    constexpr bool operator==(any_array auto a, any_array auto b) { return compare(a, b) == -1; }
+
     // Returns a deep copy of _src_
     auto clone(any_array auto src, allocator alloc = {}) {
         decltype(src) result;
         make_dynamic(&result, src.Count, alloc);
-        add(&result, src);
+        add_array(&result, src);
         return result;
     }
 }
 
 void make_dynamic(any_array auto *arr, s64 n, allocator alloc) {
-    auto *oldData = arr->Data;
-
     using T = types::remove_pointer_t<decltype(arr->Data)>;
+
+    auto *oldData = arr->Data;
 
     // If alloc is null we use the Context's allocator
     arr->Data = malloc<T>({.Count = n, .Alloc = alloc});
-    if (arr->Count) copy_elements(arr->Data, oldData, arr->Count);
+    if (arr->Count) copy_memory(arr->Data, oldData, arr->Count * sizeof(T));
 }
 
 // @Cleanup Decide if we want to store an _Allocated_ in the array object itself.
@@ -203,7 +211,16 @@ s64 get_allocated(any_array auto arr) {
 
 bool is_dynamically_allocated(any_array auto *arr) {
 #if defined DEBUG_MEMORY
-// @TODO: Do work
+    //
+    // Attempting to modify an array view...
+    // Data wasn't dynamically allocated.
+    //
+    // Make sure you call make_dynamic(arr) beforehand.
+    //
+    // Attempting to modify an array from another thread...
+    // Caution! This container is not thread-safe!
+    //
+    assert(debug_memory_list_contains((allocation_header *) arr->Data - 1));
 #endif
     return true;
 }
@@ -237,9 +254,9 @@ auto *insert_at_index(any_array auto *arr, s64 index, auto element) {
     s64 offset  = translate_index(index, arr->Count, true);
     auto *where = arr->Data + offset;
     if (offset < arr->Count) {
-        copy_elements(where + 1, where, arr->Count - offset);
+        copy_memory(where + 1, where, (arr->Count - offset) * sizeof(*where));
     }
-    copy_elements(where, &element, 1);
+    *where = element;
     ++arr->Count;
     return where;
 }
@@ -250,9 +267,9 @@ auto *insert_pointer_and_size_at_index(any_array auto *arr, s64 index, auto *ptr
     s64 offset  = translate_index(index, arr->Count, true);
     auto *where = arr->Data + offset;
     if (offset < arr->Count) {
-        copy_elements(where + size, where, arr->Count - offset);
+        copy_memory(where + size, where, (arr->Count - offset) * sizeof(*where));
     }
-    copy_elements(where, ptr, size);
+    copy_memory(where, ptr, size * sizeof(*where));
     arr->Count += size;
     return where;
 }
@@ -281,7 +298,7 @@ void remove_ordered_at_index(any_array auto *arr, s64 index) {
     s64 offset = translate_index(index, arr->Count);
 
     auto *where = arr->Data + offset;
-    copy_elements(where, where + 1, arr->Count - offset - 1);
+    copy_memory(where, where + 1, (arr->Count - offset - 1) * sizeof(*where));
     --arr->Count;
 }
 
@@ -309,7 +326,7 @@ void remove_range(any_array auto *arr, s64 begin, s64 end) {
     auto whereEnd = arr->Data + targetEnd;
 
     s64 elementCount = whereEnd - where;
-    copy_elements(where, whereEnd, arr->Count - targetBegin - elementCount);
+    copy_memory(where, whereEnd, (arr->Count - targetBegin - elementCount) * sizeof(*where));
     arr->Count -= elementCount;
 }
 
@@ -319,7 +336,6 @@ void replace_range(any_array auto *arr, s64 begin, s64 end, any_array auto repla
     s64 targetBegin = translate_index(begin, arr->Count);
     s64 targetEnd   = translate_index(end, arr->Count, true);
 
-    auto where    = arr->Data + targetBegin;
     s64 whereSize = targetEnd - targetBegin;
 
     s64 diff = replace.Count - whereSize;
@@ -328,11 +344,13 @@ void replace_range(any_array auto *arr, s64 begin, s64 end, any_array auto repla
         maybe_grow(arr, diff);
     }
 
+    auto where = arr->Data + targetBegin;
+
     // Make space for the new elements
-    copy_elements(where + replace.Count, where + whereSize, arr->Count - targetBegin - whereSize);
+    copy_memory(where + replace.Count, where + whereSize, (arr->Count - targetBegin - whereSize) * sizeof(*where));
 
     // Copy replace elements
-    copy_elements(where, replace.Data, replace.Count);
+    copy_memory(where, replace.Data, replace.Count * sizeof(*where));
 
     arr->Count += diff;
 }
@@ -358,12 +376,13 @@ void replace_all(any_array auto *arr, any_array auto search, any_array auto repl
                 auto *se = search.Data + search.Count;
                 while (n != e && sp != se) {
                     // Require only operator == to be defined (and not !=).
-                    if (!(*p == *sp)) break;
+                    if (!(*n == *sp)) break;
+                    ++n, ++sp;
                 }
 
                 if (sp == se) {
                     // Match found
-                    copy_elements(p, replace.Data, replace.Count);
+                    copy_memory(p, replace.Data, replace.Count * sizeof(*p));
                     p += replace.Count;
                 } else {
                     ++p;
