@@ -1,11 +1,8 @@
 #pragma once
 
-#include "lstd/math.h"
-#include "lstd/memory/signal.h"
-#include "lstd/memory/string.h"
 #include "window.h"
 
-LSTD_BEGIN_NAMESPACE
+import lstd.delegate;
 
 struct window;
 
@@ -39,6 +36,7 @@ struct display_mode {
     bool operator<(const display_mode &other) const { return compare_lexicographically(other) == -1; }
 };
 
+// These don't get created or freed but instead get managed by the platform layer.
 struct monitor {
     union platform_data {
         struct {
@@ -57,8 +55,8 @@ struct monitor {
     // Physical dimensions in millimeters
     s32 WidthMM = 0, HeightMM = 0;
 
-    // The handle to the window whose video mode is current on this monitor.
-    // By default it's an invalid handle.
+    // The handle to the window whose video mode is current on this monitor
+    // i.e. fullscreen. By default it's an invalid handle - if no window is fullscreen.
     window Window;
 
     array<display_mode> DisplayModes;
@@ -73,40 +71,39 @@ struct monitor_event {
     action Action;
 };
 
-// Connect a callback to this signal for monitor connect/disconnect events.
-inline signal<void(const monitor_event &)> g_MonitorEvent;
+// For monitor connect/disconnect events
+s64 monitor_connect_callback(delegate<void(monitor_event)> cb);
+bool monitor_disconnect_callback(s64 cb);
 
-display_mode os_get_current_display_mode(monitor *mon);
+display_mode monitor_get_current_display_mode(monitor *mon);
 
 // Work area is the screen excluding taskbar and other docked bars
-rect os_get_work_area(monitor *mon);
+rect get_work_area(monitor *mon);
 
-bool os_set_display_mode(monitor *mon, display_mode desired);
-void os_restore_display_mode(monitor *mon);
+bool set_display_mode(monitor *mon, display_mode desired);
+void restore_display_mode(monitor *mon);
 
-vec2<s32> os_get_monitor_pos(monitor *mon);
-v2 os_get_monitor_content_scale(monitor *mon);
+v2i get_pos(monitor *mon);
+v2 get_content_scale(monitor *mon);
 
-// You usually don't need to do this, but if for some reason _os_get_monitors()_ returns an empty array, call this.
+// You usually don't need to do this, but if for some reason _get_monitors()_ returns an empty array, call this.
 // Note: We register windows to receive notifications on device connected/disconnected, which means this will get
 // called automatically if your window is already running.
 // The problem described above might happen when initializing code.
 // @Cleanup: Figure this out!
-void os_poll_monitors();
+void poll_monitors();
 
 // Returns a pointer to the monitor which contains the window _win_.
 //
 // Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
-monitor *os_monitor_from_window(window win);
+monitor *monitor_from_window(window win);
 
 // Returns an array of all available monitors connected to the computer.
 //
 // Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
-array<monitor *> os_get_monitors();
+array<monitor *> get_monitors();
 
-// Returns os_get_monitors()[0]
+// Returns get_monitors()[0]
 //
 // Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
-monitor *os_get_primary_monitor();
-
-LSTD_END_NAMESPACE
+monitor *get_primary_monitor();

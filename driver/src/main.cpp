@@ -240,10 +240,10 @@ s32 main() {
     string windowTitle = "Calculator";
 
     auto windowFlags = window::SHOWN | window::RESIZABLE | window::VSYNC | window::FOCUS_ON_SHOW | window::CLOSE_ON_ALT_F4 | window::SCALE_TO_MONITOR;
-    m->MainWindow    = os_create_window(windowTitle, window::DONT_CARE, window::DONT_CARE, WindowWidth, WindowHeight, windowFlags);
+    m->MainWindow    = create_window(windowTitle, window::DONT_CARE, window::DONT_CARE, WindowWidth, WindowHeight, windowFlags);
 
-    auto icon = pixel_buffer("data/calc.png", false, pixel_format::RGBA);
-    array<pixel_buffer> icons;
+    auto icon = bitmap("data/calc.png", false, pixel_format::RGBA);
+    array<bitmap> icons;
     add(icons, icon);
     m->MainWindow.set_icon(icons);
     free(icons);
@@ -305,7 +305,7 @@ s32 main() {
             m->RequestReloadNextFrame = false;
         }
 
-        os_update_windows();
+        update_windows();
         if (m->MainWindow.is_destroying()) break;
 
         imgui_for_our_windows_new_frame();
@@ -433,20 +433,20 @@ file_scope void imgui_update_monitors() {
 
     platformIO.Monitors.resize(0);
 
-    os_poll_monitors();
-    For(os_get_monitors()) {
-        vec2<s32> pos    = os_get_monitor_pos(it);
-        auto displayMode = os_get_current_display_mode(it);
+    poll_monitors();
+    For(get_monitors()) {
+        v2i pos    = get_pos(it);
+        auto displayMode = monitor_get_current_display_mode(it);
 
         ImGuiPlatformMonitor monitor;
         monitor.MainPos  = ImVec2((f32) pos.x, (f32) pos.y);
         monitor.MainSize = ImVec2((f32) displayMode.Width, (f32) displayMode.Height);
 
-        rect workArea    = os_get_work_area(it);
+        rect workArea    = get_work_area(it);
         monitor.WorkPos  = ImVec2((f32) workArea.Top, (f32) workArea.Left);
         monitor.WorkSize = ImVec2((f32) workArea.width(), (f32) workArea.height());
 
-        v2 scale         = os_get_monitor_content_scale(it);
+        v2 scale         = get_content_scale(it);
         monitor.DpiScale = scale.x;
 
         platformIO.Monitors.push_back(monitor);
@@ -524,7 +524,7 @@ file_scope void imgui_init_photoshop_style() {
 }
 
 file_scope void init_imgui_for_our_windows(window mainWindow) {
-    // os_poll_monitors();  // @Cleanup: In the ideal case we shouldn't need this.
+    // poll_monitors();  // @Cleanup: In the ideal case we shouldn't need this.
 
     ImGui::CreateContext();
 
@@ -625,7 +625,7 @@ file_scope void init_imgui_for_our_windows(window mainWindow) {
             auto width  = (s32) viewport->Size.x;
             auto height = (s32) viewport->Size.y;
 
-            window win = os_create_window("", window::DONT_CARE, window::DONT_CARE, width, height, flags);
+            window win = create_window("", window::DONT_CARE, window::DONT_CARE, width, height, flags);
 
             auto *bd = (imgui_our_windows_data *) ImGui::GetIO().BackendPlatformUserData;
             auto *vd = malloc<imgui_our_windows_viewport_data>();
@@ -783,10 +783,10 @@ file_scope void imgui_for_our_windows_new_frame() {
 
     auto mainWindow = bd->Window;
 
-    vec2<s32> windowSize = mainWindow.get_size();
+    v2i windowSize = mainWindow.get_size();
     s32 w = windowSize.x, h = windowSize.y;
 
-    vec2<s32> frameBufferSize = mainWindow.get_framebuffer_size();
+    v2i frameBufferSize = mainWindow.get_framebuffer_size();
     io.DisplaySize            = ImVec2((f32) w, (f32) h);
     if (w > 0 && h > 0) io.DisplayFramebufferScale = ImVec2((f32) frameBufferSize.x / w, (f32) frameBufferSize.y / h);
 

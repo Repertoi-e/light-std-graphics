@@ -3,9 +3,8 @@
 /// Defines the graphics API that can be used to draw stuff on windows.
 /// Implementations of it can be switched dynamically.
 
+#include "../math.h"
 #include "../video/window.h"
-#include "lstd/math/rect.h"
-#include "lstd/math/vec.h"
 
 #if OS == WINDOWS
 struct ID3D11Device;
@@ -18,8 +17,6 @@ struct ID3D11Texture2D;
 struct ID3D11DepthStencilView;
 struct ID3D11RasterizerState;
 #endif
-
-LSTD_BEGIN_NAMESPACE
 
 // @AvoidInclude
 struct event;
@@ -38,7 +35,7 @@ enum class cull : u32 { None = 0,
                         Front,
                         Back };
 
-struct graphics : non_copyable, non_movable {
+struct graphics {
 #if OS == WINDOWS
     struct {
         ID3D11Device *Device               = null;
@@ -75,6 +72,7 @@ struct graphics : non_copyable, non_movable {
         } D3D{};
 #endif
     };
+
     array<target_window> TargetWindows;
     target_window *CurrentTargetWindow = null;
 
@@ -82,7 +80,7 @@ struct graphics : non_copyable, non_movable {
 
     graphics_api API = graphics_api::None;
 
-    graphics() {}
+    bool window_event_handler(const event &e);
 
     struct impl {
         void (*Init)(graphics *g) = null;
@@ -135,10 +133,5 @@ struct graphics : non_copyable, non_movable {
 
     void swap();
 
-    void release();
-
-   private:
-    bool window_event_handler(const event &e);
+    void free();
 };
-
-LSTD_END_NAMESPACE

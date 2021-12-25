@@ -16,8 +16,6 @@
 
 import lstd.os;
 
-LSTD_BEGIN_NAMESPACE
-
 // @TODO: These are so useful that we should include them in the API
 string utf16_to_utf8(const wchar *str, allocator alloc = {});
 
@@ -132,7 +130,7 @@ void d3d_init_target_window(graphics *g, graphics::target_window *targetWindow) 
     auto win = targetWindow->Window;
     assert(win);
 
-    vec2<s32> windowSize = win.get_size();
+    v2i windowSize = win.get_size();
 
     DXGI_SWAP_CHAIN_DESC desc;
     zero_memory(&desc, sizeof(desc));
@@ -142,7 +140,7 @@ void d3d_init_target_window(graphics *g, graphics::target_window *targetWindow) 
         desc.BufferDesc.Height = windowSize.y;
         desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         desc.BufferDesc.RefreshRate.Numerator =
-            win.get_flags() & window::VSYNC ? os_monitor_from_window(win)->CurrentMode.RefreshRate : 0;
+            win.get_flags() & window::VSYNC ? monitor_from_window(win)->CurrentMode.RefreshRate : 0;
         desc.BufferDesc.RefreshRate.Denominator = 1;
         desc.BufferDesc.ScanlineOrdering        = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
         desc.BufferDesc.Scaling                 = DXGI_MODE_SCALING_UNSPECIFIED;
@@ -339,7 +337,5 @@ graphics::impl g_D3DImpl = {d3d_init,
                             d3d_draw_indexed,
                             d3d_swap,
                             d3d_release};
-
-LSTD_END_NAMESPACE
 
 #endif

@@ -12,8 +12,6 @@
 #include "lstd_graphics/graphics/buffer.h"
 #include "lstd_graphics/graphics/shader.h"
 
-LSTD_BEGIN_NAMESPACE
-
 void d3d_buffer_init(buffer *b, const char *data) {
     if (b->Usage == buffer_usage::Immutable) {
         assert(data && "Immutable buffers must be created with initial data");
@@ -200,7 +198,5 @@ void d3d_buffer_release(buffer *b) {
 }
 
 buffer::impl g_D3DBufferImpl = {d3d_buffer_init, d3d_buffer_set_input_layout, d3d_buffer_map, d3d_buffer_unmap, d3d_buffer_bind, d3d_buffer_unbind, d3d_buffer_release};
-
-LSTD_END_NAMESPACE
 
 #endif

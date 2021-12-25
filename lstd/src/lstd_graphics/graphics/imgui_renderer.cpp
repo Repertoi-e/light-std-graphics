@@ -1,9 +1,7 @@
 #include "imgui_renderer.h"
 
-#include "../memory/pixel_buffer.h"
+#include "../graphics/bitmap.h"
 #include "../video/window.h"
-
-LSTD_BEGIN_NAMESPACE
 
 void imgui_renderer::init(graphics *g) {
     assert(!Graphics);
@@ -37,7 +35,7 @@ void imgui_renderer::init(graphics *g) {
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
     FontTexture.init(g, width, height);
-    FontTexture.set_data(pixel_buffer(pixels, width, height, pixel_format::RGBA));
+    FontTexture.set_data(bitmap(pixels, width, height, pixel_format::RGBA));
 
     io.Fonts->TexID = &FontTexture;
 }
@@ -141,5 +139,3 @@ void imgui_renderer::set_render_state() {
     IB.bind_ib();
     UB.bind_ub(shader_type::Vertex_Shader, 0);
 }
-
-LSTD_END_NAMESPACE

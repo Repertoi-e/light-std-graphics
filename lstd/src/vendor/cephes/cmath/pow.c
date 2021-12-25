@@ -363,10 +363,6 @@ extern double NAN;
 extern double NEGZERO;
 #endif
 
-#if COMPILER == MSVC
-#pragma function(pow)
-#endif
-
 double pow(x, y)
 double x, y; {
     double w, z, W, Wa, Wb, ya, yb, u;

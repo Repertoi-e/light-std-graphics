@@ -1,6 +1,20 @@
-#pragma once
+module;
 
 #include "../common.h"
+
+export module lstd.hash;
+
+//
+// !!! THESE ARE NOT SUPPOSED TO BE CRYPTOGRAPHICALLY SECURE !!!
+//
+// This header provides a way to hash any type.
+// If you want to implement a custom hash function for your type,
+// implement it in global namespace like this:
+//
+// LSTD_BEGIN_NAMESPACE
+// u64 get_hash(T value) { return ...; }
+// LSTD_END_NAMESPACE
+//
 
 LSTD_BEGIN_NAMESPACE
 
@@ -12,8 +26,7 @@ LSTD_BEGIN_NAMESPACE
 //    h.add(&value);
 //    ...
 //    u64 result = h.get_hash();
-// @Speed: Not so fast atm..
-
+//
 struct hasher {
     // Temporarily store up to 31 bytes between multiple add() calls
     static constexpr s64 MAX_BUFFER_SIZE = 31 + 1;
@@ -33,7 +46,7 @@ struct hasher {
         State[3] = seed - 11400714785074694791ULL;
     }
 
-    // @Speed: SIMD 
+    // @Speed: SIMD
     bool add(const char *data, s64 size) {
         if (!data) return false;
 
@@ -121,7 +134,6 @@ struct hasher {
         return result;
     }
 
-private:
     void process(const void *data) {
         auto *block = (const u64 *) data;
         State[0]    = rotate_left_64(State[0] + block[0] * 14029467366897019727ULL, 31) * 11400714785074694791ULL;
@@ -130,5 +142,48 @@ private:
         State[3]    = rotate_left_64(State[3] + block[3] * 14029467366897019727ULL, 31) * 11400714785074694791ULL;
     }
 };
+
+// Hash for any type.
+// Floats are handled here.
+// The output depends on the endianness of the machine.
+template <typename T>
+constexpr u64 get_hash(const T &value) {
+    hasher h(0);
+    h.add((const char *) &value, sizeof(T));
+    return h.hash();
+}
+
+// Partial specialization for pointers
+constexpr u64 get_hash(types::is_pointer auto value) { return (u64) value; }
+
+// @TODO: Hash for array_like
+
+// Partial specialization for arrays of known size
+template <types::is_array T>
+requires(types::is_array_of_known_bounds_v<T>) constexpr u64 get_hash(const T value) {
+    hasher h(0);
+    h.add((const char *) value, sizeof(types::remove_extent_t<T>) * types::extent_v<T>);
+    return h.hash();
+}
+
+// Hashes for integer types
+#define TRIVIAL_HASH(T) \
+    constexpr u64 get_hash(T value) { return (u64) value; }
+
+TRIVIAL_HASH(s8);
+TRIVIAL_HASH(u8);
+
+TRIVIAL_HASH(s16);
+TRIVIAL_HASH(u16);
+
+TRIVIAL_HASH(s32);
+TRIVIAL_HASH(u32);
+
+TRIVIAL_HASH(s64);
+TRIVIAL_HASH(u64);
+
+TRIVIAL_HASH(bool);
+
+#undef TRIVIAL_HASH
 
 LSTD_END_NAMESPACE

@@ -1,9 +1,6 @@
 #pragma once
 
-#include "../memory/pixel_buffer.h"
-#include "lstd/math.h"
-
-LSTD_BEGIN_NAMESPACE
+#include "../graphics/bitmap.h"
 
 enum os_cursor : u32 {
     OS_APPSTARTING,  // Standard arrow and small hourglass
@@ -29,19 +26,16 @@ enum os_cursor : u32 {
 struct cursor {
     union platform_data {
         struct {
-            void *hCursor = null;
+            void *hCursor      = null;
             bool ShouldDestroy = false;
         } Win32;
     } PlatformData{};
-
-    cursor() {}
-    cursor(const pixel_buffer &image, vec2<s32> hot);
-    cursor(os_cursor osCursor);
-
-    void release();
 
     // We keep track of created cursors in a linked list
     cursor *Next = null;
 };
 
-LSTD_END_NAMESPACE
+cursor make_cursor(bitmap *image, v2i hotSpot);
+cursor make_cursor(os_cursor osCursor);
+
+void free_cursor(cursor *c);

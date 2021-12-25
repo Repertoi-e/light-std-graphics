@@ -111,7 +111,7 @@ int nn; {
     }
 
     if (s > MAXLOG) {
-        mtherr("powi", 3);
+        mtherr("powi", OVERFLOW);
         y = INFINITY;
         goto done;
     }

@@ -6,8 +6,6 @@
 #include "shader.h"
 #include "texture.h"
 
-LSTD_BEGIN_NAMESPACE
-
 extern graphics::impl g_D3DImpl;  // Defined in d3d_api.cpp
 
 void graphics::init(graphics_api api) {
@@ -86,7 +84,7 @@ void graphics::set_custom_render_target(texture_2D *target) {
 
     set_cull_mode(CurrentTargetWindow->CullMode);
 
-    vec2<s32> size = CurrentTargetWindow->Window.get_size();
+    v2i size = CurrentTargetWindow->Window.get_size();
     if (target) size = {target->Width, target->Height};
     set_viewport({0, 0, size.x, size.y});
     set_scissor_rect({0, 0, size.x, size.y});
@@ -159,5 +157,3 @@ void graphics::release() {
     }
     free(TargetWindows);
 }
-
-LSTD_END_NAMESPACE

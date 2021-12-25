@@ -213,12 +213,6 @@ extern double NAN;
 extern double INFINITY;
 #endif
 
-#if COMPILER == MSVC
-#pragma function(sin)
-#pragma function(cos)
-#endif
-
-
 double sin(x)
 double x; {
     double y, z, zz;

@@ -22,7 +22,7 @@ void camera_reset_constants(camera *cam) {
 void camera_update(camera *cam) {
     auto win = Memory->MainWindow;
 
-    vec2<s32> mouse = win.get_cursor_pos();
+    v2i mouse = win.get_cursor_pos();
     v2 delta = {(f32) mouse.x - GraphState->LastMouse.x, (f32) mouse.y - GraphState->LastMouse.y};
     GraphState->LastMouse = mouse;
 

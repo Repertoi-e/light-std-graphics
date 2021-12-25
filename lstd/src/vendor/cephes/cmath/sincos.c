@@ -231,8 +231,6 @@ double floor(double);
 #else
 double floor();
 #endif
-
-
 /* Rename this so it doesn't surprise anyone else!
 int sincos(x, s, c, flg)
 double x;

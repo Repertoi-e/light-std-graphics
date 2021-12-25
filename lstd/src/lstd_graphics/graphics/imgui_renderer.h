@@ -6,8 +6,6 @@
 #include "texture.h"
 #include "vendor/imgui/imgui.h"
 
-LSTD_BEGIN_NAMESPACE
-
 struct imgui_renderer {
     graphics *Graphics = null;
 
@@ -25,5 +23,3 @@ struct imgui_renderer {
    private:
     void set_render_state();
 };
-
-LSTD_END_NAMESPACE

@@ -1,34 +1,28 @@
 #pragma once
 
 #include "gtype.h"
-#include "lstd/memory/string.h"
 
-#if OS == WINDOWS
-struct ID3D11Buffer;
-struct ID3D11InputLayout;
-#endif
+import "lstd.h";
 
-LSTD_BEGIN_NAMESPACE
-
-struct buffer_layout {
-    struct element {
-        string Name;
-        gtype Type = gtype::Unknown;
-        s64 SizeInBits = 0;
-        bool Normalized = false;
-        s64 Count = 0;
-        u32 AlignedByteOffset = 0;  // 1-bit values add 7 bits of packing for the next element
-    };
-
-    array<element> Elements;
-    s64 TotalSize = 0;  // Calculated in bytes (1-bit values add 7 bits of packing),
-                        // generally used internally to calculate the offset for the next element
-
-    void add(string name, gtype type, s64 count = 1, bool normalized = false);
-    void add_padding(s64 bytes);
-
-    void release() { free(Elements); }
+struct gbuffer_layout_element {
+    string Name;
+    gtype Type;
+    s64 SizeInBits;
+    bool Normalized;
+    s64 Count;
 };
+
+gbuffer_layout_element layout_element(string name, gtype type, s64 count = 1, bool normalized = false) {
+    assert(type != gtype::Unknown);
+    s64 sizeInBits = get_size_of_base_gtype_in_bits(type);
+
+    // e.g. F32_3x2 has 6 floats
+    count *= get_count_of_gtype(type);
+
+    return {name, get_scalar_gtype(type), sizeInBits, normalized, count};
+}
+
+gbuffer_layout_element layout_padding(s64 bytes) { return {"", gtype::Unknown, bytes * 8, false, 1}; }
 
 enum class primitive_topology { PointList = 0,
                                 LineList,
@@ -36,78 +30,95 @@ enum class primitive_topology { PointList = 0,
                                 TriangleList,
                                 TriangleStrip };
 
-enum class buffer_type {
+enum class gbuffer_type {
     None = 0,
+
     Vertex_Buffer,
     Index_Buffer,
-    Shader_Uniform_Buffer  // Used to pack shader data, "constant buffers" (dx), "uniform buffer objects" (gl), etc.
+
+    // Used to pack shader data, called "constant buffers" (DX) or "uniform buffer objects" (GL)
+    Shader_Uniform_Buffer
 };
 
-// This only makes sense when using DX, OpenGL doesn't support these options when binding a buffer
-enum class buffer_usage {
+// This only makes sense when using DX, GL doesn't support these options when binding a buffer
+enum class gbuffer_usage {
     Default,    // The buffer requires read and write access by the GPU
     Immutable,  // Cannot be modified after creation, so it must be created with initial data
     Dynamic,    // Can be written to by the CPU and read by the GPU
     Staging     // Supports data transfer (copy) from the GPU to the CPU
 };
 
-enum class buffer_map_access {
-    Read,                    // Buffer can only be read by the CPU
-    Write,                   // Buffer can only be written to by the CPU
-    Read_Write,              // Buffer can be read and written to by the CPU
-    Write_Discard_Previous,  // Previous contents of buffer may be discarded, and new buffer is opened for writing
-    Write_Unsynchronized     // An advanced option that allows you to add more data to the buffer even while the GPU is
-                             // using parts. However, you must not work with the parts the GPU is using.
+enum class gbuffer_map_access {
+    Read,        // Buffer can only be read by the CPU
+    Write,       // Buffer can only be written to by the CPU
+    Read_Write,  // Buffer can be read and written to by the CPU
+
+    // Previous contents of buffer may be discarded, and new buffer is opened for writing
+    Write_Discard_Previous,
+
+    // An advanced option that allows you to add more data to the buffer even while the GPU is
+    // using parts. However, you must not work with the parts the GPU is using.
+    Write_Unsynchronized
+
 };
 
 struct graphics;
 
-struct buffer : non_copyable, non_movable {
+struct ID3D11Buffer;
+struct ID3D11InputLayout;
+
+struct gbuffer {
 #if OS == WINDOWS
     struct {
-        ID3D11Buffer *Buffer = null;
+        ID3D11Buffer *Buffer      = null;
         ID3D11InputLayout *Layout = null;
 
-        // Based on the definition of _D3D11_MAPPED_SUBRESOURCE_
+        // Based on the definition of _D3D11_MAPPED_SUBRESOURCE_,
+        // we don't include DirectX headers here...
         char MappedData[POINTER_SIZE + sizeof(u32) + sizeof(u32)]{};
     } D3D{};
 #endif
 
     struct impl {
-        void (*Init)(buffer *b, const char *data) = null;
-        void (*SetInputLayout)(buffer *b, const buffer_layout &layout) = null;
+        void (*Init)(buffer *b, char *initialData);
+        void (*SetLayout)(buffer *b, array<buffer_layout_element> layout);
 
-        void *(*Map)(buffer *b, buffer_map_access access) = null;
-        void (*Unmap)(buffer *b) = null;
+        void *(*Map)(buffer *b, buffer_map_access access);
+        void (*Unmap)(buffer *b);
 
-        void (*Bind)(buffer *b, primitive_topology topology, u32 offset, u32 stride, shader_type shaderType, u32 position) = null;
-        void (*Unbind)(buffer *b) = null;
-        void (*Release)(buffer *b) = null;
-    } Impl{};
+        void (*Bind)(buffer *b, primitive_topology topology, u32 offset, u32 stride, shader_type shaderType, u32 position);
+        void (*Unbind)(buffer *b);
+        void (*Free)(buffer *b);
+    };
+    impl *Impl;
 
+    // The graphics object associated with this buffer
     graphics *Graphics = null;
 
-    buffer_type Type = buffer_type::None;
+    buffer_type Type   = buffer_type::None;
     buffer_usage Usage = buffer_usage::Default;
-    s64 Size = 0;
+
+    s64 Size   = 0;
     s64 Stride = 0;  // Determined by the buffer layout
-
-    buffer() {}
-
-    void init(graphics *g, buffer_type type, buffer_usage usage, s64 size, const char *data = null);
-
-    void set_input_layout(const buffer_layout &layout);
-
-    void *map(buffer_map_access access);
-    void unmap();
-
-    void bind_vb(primitive_topology topology, u32 offset = 0, u32 customStride = 0);
-    void bind_ib(u32 offset = 0);
-    void bind_ub(shader_type shaderType, u32 position);
-
-    void unbind();
-
-    void release();
 };
 
-LSTD_END_NAMESPACE
+void graphics_init_buffer(gbuffer *b, graphics *g, buffer_type type, buffer_usage usage, s64 size, char *initialData = null);
+
+gbuffer graphics_create_buffer(graphics *g, buffer_type type, buffer_usage usage, s64 size, char *initialData = null) {
+    gbuffer b;
+    graphics_init_buffer(&b, g, type, usage, size, initialData);
+    return b;
+}
+
+void set_layout(gbuffer *b, array<buffer_layout_element> layout);
+
+void *map(gbuffer *b, buffer_map_access access);
+void unmap(gbuffer *b);
+
+void bind_vb(gbuffer *b, primitive_topology topology, u32 offset = 0, u32 customStride = 0);
+void bind_ib(gbuffer *b, u32 offset = 0);
+void bind_ub(gbuffer *b, shader_type shaderType, u32 position);
+
+void unbind(gbuffer *b);
+
+void free_buffer(gbuffer *b);

@@ -13,8 +13,6 @@
 #include "lstd_graphics/graphics/texture.h"
 #include "lstd_graphics/memory/pixel_buffer.h"
 
-LSTD_BEGIN_NAMESPACE
-
 void d3d_texture_2D_init(texture_2D *t) {
     D3D11_TEXTURE2D_DESC textureDesc;
     zero_memory(&textureDesc, sizeof(textureDesc));
@@ -142,7 +140,5 @@ void d3d_texture_2D_release(texture_2D *t) {
 }
 
 texture_2D::impl g_D3DTexture2DImpl = {d3d_texture_2D_init, d3d_texture_2D_set_data, d3d_texture_2D_bind, d3d_texture_2D_unbind, d3d_texture_2D_release};
-
-LSTD_END_NAMESPACE
 
 #endif

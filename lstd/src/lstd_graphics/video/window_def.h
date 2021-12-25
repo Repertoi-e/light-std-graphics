@@ -1,11 +1,6 @@
 #pragma once
 
-#include "../memory/pixel_buffer.h"
 #include "cursor.h"
-#include "lstd/math.h"
-#include "lstd/memory/signal.h"
-
-LSTD_BEGIN_NAMESPACE
 
 //
 // @ThreadSafety.
@@ -75,8 +70,6 @@ struct window {
         CURSOR_DISABLED  // Hides and grabs the cursor, providing virtual and unlimited cursor movement.
     };
 
-    using event_signal_t = signal<bool(const event &), collector_while0<bool>>;
-
     // _ID_ is set to this when the window is not initialized/destroyed and no longer valid.
     static constexpr u32 INVALID_ID = (u32) -1;
 
@@ -86,11 +79,9 @@ struct window {
     // _ID_ is set to the platform specific handle (e.g. HWND for Windows).
     u64 ID = INVALID_ID;
 
-    window() {}
-
     // Use these routines to register callbacks in order to be notified about events.
     // See event.h
-    s64 connect_event(const event_signal_t::callback_t &sb);
+    s64 connect_event(delegate<bool(const event &)> sb);
     bool disconnect_event(s64 cb);
 
     // Use this to get all current flags and set options, see the enum _flags_ above.
@@ -109,24 +100,24 @@ struct window {
     // The pixels should be arranged canonically as sequential rows, starting from the top-left corner.
     //
     // We choose the icons with the closest sizes which we need.
-    void set_icon(array<pixel_buffer> icons);
+    void set_icon(array<bitmap> icons);
 
     void set_cursor(cursor *curs);
 
-    vec2<s32> get_cursor_pos() const;
-    void set_cursor_pos(vec2<s32> pos);
+    v2i get_cursor_pos() const;
+    void set_cursor_pos(v2i pos);
     void set_cursor_pos(s32 x, s32 y) { set_pos({x, y}); }
 
-    vec2<s32> get_pos() const;
-    void set_pos(vec2<s32> pos);
+    v2i get_pos() const;
+    void set_pos(v2i pos);
     void set_pos(s32 x, s32 y) { set_pos({x, y}); }
 
-    vec2<s32> get_size() const;
-    void set_size(vec2<s32> size);
+    v2i get_size() const;
+    void set_size(v2i size);
     void set_size(s32 width, s32 height) { set_size({width, height}); }
 
     // May not map 1:1 with window size (e.g. Retina display on Mac)
-    vec2<s32> get_framebuffer_size() const;
+    v2i get_framebuffer_size() const;
 
     // Gets the full area the window occupies (including title bar, borders, etc.),
     // relative to the window's position. So to get the absolute top-left corner
@@ -134,7 +125,7 @@ struct window {
     rect get_adjusted_bounds() const;
 
     // You can call these with _DONT_CARE_ to reset.
-    void set_size_limits(vec2<s32> minDimension, vec2<s32> maxDimension);
+    void set_size_limits(v2i minDimension, v2i maxDimension);
     void set_size_limits(s32 minWidth, s32 minHeight, s32 maxWidth, s32 maxHeight) {
         set_size_limits({minWidth, minHeight}, {maxWidth, maxHeight});
     }
@@ -185,16 +176,14 @@ struct window {
 // If the routine fails, the returned handle has value == window::INVALID_ID.
 //
 // You can check this with an if:
-//    e.g.     if (os_create_window(...)) {}
+//    e.g.     if (create_window(...)) {}
 //
 // You can use _DONT_CARE_ or _CENTERED_ for _x_ and _y_ if
 // you don't want to specify them explicitly.
-window os_create_window(string title, s32 x, s32 y, s32 width, s32 height, u32 flags);
+window create_window(string title, s32 x, s32 y, s32 width, s32 height, u32 flags);
 
 // Call in your main program loop. Handles messages for all windows.
-void os_update_windows();
+void update_windows();
 
 // Destroys the window
-void free(window win);
-
-LSTD_END_NAMESPACE
+void free_window(window win);

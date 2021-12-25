@@ -2,8 +2,6 @@
 
 #include "window_def.h"
 
-LSTD_BEGIN_NAMESPACE
-
 enum : u32 {
     Mouse_Button_Left   = 0,
     Mouse_Button_Right  = 1,
@@ -16,15 +14,15 @@ enum : u32 {
 
 // Convert a mouse button from it's name to code
 inline u32 mouse_button_code_from_name(string name) {
-    if (name == "Left") {
+    if (name == string("Left")) {
         return Mouse_Button_Left;
-    } else if (name == "Right") {
+    } else if (name == string("Right")) {
         return Mouse_Button_Right;
-    } else if (name == "Middle") {
+    } else if (name == string("Middle")) {
         return Mouse_Button_Middle;
-    } else if (name == "X1") {
+    } else if (name == string("X1")) {
         return Mouse_Button_X1;
-    } else if (name == "X2") {
+    } else if (name == string("X2")) {
         return Mouse_Button_X2;
     }
     assert(false);
@@ -290,5 +288,3 @@ struct event {
     // Gets temporarily allocated in the window procedure, the event doesn't own this.
     array<string> Paths;  // Only set on Window_Files_Dropped
 };
-
-LSTD_END_NAMESPACE

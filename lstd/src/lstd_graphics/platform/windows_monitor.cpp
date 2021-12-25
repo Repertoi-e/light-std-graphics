@@ -2,10 +2,10 @@
 
 #if OS == WINDOWS
 
-#include "lstd_platform/windows.h"
 #include "lstd/fmt/fmt.h"
 #include "lstd_graphics/video/monitor.h"
 #include "lstd_graphics/video/window.h"
+#include "lstd_platform/windows.h"
 
 import lstd.os;
 
@@ -36,8 +36,6 @@ typedef HRESULT(WINAPI *PFN_GetDpiForMonitor)(HMONITOR, MONITOR_DPI_TYPE, UINT *
 // ntdll.dll function pointer typedefs
 typedef LONG(WINAPI *PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW *, ULONG, ULONGLONG);
 #define RtlVerifyVersionInfo ntdll.RtlVerifyVersionInfo_
-
-LSTD_BEGIN_NAMESPACE
 
 struct {
     HINSTANCE hInstance;
@@ -77,11 +75,13 @@ BOOL is_windows_10_build_or_greater(WORD build) {
 
 file_scope array<monitor *> Monitors;
 file_scope DWORD ForegroundLockTimeout;
+// @ThreadSafety
+file_scope signal<void(monitor_event)> MonitorEvent;
 
 void win32_poll_monitors();
 
 void win32_monitor_uninit() {
-    g_MonitorEvent.release();
+    free_signal(&MonitorEvent);
 
     For(Monitors) {
         free(it->Name);
@@ -187,7 +187,7 @@ file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *di
         },
         (LPARAM) mon);
 
-    mon->CurrentMode = os_get_current_display_mode(mon);
+    mon->CurrentMode = monitor_get_current_display_mode(mon);
     return mon;
 }
 
@@ -204,7 +204,7 @@ file_scope void do_monitor_event(monitor *mon, monitor_event::action action, boo
         free(mon);
     }
 
-    g_MonitorEvent.emit({mon, action});
+    MonitorEvent.emit({mon, action});
 }
 
 // Splits a color depth into red, green and blue bit depths
@@ -218,7 +218,7 @@ file_scope void split_bpp(s32 bpp, s32 *red, s32 *green, s32 *blue) {
     if (delta == 2) *red = *red + 1;
 }
 
-display_mode os_get_current_display_mode(monitor *mon) {
+display_mode monitor_get_current_display_mode(monitor *mon) {
     DEVMODEW dm;
     zero_memory(&dm, sizeof(dm));
     dm.dmSize = sizeof(dm);
@@ -270,16 +270,19 @@ file_scope display_mode choose_video_mode(monitor *mon, display_mode desired) {
     return closest;
 }
 
-rect os_get_work_area(monitor *mon) {
+s64 monitor_connect_callback(delegate<void(monitor_event)> cb) { return connect(&MonitorEvent, cb); }
+bool monitor_disconnect_callback(s64 cb) { return disconenct(&MonitorEvent, cb); }
+
+rect get_work_area(monitor *mon) {
     MONITORINFO mi;
     mi.cbSize = sizeof(MONITORINFO);
     GetMonitorInfoW(mon->PlatformData.Win32.hMonitor, &mi);
     return {mi.rcWork.left, mi.rcWork.top, mi.rcWork.right - mi.rcWork.left, mi.rcWork.bottom - mi.rcWork.top};
 }
 
-bool os_set_display_mode(monitor *mon, display_mode desired) {
+bool set_display_mode(monitor *mon, display_mode desired) {
     display_mode best = choose_video_mode(mon, desired);
-    if (os_get_current_display_mode(mon) == best) return true;
+    if (monitor_get_current_display_mode(mon) == best) return true;
 
     DEVMODEW dm;
     zero_memory(&dm, sizeof(dm));
@@ -313,7 +316,7 @@ bool os_set_display_mode(monitor *mon, display_mode desired) {
     return true;
 }
 
-void os_restore_display_mode(monitor *mon) {
+void restore_display_mode(monitor *mon) {
     if (mon->PlatformData.Win32.ModeChanged) {
         ChangeDisplaySettingsExW(mon->PlatformData.Win32.AdapterName, null, null, CDS_FULLSCREEN, null);
         mon->PlatformData.Win32.ModeChanged = false;
@@ -361,7 +364,7 @@ file_scope void get_display_modes(array<display_mode> &modes, monitor *mon) {
 
     if (!modes.Count) {
         // Hack: Report the current mode if no valid modes were found
-        add(modes, os_get_current_display_mode(mon));
+        add(modes, monitor_get_current_display_mode(mon));
     }
 }
 
@@ -437,13 +440,13 @@ void win32_poll_monitors() {
     }
 }
 
-void os_poll_monitors() { win32_poll_monitors(); }
+void poll_monitors() { win32_poll_monitors(); }
 
-array<monitor *> os_get_monitors() { return Monitors; }
+array<monitor *> get_monitors() { return Monitors; }
 
-monitor *os_get_primary_monitor() { return Monitors[0]; }
+monitor *get_primary_monitor() { return Monitors[0]; }
 
-monitor *os_monitor_from_window(window win) {
+monitor *monitor_from_window(window win) {
     HMONITOR hMonitor = MonitorFromWindow((HWND) win.ID, MONITOR_DEFAULTTONEAREST);
 
     monitor *result = null;
@@ -457,7 +460,7 @@ monitor *os_monitor_from_window(window win) {
     return result;
 }
 
-vec2<s32> os_get_monitor_pos(monitor *mon) {
+v2i get_pos(monitor *mon) {
     DEVMODEW dm;
     zero_memory(&dm, sizeof(dm));
     dm.dmSize = sizeof(dm);
@@ -467,7 +470,7 @@ vec2<s32> os_get_monitor_pos(monitor *mon) {
     return {dm.DUMMYUNIONNAME.dmPosition.x, dm.DUMMYUNIONNAME.dmPosition.y};  // What's up with DUMMYUNIONNAME
 }
 
-v2 os_get_monitor_content_scale(monitor *mon) {
+v2 get_content_scale(monitor *mon) {
     HMONITOR handle = mon->PlatformData.Win32.hMonitor;
 
     u32 xdpi, ydpi;
@@ -481,7 +484,5 @@ v2 os_get_monitor_content_scale(monitor *mon) {
     }
     return {xdpi / (f32) USER_DEFAULT_SCREEN_DPI, ydpi / (f32) USER_DEFAULT_SCREEN_DPI};
 }
-
-LSTD_END_NAMESPACE
 
 #endif  // OS == WINDOWS

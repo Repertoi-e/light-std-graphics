@@ -9,7 +9,7 @@
 #include "tlsf.h"
 
 // :WEMODIFIED: We replaced printf with our print.
-#include <lstd/fmt/fmt.h>
+import lstd.fmt;
 using LSTD_NAMESPACE::print;
 
 #if defined(__cplusplus)
@@ -41,7 +41,7 @@ using LSTD_NAMESPACE::print;
 ** architecture. There is no reliable portable method at compile-time.
 */
 #if defined (__alpha__) || defined (__ia64__) || defined (__x86_64__) \
-	|| defined (_win32) || defined (__LP64__) || defined (__LLP64__)
+	|| defined (_WIN64) || defined (__LP64__) || defined (__LLP64__)
 #define TLSF_64BIT
 #endif
 
@@ -1220,7 +1220,7 @@ void* tlsf_resize(tlsf_t tlsf, void* ptr, u64 size)
 	control_t* control = tlsf_cast(control_t*, tlsf);
 	void* p = 0;
 	
-	// :WEMODIFIED: We handle these edges cases in the realloc() function.
+	// :WEMODIFIED: We handle these edges cases in the reallocate_array function.
 	/* Zero-size requests are treated as free. */
 	// if (ptr && size == 0)
 	// {
@@ -1248,7 +1248,7 @@ void* tlsf_resize(tlsf_t tlsf, void* ptr, u64 size)
 		* ...
 		** Because in our memory model, we require allocators to implement a
 		** resize function which fails if there is not enough space and returns null.
-		** The realloc() function handles allocating a new block and all that jazz.
+		** The reallocate_array function handles allocating a new block and all that jazz.
 		*/
 		if (adjust > cursize && (!block_is_free(next) || adjust > combined))
 		{

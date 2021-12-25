@@ -1,10 +1,11 @@
 module;
 
-#include "hash.h"
+#include "../common.h"
 
 export module lstd.hash_table;
 
-import lstd.memory;
+export import lstd.memory;
+export import lstd.hash;
 
 LSTD_BEGIN_NAMESPACE
 

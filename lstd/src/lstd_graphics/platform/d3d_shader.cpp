@@ -13,8 +13,6 @@
 #include "lstd_graphics/graphics/api.h"
 #include "lstd_graphics/graphics/shader.h"
 
-LSTD_BEGIN_NAMESPACE
-
 static ID3DBlob *compile_shader(string source, const char *profile, const char *main) {
     ID3DBlob *shaderBlob = null, *errorBlob = null;
     DX_CHECK(D3DCompile(source.Data, source.Count, null, null, null, main, profile, D3DCOMPILE_DEBUG, 0, &shaderBlob, &errorBlob));
@@ -185,7 +183,5 @@ void d3d_shader_release(shader *s) {
 }
 
 shader::impl g_D3DShaderImpl = {d3d_shader_init, d3d_shader_bind, d3d_shader_unbind, d3d_shader_release};
-
-LSTD_END_NAMESPACE
 
 #endif

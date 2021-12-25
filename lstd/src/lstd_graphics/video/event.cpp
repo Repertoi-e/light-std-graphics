@@ -1,7 +1,5 @@
 #include "event.h"
 
-LSTD_BEGIN_NAMESPACE
-
 // Copyright 2019 Dietrich Epp.
 // This file is licensed under the terms of the MIT license.
 // https://github.com/depp/keycode
@@ -84,5 +82,3 @@ string key_name_from_code(u32 code) {
     if (off == 0) return "";
     return string(KEY_ID_DATA + off);
 }
-
-LSTD_END_NAMESPACE

@@ -1,8 +1,8 @@
 #pragma once
 
-LSTD_BEGIN_NAMESPACE
+#include <lstd/common.h>
 
-enum class gtype {
+enum class gtype : u32 {
     Unknown = 0,
 
     BOOL,
@@ -106,7 +106,7 @@ enum class gtype {
     F32_1 = F32_1x1
 };
 
-// Returns the size of the scalar type, not the whole type, e.g. returns 32 on F32_4x4
+// Returns the base type, e.g. F32 for F32_4x4
 inline gtype get_scalar_gtype(gtype type) {
     u32 v = (u32) type;
     if (v >= (u32) gtype::BOOL_1x1 && v <= (u32) gtype::BOOL_4x4) return gtype::BOOL;
@@ -117,6 +117,7 @@ inline gtype get_scalar_gtype(gtype type) {
 }
 
 inline s64 get_size_of_base_gtype_in_bits(gtype type) {
+    type = get_scalar_gtype(type);
     if (type == gtype::BOOL) return 1;
     if (type == gtype::U8) return 8;
     if (type == gtype::S8) return 8;
@@ -205,5 +206,3 @@ inline s64 get_count_of_gtype(gtype type) {
 }
 
 enum class shader_type { None = 0, Vertex_Shader, Fragment_Shader };
-
-LSTD_END_NAMESPACE

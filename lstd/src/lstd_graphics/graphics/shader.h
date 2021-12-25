@@ -8,8 +8,6 @@ struct ID3D11VertexShader;
 struct ID3D11PixelShader;
 #endif
 
-LSTD_BEGIN_NAMESPACE
-
 struct graphics;
 
 // Holds both a vertex and a pixel shader (those are the two shader types we support for now!)
@@ -68,4 +66,3 @@ struct shader : public asset, non_copyable, non_movable {
     void release();
 };
 
-LSTD_END_NAMESPACE

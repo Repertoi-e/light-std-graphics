@@ -42,7 +42,7 @@ function common_settings()
     -- defines { "LSTD_DONT_DEFINE_STD" }
 	
     -- Uncomment this to build the library without a namespace
-    -- defines { "LSTD_NO_NAMESPACE" }
+    defines { "LSTD_NO_NAMESPACE" }
     
     -- Uncomment this to use a custom namespace name for the library
     -- defines { "LSTD_NAMESPACE=my_lstd" }
@@ -112,7 +112,7 @@ project "lstd"
     kind "StaticLib"
 	
     -- These options control how much memory the platform allocators reserve upfront.
-    -- Increase this if you get platform warnings with the message "Not enough memory in the temporary/persistent allocator; expanding the pool".
+    -- Increase this if you get platform warnings with the message "Not enough memory in the temporary/persistent allocator".
     -- Decrease this if you want to tweak the memory footprint of your application.
     -- Note: Feel free to modify the library source code however you like. We just try to be as general as possible.
     --
@@ -120,7 +120,7 @@ project "lstd"
     --
     -- @TODO: Have a clearer picture on memory usage. Persisent storage size can be calculated. 
     --        Allow turning off certain options in order to make the persistent block smaller,
-    --        thus reducing the memory footprint of the library.
+    --        thus reducing the footprint of the library.
     defines { "PLATFORM_TEMPORARY_STORAGE_STARTING_SIZE=16_KiB", "PLATFORM_PERSISTENT_STORAGE_STARTING_SIZE=1_MiB" }
 	
 	files {

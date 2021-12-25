@@ -74,7 +74,7 @@ static const char *ermsg[7] = {
     "partial loss of precision"
 };
 
-// import lstd.fmt; // :WEMODIFIEDCEPHES: Instead of using printf
+// import fmt; // :WEMODIFIEDCEPHES: Instead of using printf
 
 int mtherr(char *name, int code) {
 
