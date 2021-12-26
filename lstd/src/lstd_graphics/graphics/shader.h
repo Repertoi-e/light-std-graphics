@@ -11,7 +11,7 @@ struct ID3D11PixelShader;
 struct graphics;
 
 // Holds both a vertex and a pixel shader (those are the two shader types we support for now!)
-struct shader : public asset, non_copyable, non_movable {
+struct shader : public asset {
 #if OS == WINDOWS
     struct {
         ID3D11VertexShader *VS = null;

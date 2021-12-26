@@ -1,4 +1,4 @@
-#include "pch.h"
+#include <driver.h>
 #include "state.h"
 
 void ui_main() {
@@ -98,7 +98,7 @@ string validate_and_parse_formula(function_entry *f) {
             return tokens.Error;
         }
 
-        validate_expression(tokens);
+        validate_expression(&tokens);
         if (tokens.Error) {
             return tokens.Error;
         }
@@ -107,7 +107,7 @@ string validate_and_parse_formula(function_entry *f) {
     tokens.It    = tokens.Tokens;  // Reset it
     tokens.Error = "";
 
-    ast *root = parse_expression(tokens);
+    ast *root = parse_expression(&tokens);
     assert(!tokens.Error);  // We should've caught that when validating, no?
 
     // Store the AST
@@ -132,7 +132,10 @@ void display_ast(ast *node) {
     } else if (node->Type == ast::TERM) {
         auto *var = (ast_term *) node;
 
+        string_builder b;
         string_builder_writer w;
+        w.Builder = &b;
+
         PUSH_ALLOC(TemporaryAllocator) {
             fmt_to_writer(&w, "{:g} ", var->Coeff);
             for (auto [k, v] : var->Letters) {
@@ -140,7 +143,7 @@ void display_ast(ast *node) {
             }
         }
 
-        auto *nodeTitle = mprint("TERM {}##{}", w.Builder, node->ImGuiID);
+        auto *nodeTitle = mprint("TERM {}##{}", b, node->ImGuiID);
         if (ImGui::TreeNode(nodeTitle)) {
             ImGui::TreePop();
         }
@@ -156,7 +159,7 @@ void determine_new_parameters(function_entry *f, hash_table<code_point, f64> old
     if (node->Type == ast::TERM) {
         for (auto [k, _] : ((ast_term *) node)->Letters) {
             if (*k != 'x') {  // @TODO
-                if (has(oldParams, *k)) {
+                if (has(&oldParams, *k)) {
                     *(f->Parameters[*k]) = *oldParams[*k];
                 } else {
                     *(f->Parameters[*k]) = 0.0;
@@ -171,28 +174,31 @@ void ui_functions() {
     {
         s64 indexToRemove = -1;
 
-        For_enumerate(GraphState->Functions) {
-            ImGui::PushID(it.ImGuiID);
+        // @Cleamup for_enumerate doesn't work for some reason
+        For_as(it_index, range(GraphState->Functions.Count)) {
+            auto *it = GraphState->Functions.Data + it_index;
 
-            ImGui::ColorEdit3("", &it.Color.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoAlpha);
+            ImGui::PushID(it->ImGuiID);
+
+            ImGui::ColorEdit3("", &it->Color.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoAlpha);
 
             ImGui::SameLine();
-            if (ImGui::InputText("", it.Formula, function_entry::FORMULA_INPUT_BUFFER_SIZE)) {
-                if (it.FormulaRoot) {
-                    free_ast(it.FormulaRoot);
-                    it.FormulaRoot = null;
+            if (ImGui::InputText("", it->Formula, function_entry::FORMULA_INPUT_BUFFER_SIZE)) {
+                if (it->FormulaRoot) {
+                    free_ast(it->FormulaRoot);
+                    it->FormulaRoot = null;
                 }
 
-                string error = validate_and_parse_formula(&it);
-                clone(&it.FormulaMessage, error);
+                string error = validate_and_parse_formula(it);
+                it->FormulaMessage = clone(error);
 
-                if (!it.FormulaMessage) {
+                if (!it->FormulaMessage) {
                     hash_table<code_point, f64> oldParams;
                     PUSH_ALLOC(TemporaryAllocator) {
-                        clone(&oldParams, it.Parameters);
+                        oldParams = clone(&it->Parameters);
                     }
-                    free(it.Parameters);
-                    determine_new_parameters(&it, oldParams, it.FormulaRoot);
+                    free_table(&it->Parameters);
+                    determine_new_parameters(it, oldParams, it->FormulaRoot);
                 }
             }
 
@@ -201,13 +207,13 @@ void ui_functions() {
                 indexToRemove = it_index;
             }
 
-            if (it.FormulaMessage) {
-                ImGui::Text(string_to_c_string_temp(it.FormulaMessage));
+            if (it->FormulaMessage) {
+                ImGui::Text(string_to_c_string(it->FormulaMessage, TemporaryAllocator));
             } else if (GraphState->DisplayAST) {
-                display_ast(it.FormulaRoot);
+                display_ast(it->FormulaRoot);
             }
 
-            for (auto [k, v] : it.Parameters) {
+            for (auto [k, v] : it->Parameters) {
                 f64 min = -30, max = 30;
                 ImGui::SliderScalar(mprint("{:c}", *k), ImGuiDataType_Double, v, &min, &max, "%.7f", ImGuiSliderFlags_NoRoundToFormat);
             }
@@ -216,12 +222,12 @@ void ui_functions() {
         }
 
         if (indexToRemove != -1) {
-            free(GraphState->Functions[indexToRemove]);
-            array_remove_at(GraphState->Functions, indexToRemove);
+            free_function_entry(GraphState->Functions.Data + indexToRemove);
+            remove_ordered_at_index(&GraphState->Functions, indexToRemove);
         }
 
         if (ImGui::Button("Add entry")) {
-            add(GraphState->Functions);
+            add(&GraphState->Functions, function_entry{});
         }
     }
     ImGui::End();

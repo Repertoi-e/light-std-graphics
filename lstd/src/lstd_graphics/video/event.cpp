@@ -42,12 +42,12 @@ u32 key_code_from_name(string name) {
     char buffer[14];
 
     s32 n;
-    for (n = 0; n < 14 && name.Length != n; ++n) {
+    for (n = 0; n < 14 && string_length(name) != n; ++n) {
         auto c = (char) name[n];
         if ('A' <= c && c <= 'Z') c |= 32;
         buffer[n] = c;
     }
-    if (name.Length != n) return 0;
+    if (string_length(name) != n) return 0;
 
     // Binary search in sorted list of identifiers
     s32 left = 0, right = sizeof(KEY_ID_ORDER) / sizeof(s32), center;

@@ -35,7 +35,7 @@ struct cursor {
     cursor *Next = null;
 };
 
-cursor make_cursor(bitmap *image, v2i hotSpot);
-cursor make_cursor(os_cursor osCursor);
+cursor *make_cursor(bitmap *image, int2 hotSpot);
+cursor *make_cursor(os_cursor osCursor);
 
 void free_cursor(cursor *c);

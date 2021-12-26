@@ -14,15 +14,15 @@ enum : u32 {
 
 // Convert a mouse button from it's name to code
 inline u32 mouse_button_code_from_name(string name) {
-    if (name == string("Left")) {
+    if (strings_match(name, "Left")) {
         return Mouse_Button_Left;
-    } else if (name == string("Right")) {
+    } else if (strings_match(name, "Right")) {
         return Mouse_Button_Right;
-    } else if (name == string("Middle")) {
+    } else if (strings_match(name, "Middle")) {
         return Mouse_Button_Middle;
-    } else if (name == string("X1")) {
+    } else if (strings_match(name, "X1")) {
         return Mouse_Button_X1;
-    } else if (name == string("X2")) {
+    } else if (strings_match(name, "X2")) {
         return Mouse_Button_X2;
     }
     assert(false);
@@ -255,7 +255,7 @@ struct event {
         u32 KeyCode;  // Only set on keyboard pressed/released/repeated events
     };
 
-    v2 Scale;  // Only set on Window_Content_Scale_Changed
+    float2 Scale;  // Only set on Window_Content_Scale_Changed
 
     union {
         bool DoubleClicked;  // Only set on Mouse_Button_Pressed

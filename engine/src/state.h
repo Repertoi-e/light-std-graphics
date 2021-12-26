@@ -12,9 +12,9 @@ struct camera {
     // We can do this because we know we are drawing a graph and not arbitrary geometry, which means we don't need all
     // the flexibility that a camera-view-matrix system provides us with.
     //
-    v2 Position;
+    float2 Position;
     // f32 Roll; Should we even support this?
-    v2 Scale;
+    float2 Scale;
 
     f32 PanSpeed;
     f32 ZoomSpeed;
@@ -42,7 +42,7 @@ struct function_entry {
 
     hash_table<char32_t, f64> Parameters;
 
-    v4 Color = {1.0, 0.2f, 0.3f, 0.8f};
+    float4 Color = {1.0, 0.2f, 0.3f, 0.8f};
 
     // @TODO:
     // - Domain
@@ -62,11 +62,11 @@ inline void free(function_entry &entry) {
 }
 
 struct graph_state {
-    v4 ClearColor = {0.92f, 0.92f, 0.92f, 1.0f};
+    float4 ClearColor = {0.92f, 0.92f, 0.92f, 1.0f};
     camera Camera;
 
-    v2 ViewportPos, ViewportSize;  // Set in viewport.cpp, needed to determine if mouse is in the viewport
-    v2 LastMouse;                  // Gets calculated in camera.cpp @Cleanup Use events?
+    float2 ViewportPos, ViewportSize;  // Set in viewport.cpp, needed to determine if mouse is in the viewport
+    float2 LastMouse;                  // Gets calculated in camera.cpp @Cleanup Use events?
 
     bool DisplayAST = false;
 
@@ -97,10 +97,10 @@ void render_viewport();
 
 inline graph_state *GraphState = null;
 
-inline bool point_in_rect(v2 p, v2 min, v2 max) { return p.x > min.x && p.y > min.y && p.x < max.x && p.y < max.y; }
+inline bool point_in_rect(float2 p, float2 min, float2 max) { return p.x > min.x && p.y > min.y && p.x < max.x && p.y < max.y; }
 
 inline bool mouse_in_viewport() {
-    v2 vpPos = GraphState->ViewportPos - (v2) Memory->MainWindow->get_pos();
-    v2 vpSize = GraphState->ViewportSize;
+    float2 vpPos = GraphState->ViewportPos - (float2) Memory->MainWindow->get_pos();
+    float2 vpSize = GraphState->ViewportSize;
     return point_in_rect(GraphState->LastMouse, vpPos, vpPos + vpSize);
 }

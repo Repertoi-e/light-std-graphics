@@ -2,6 +2,10 @@
 
 #if OS == WINDOWS
 
+#pragma warning(disable : 4005)
+#pragma warning(disable : 5105)
+#pragma warning(disable : 5106)
+
 #define LSTD_JUST_DX
 #include "lstd/platform/windows.h"
 #undef LSTD_JUST_DX
@@ -9,9 +13,10 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 
-#include "lstd/fmt/fmt.h"
 #include "lstd_graphics/graphics/api.h"
 #include "lstd_graphics/graphics/shader.h"
+
+import lstd.fmt;
 
 static ID3DBlob *compile_shader(string source, const char *profile, const char *main) {
     ID3DBlob *shaderBlob = null, *errorBlob = null;
@@ -25,20 +30,20 @@ static ID3DBlob *compile_shader(string source, const char *profile, const char *
 }
 
 static gtype string_to_gtype(string type) {
-    s64 digit = find_any_of(type, "0123456789");
+    s64 digit = string_find_any_of(type, "0123456789");
     if (digit != -1) {
-        s64 x             = find(type, 'x');
+        s64 x             = string_find(type, 'x');
         string scalarType = substring(type, 0, digit);
         s64 offset        = (type[digit] - '0' - 1) * 4 + (x == -1 ? 0 : type[x + 1] - '0' - 1);
-        if (scalarType == "bool") return (gtype) ((u32) gtype::BOOL_1x1 + offset);
-        if (scalarType == "int" || scalarType == "int32") return (gtype) ((u32) gtype::S32_1x1 + offset);
-        if (scalarType == "uint" || scalarType == "uint32" || scalarType == "dword") return (gtype) ((u32) gtype::U32_1x1 + offset);
-        if (scalarType == "float") return (gtype) ((u32) gtype::F32_1x1 + offset);
+        if (strings_match(scalarType, "bool")) return (gtype) ((u32) gtype::BOOL_1x1 + offset);
+        if (strings_match(scalarType, "int") || strings_match(scalarType, "int32")) return (gtype) ((u32) gtype::S32_1x1 + offset);
+        if (strings_match(scalarType, "uint") || strings_match(scalarType, "uint32") || strings_match(scalarType, "dword")) return (gtype) ((u32) gtype::U32_1x1 + offset);
+        if (strings_match(scalarType, "float")) return (gtype) ((u32) gtype::F32_1x1 + offset);
     } else {
-        if (type == "bool") return gtype::BOOL;
-        if (type == "int" || type == "int32") return gtype::S32;
-        if (type == "uint" || type == "uint32" || type == "dword") return gtype::U32;
-        if (type == "float") return gtype::F32;
+        if (strings_match(type, "bool")) return gtype::BOOL;
+        if (strings_match(type, "int") || strings_match(type, "int32")) return gtype::S32;
+        if (strings_match(type, "uint") || strings_match(type, "uint32") || strings_match(type, "dword")) return gtype::U32;
+        if (strings_match(type, "float")) return gtype::F32;
     }
     return gtype::Unknown;
 }

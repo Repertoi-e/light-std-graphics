@@ -4,8 +4,6 @@
 #error Error
 #endif
 
-#include <lstd/parse.h>
-
 import lstd.os;
 import lstd.fmt;
 import lstd.path;
@@ -28,7 +26,7 @@ main_window_event_func *MainWindowEvent = null;
 string DLLFile, BuildLockFile;
 
 file_scope void setup_paths() {
-    assert(DLLFileName != "");
+    assert(DLLFileName.Count);
 
     // This may be different from the working directory
     string exeDir = path_directory(os_get_current_module());
@@ -88,24 +86,26 @@ void imgui_for_our_windows_new_frame();
 // @TODO: Provide a library construct for parsing arguments automatically
 file_scope void parse_arguments() {
     array<string> usage;
-    add(usage, string("Usage:\n"));
-    add(usage,
-                 string("    {!YELLOW}-dll <name>{!GRAY}    "
-                        "Specifies which dll to hot load in the engine. By default it searches for cars.dll{!}\n\n"));
-    add(usage,
-                 string("    {!YELLOW}-memory <amount>{!GRAY}    "
-                        "Specifies the amount of memory (in MiB) which gets reserved for the app (default is 128 MiB)."
-                        "Usage must never cross this.{!}\n\n"));
-    add(usage,
-                 string("    {!YELLOW}-width <value>{!GRAY}    "
-                        "Specifies the width of the app window (default is 1200).{!}\n\n"));
-    add(usage,
-                 string("    {!YELLOW}-heigth <value>{!GRAY}    "
-                        "Specifies the height of the app window (default is 600).\n\n"));
-    add(usage,
-                 string("    {!YELLOW}-fps <value>{!GRAY}    "
-                        "Specifies the target fps (default is 60).\n\n"));
-    defer(free(usage));
+    make_dynamic(&usage, 8);
+
+    add(&usage, string("Usage:\n"));
+    add(&usage,
+        string("    {!YELLOW}-dll <name>{!GRAY}    "
+               "Specifies which dll to hot load in the engine. By default it searches for cars.dll{!}\n\n"));
+    add(&usage,
+        string("    {!YELLOW}-memory <amount>{!GRAY}    "
+               "Specifies the amount of memory (in MiB) which gets reserved for the app (default is 128 MiB)."
+               "Usage must never cross this.{!}\n\n"));
+    add(&usage,
+        string("    {!YELLOW}-width <value>{!GRAY}    "
+               "Specifies the width of the app window (default is 1200).{!}\n\n"));
+    add(&usage,
+        string("    {!YELLOW}-heigth <value>{!GRAY}    "
+               "Specifies the height of the app window (default is 600).\n\n"));
+    add(&usage,
+        string("    {!YELLOW}-fps <value>{!GRAY}    "
+               "Specifies the target fps (default is 60).\n\n"));
+    defer(free(usage.Data));
 
     bool seekFileName = false,
          seekMemory = false, seekWidth = false, seekHeight = false, seekFPS = false;
@@ -120,11 +120,9 @@ file_scope void parse_arguments() {
             auto [value, status, rest] = parse_int<u32, parse_int_options{.ParseSign = false, .LookForBasePrefix = true}>(it, 10);
 
             if (status == PARSE_INVALID) {
-                print(">>> {!RED}Invalid character encountered when parsing memory argument. The argument was: \"{}\"\n", it);
+                print(">>> {!RED}Couldn't parse memory value. The argument was: \"{}\"\n", it);
             } else if (status == PARSE_TOO_MANY_DIGITS) {
                 print(">>> {!RED}Memory value too big. The argument was: \"{}\"\n", it);
-            } else if (status == PARSE_EXHAUSTED) {
-                print(">>> {!RED}Couldn't parse memory value. The argument was: \"{}\"\n", it);
             } else {
                 MemoryInBytes = (s64) value * 1_MiB;
             }
@@ -135,11 +133,9 @@ file_scope void parse_arguments() {
             auto [value, status, rest] = parse_int<u32, parse_int_options{.ParseSign = false, .LookForBasePrefix = true}>(it, 10);
 
             if (status == PARSE_INVALID) {
-                print(">>> {!RED}Invalid character encountered when parsing memory argument. The argument was: \"{}\"\n", it);
+                print(">>> {!RED}Couldn't parse width value. The argument was: \"{}\"\n", it);
             } else if (status == PARSE_TOO_MANY_DIGITS) {
-                print(">>> {!RED}Memory value too big. The argument was: \"{}\"\n", it);
-            } else if (status == PARSE_EXHAUSTED) {
-                print(">>> {!RED}Couldn't parse memory value. The argument was: \"{}\"\n", it);
+                print(">>> {!RED}Width value too big. The argument was: \"{}\"\n", it);
             } else {
                 WindowWidth = value;
             }
@@ -150,11 +146,9 @@ file_scope void parse_arguments() {
             auto [value, status, rest] = parse_int<u32, parse_int_options{.ParseSign = false, .LookForBasePrefix = true}>(it, 10);
 
             if (status == PARSE_INVALID) {
-                print(">>> {!RED}Invalid character encountered when parsing memory argument. The argument was: \"{}\"\n", it);
+                print(">>> {!RED}Couldn't parse height value. The argument was: \"{}\"\n", it);
             } else if (status == PARSE_TOO_MANY_DIGITS) {
-                print(">>> {!RED}Memory value too big. The argument was: \"{}\"\n", it);
-            } else if (status == PARSE_EXHAUSTED) {
-                print(">>> {!RED}Couldn't parse memory value. The argument was: \"{}\"\n", it);
+                print(">>> {!RED}Height value too big. The argument was: \"{}\"\n", it);
             } else {
                 WindowHeight = value;
             }
@@ -165,26 +159,24 @@ file_scope void parse_arguments() {
             auto [value, status, rest] = parse_int<u32, parse_int_options{.ParseSign = false, .LookForBasePrefix = true}>(it, 10);
 
             if (status == PARSE_INVALID) {
-                print(">>> {!RED}Invalid character encountered when parsing memory argument. The argument was: \"{}\"\n", it);
+                print(">>> {!RED}Couldn't parse FPS value. The argument was: \"{}\"\n", it);
             } else if (status == PARSE_TOO_MANY_DIGITS) {
-                print(">>> {!RED}Memory value too big. The argument was: \"{}\"\n", it);
-            } else if (status == PARSE_EXHAUSTED) {
-                print(">>> {!RED}Couldn't parse memory value. The argument was: \"{}\"\n", it);
+                print(">>> {!RED}FPS value too big. The argument was: \"{}\"\n", it);
             } else {
                 TargetFPS = value;
             }
             seekFPS = false;
             continue;
         }
-        if (it == "-dll") {
+        if (strings_match(it, "-dll")) {
             seekFileName = true;
-        } else if (it == "-memory") {
+        } else if (strings_match(it, "-memory")) {
             seekMemory = true;
-        } else if (it == "-width") {
+        } else if (strings_match(it, "-width")) {
             seekWidth = true;
-        } else if (it == "-height") {
+        } else if (strings_match(it, "-height")) {
             seekHeight = true;
-        } else if (it == "-fps") {
+        } else if (strings_match(it, "-fps")) {
             seekFPS = true;
         } else {
             print(">>> {!RED}Encountered invalid argument (\"{}\").{!}\n", it);
@@ -216,9 +208,15 @@ file_scope void parse_arguments() {
 
 s32 main() {
     // We allocate all the state we need next to each other in order to reduce fragmentation.
-    auto [data, m, g, pool] = os_allocate_packed<tlsf_allocator_data, memory, graphics>(MemoryInBytes);
-    PersistentAlloc         = {tlsf_allocator, data};
-    allocator_add_pool(PersistentAlloc, pool, MemoryInBytes);
+    auto pack = os_allocate_packed<tlsf_allocator_data, memory, graphics>(MemoryInBytes);
+
+    auto data = tuple_get<0>(pack);
+    auto m    = tuple_get<1>(pack);
+    auto g    = tuple_get<2>(pack);
+    auto pool = tuple_get<3>(pack);
+
+    PersistentAlloc = {tlsf_allocator, data};
+    tlsf_allocator_add_pool(data, pool, MemoryInBytes);
 
     Memory   = m;
     Graphics = g;
@@ -230,7 +228,9 @@ s32 main() {
 
     m->PersistentAlloc = PersistentAlloc;
 
-    allocator_add_pool(TemporaryAllocator, os_allocate_block(1_MiB), 1_MiB);
+    TemporaryAllocatorData.Block = os_allocate_block(1_MiB);
+    TemporaryAllocatorData.Size  = 1_MiB;
+
     m->TemporaryAlloc = TemporaryAllocator;
 
     parse_arguments();
@@ -242,31 +242,38 @@ s32 main() {
     auto windowFlags = window::SHOWN | window::RESIZABLE | window::VSYNC | window::FOCUS_ON_SHOW | window::CLOSE_ON_ALT_F4 | window::SCALE_TO_MONITOR;
     m->MainWindow    = create_window(windowTitle, window::DONT_CARE, window::DONT_CARE, WindowWidth, WindowHeight, windowFlags);
 
-    auto icon = bitmap("data/calc.png", false, pixel_format::RGBA);
-    array<bitmap> icons;
-    add(icons, icon);
-    m->MainWindow.set_icon(icons);
-    free(icons);
+    auto icon = make_bitmap("data/calc.png", false, pixel_format::RGBA);
 
-    m->MainWindow.connect_event(delegate<bool(const event &e)>([](auto e) {
+    array<bitmap> icons;
+    make_dynamic(&icons, 1);
+
+    add(&icons, icon);
+    m->MainWindow.set_icon(icons);
+
+    free(icon.Pixels);
+    free(icons.Data);
+
+    m->MainWindow.connect_event(delegate<bool(event e)>([](auto e) {
         if (MainWindowEvent) return MainWindowEvent(e);
         return false;
     }));
 
     m->GetStateImpl = [](string name, s64 size, bool *created) {
         string identifier = name;
-        string_append(identifier, "Ident");
+        make_dynamic(&identifier, 5 + name.Count);
 
-        auto **found = find(Memory->States, identifier).Value;
+        string_append(&identifier, "Ident");
+
+        auto **found = find(&Memory->States, identifier).Value;
         if (!found) {
             // We allocate with alignment 16 because we use SIMD types
             void *result = malloc<char>({.Count = size, .Alignment = 16});
-            add(Memory->States, identifier, result);
+            add(&Memory->States, identifier, result);
             *created = true;
             return result;
         }
 
-        free(identifier);
+        free(identifier.Data);
         return *found;
     };
 
@@ -284,10 +291,10 @@ s32 main() {
 
     init_imgui_for_our_windows(m->MainWindow);
     m->ImGuiContext = ImGui::GetCurrentContext();
-    exit_schedule(delegate<void(void)>([]() {
-        ImGui::DestroyPlatformWindows();
-        ImGui::DestroyContext();
-    }));
+    // exit_schedule(delegate<void(void)>([]() {
+    //     ImGui::DestroyPlatformWindows();
+    //     ImGui::DestroyContext();
+    // }));
 
     // This state also needs to be shared
 #if defined DEBUG_MEMORY
@@ -354,8 +361,7 @@ struct imgui_our_windows_viewport_data {
 };
 
 // This can be global
-file_scope cursor MouseCursors[ImGuiMouseCursor_COUNT] = {
-    cursor(OS_ARROW), cursor(OS_IBEAM), cursor(OS_RESIZE_ALL), cursor(OS_RESIZE_NS), cursor(OS_RESIZE_WE), cursor(OS_RESIZE_NESW), cursor(OS_RESIZE_NWSE), cursor(OS_HAND)};
+file_scope cursor *MouseCursors[ImGuiMouseCursor_COUNT];
 
 file_scope void update_modifiers() {
     ImGuiIO &io = ImGui::GetIO();
@@ -371,7 +377,7 @@ file_scope void update_modifiers() {
 #endif
 }
 
-file_scope bool common_event_callback(const event &e) {
+file_scope bool common_event_callback(event e) {
     ImGuiIO &io = ImGui::GetIO();
     auto *bd    = (imgui_our_windows_data *) io.BackendPlatformUserData;
 
@@ -435,7 +441,7 @@ file_scope void imgui_update_monitors() {
 
     poll_monitors();
     For(get_monitors()) {
-        v2i pos    = get_pos(it);
+        int2 pos         = get_pos(it);
         auto displayMode = monitor_get_current_display_mode(it);
 
         ImGuiPlatformMonitor monitor;
@@ -443,10 +449,10 @@ file_scope void imgui_update_monitors() {
         monitor.MainSize = ImVec2((f32) displayMode.Width, (f32) displayMode.Height);
 
         rect workArea    = get_work_area(it);
-        monitor.WorkPos  = ImVec2((f32) workArea.Top, (f32) workArea.Left);
-        monitor.WorkSize = ImVec2((f32) workArea.width(), (f32) workArea.height());
+        monitor.WorkPos  = ImVec2((f32) workArea.top, (f32) workArea.left);
+        monitor.WorkSize = ImVec2((f32) (workArea.right - workArea.left), (f32) (workArea.bottom - workArea.top));
 
-        v2 scale         = get_content_scale(it);
+        float2 scale     = get_content_scale(it);
         monitor.DpiScale = scale.x;
 
         platformIO.Monitors.push_back(monitor);
@@ -540,6 +546,15 @@ file_scope void init_imgui_for_our_windows(window mainWindow) {
     io.BackendFlags |= ImGuiBackendFlags_PlatformHasViewports;  // We can create multi-viewports on the Platform side (optional)
     io.BackendFlags |= ImGuiBackendFlags_HasMouseHoveredViewport;
 
+    MouseCursors[0] = make_cursor(OS_ARROW);
+    MouseCursors[1] = make_cursor(OS_IBEAM);
+    MouseCursors[2] = make_cursor(OS_RESIZE_ALL);
+    MouseCursors[3] = make_cursor(OS_RESIZE_NS);
+    MouseCursors[4] = make_cursor(OS_RESIZE_WE);
+    MouseCursors[5] = make_cursor(OS_RESIZE_NESW);
+    MouseCursors[6] = make_cursor(OS_RESIZE_NWSE);
+    MouseCursors[7] = make_cursor(OS_HAND);
+
     bd->Window             = mainWindow;
     bd->WantUpdateMonitors = true;
 
@@ -570,7 +585,8 @@ file_scope void init_imgui_for_our_windows(window mainWindow) {
         // @TODO @Speed Make os_get_clipboard_content() ensure it is null terminated to avoid allocating. Similar to os_get_env.
 
         auto content = os_get_clipboard_content();
-        array_reserve(buffer, content.Count + 1);
+        resize(&buffer, content.Count + 1);
+
         copy_memory(buffer.Data, content.Data, content.Count);
         buffer.Count          = content.Count + 1;
         buffer[content.Count] = 0;
@@ -639,7 +655,7 @@ file_scope void init_imgui_for_our_windows(window mainWindow) {
             win.set_pos((s32) viewport->Pos.x, (s32) viewport->Pos.y);
 
             win.connect_event(common_event_callback);
-            win.connect_event(delegate<bool(const event &)>([](auto e) {
+            win.connect_event(delegate<bool(event)>([](auto e) {
                 ImGuiIO &io = ImGui::GetIO();
 
                 auto *viewport = ImGui::FindViewportByPlatformHandle((void *) e.Window.ID);
@@ -672,7 +688,7 @@ file_scope void init_imgui_for_our_windows(window mainWindow) {
                         }
                     }
                 }
-                free(vd->Window);
+                free_window(vd->Window);
                 free(vd);
             }
             viewport->PlatformHandle = viewport->PlatformUserData = null;
@@ -763,7 +779,7 @@ file_scope void init_imgui_for_our_windows(window mainWindow) {
         platformIO.Platform_SetImeInputPos = imgui_set_ime_pos;
 #endif
 
-        g_MonitorEvent.connect(delegate<void(const monitor_event &)>([](auto e) {
+        monitor_connect_callback(delegate<void(monitor_event)>([](auto e) {
             auto *bd = (imgui_our_windows_data *) ImGui::GetIO().BackendPlatformUserData;
 
             bd->WantUpdateMonitors = true;
@@ -783,11 +799,11 @@ file_scope void imgui_for_our_windows_new_frame() {
 
     auto mainWindow = bd->Window;
 
-    v2i windowSize = mainWindow.get_size();
+    int2 windowSize = mainWindow.get_size();
     s32 w = windowSize.x, h = windowSize.y;
 
-    v2i frameBufferSize = mainWindow.get_framebuffer_size();
-    io.DisplaySize            = ImVec2((f32) w, (f32) h);
+    int2 frameBufferSize = mainWindow.get_framebuffer_size();
+    io.DisplaySize       = ImVec2((f32) w, (f32) h);
     if (w > 0 && h > 0) io.DisplayFramebufferScale = ImVec2((f32) frameBufferSize.x / w, (f32) frameBufferSize.y / h);
 
     if (bd->WantUpdateMonitors) imgui_update_monitors();
@@ -857,7 +873,7 @@ file_scope void imgui_for_our_windows_new_frame() {
             win.set_cursor_mode(window::CURSOR_HIDDEN);
         } else {
             // Show OS mouse cursor
-            win.set_cursor(&MouseCursors[imguiCursor]);
+            win.set_cursor(MouseCursors[imguiCursor]);
             win.set_cursor_mode(window::CURSOR_NORMAL);
         }
     }

@@ -17,3 +17,5 @@
 #include "lstd/common.h"
 
 import lstd.basic;
+
+import "lstd/math/linalg.h";

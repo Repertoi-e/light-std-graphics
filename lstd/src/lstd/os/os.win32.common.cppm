@@ -321,6 +321,8 @@ export {
         parse_arguments();
 
         QueryPerformanceFrequency(&S->PerformanceFrequency);
+
+        make_dynamic(&S->ExitFunctions, 8, platform_get_persistent_allocator());
     }
 
     //
@@ -558,9 +560,10 @@ string os_read_from_console() {
     GetFileSizeEx(file, &size);
 
     string result;
-    resize(&result, size.QuadPart);
+    make_dynamic(&result, size.QuadPart);
+
     DWORD bytesRead;
-    if (!ReadFile(file, result.Data, (u32) size.QuadPart, &bytesRead, null)) return {{}, false};
+    if (!ReadFile(file, result.Data, (u32)size.QuadPart, &bytesRead, null)) return {{}, false};
     assert(size.QuadPart == bytesRead);
 
     result.Count = bytesRead;

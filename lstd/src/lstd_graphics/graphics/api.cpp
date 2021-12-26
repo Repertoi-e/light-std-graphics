@@ -2,7 +2,6 @@
 
 #include "../video/window.h"
 #include "buffer.h"
-#include "lstd/math.h"
 #include "shader.h"
 #include "texture.h"
 
@@ -17,8 +16,10 @@ void graphics::init(graphics_api api) {
     }
     Impl.Init(this);
 
+    make_dynamic(&TargetWindows, 8);
+
     auto predicate = [](auto x) { return !x.Window; };
-    if (find(TargetWindows, &predicate) == -1) add(TargetWindows);  // Add a null target
+    if (find(TargetWindows, &predicate) == -1) add(&TargetWindows, target_window{});  // Add a null target
     set_target_window({});
 }
 
@@ -32,7 +33,7 @@ void graphics::set_target_window(window win) {
 
     target_window *targetWindow;
     if (index == -1) {
-        targetWindow         = add(TargetWindows);
+        targetWindow         = add(&TargetWindows, target_window{});
         targetWindow->Window = win;
         if (win) {
             targetWindow->CallbackID = win.connect_event({this, &graphics::window_event_handler});
@@ -46,7 +47,7 @@ void graphics::set_target_window(window win) {
             window_event_handler(e);
         }
     } else {
-        targetWindow = &TargetWindows[index];
+        targetWindow = TargetWindows.Data + index;
     }
 
     CurrentTargetWindow = targetWindow;
@@ -84,10 +85,16 @@ void graphics::set_custom_render_target(texture_2D *target) {
 
     set_cull_mode(CurrentTargetWindow->CullMode);
 
-    v2i size = CurrentTargetWindow->Window.get_size();
+    int2 size = CurrentTargetWindow->Window.get_size();
     if (target) size = {target->Width, target->Height};
-    set_viewport({0, 0, size.x, size.y});
-    set_scissor_rect({0, 0, size.x, size.y});
+
+    rect r;
+    r.top = 0;
+    r.left = 0;
+    r.bottom = size.y;
+    r.right  = size.x;
+    set_viewport(r);
+    set_scissor_rect(r);
 }
 
 void graphics::set_blend(bool enabled) { Impl.SetBlend(this, enabled); }
@@ -100,7 +107,7 @@ void graphics::set_cull_mode(cull mode) {
     Impl.SetCullMode(this, mode);
 }
 
-void graphics::clear_color(v4 color) {
+void graphics::clear_color(float4 color) {
     assert(CurrentTargetWindow->Window);
     if (!CurrentTargetWindow->Window.is_visible()) return;
 
@@ -126,34 +133,33 @@ bool graphics::window_event_handler(const event &e) {
         s64 index      = find(TargetWindows, &predicate);
         assert(index != -1);
 
-        target_window *targetWindow = &TargetWindows[index];
+        target_window *targetWindow = TargetWindows.Data + index;
         targetWindow->Window.disconnect_event(targetWindow->CallbackID);
         Impl.ReleaseTargetWindow(this, targetWindow);
 
-        array_remove_at(TargetWindows, index);
+        remove_unordered_at_index(&TargetWindows, index);
     } else if (e.Type == event::Window_Resized) {
         auto predicate = [&](auto x) { return x.Window == e.Window; };
         s64 index      = find(TargetWindows, &predicate);
         assert(index != -1);
 
         if (!e.Window.is_visible()) return false;
-        Impl.TargetWindowResized(this, &TargetWindows[index], e.Width, e.Height);
+        Impl.TargetWindowResized(this, TargetWindows.Data + index, e.Width, e.Height);
     }
     return false;
 }
 
-void graphics::release() {
+void graphics::free() {
     if (Impl.Release) {
         Impl.Release(this);
         API = graphics_api::None;
     }
 
-    For_as(it_index, range(TargetWindows.Count)) {
-        auto *it = &TargetWindows[it_index];
-        if (it->Window) {
-            it->Window.disconnect_event(it->CallbackID);
-            Impl.ReleaseTargetWindow(this, it);
+    For(TargetWindows) {
+        if (it.Window) {
+            it.Window.disconnect_event(it.CallbackID);
+            Impl.ReleaseTargetWindow(this, &it);
         }
     }
-    free(TargetWindows);
+    ::free(TargetWindows.Data);
 }

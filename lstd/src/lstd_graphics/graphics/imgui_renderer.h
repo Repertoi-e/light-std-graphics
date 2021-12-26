@@ -9,7 +9,7 @@
 struct imgui_renderer {
     graphics *Graphics = null;
 
-    buffer VB, IB, UB;
+    gbuffer VB, IB, UB;
     texture_2D FontTexture;
     shader Shader;
     s64 VBSize = 0, IBSize = 0;

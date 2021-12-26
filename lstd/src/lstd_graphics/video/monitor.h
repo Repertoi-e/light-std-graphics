@@ -83,8 +83,8 @@ rect get_work_area(monitor *mon);
 bool set_display_mode(monitor *mon, display_mode desired);
 void restore_display_mode(monitor *mon);
 
-v2i get_pos(monitor *mon);
-v2 get_content_scale(monitor *mon);
+int2 get_pos(monitor *mon);
+float2 get_content_scale(monitor *mon);
 
 // You usually don't need to do this, but if for some reason _get_monitors()_ returns an empty array, call this.
 // Note: We register windows to receive notifications on device connected/disconnected, which means this will get

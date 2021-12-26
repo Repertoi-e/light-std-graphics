@@ -16,9 +16,7 @@
 
 #pragma once
 
-#include "lstd/math/vec.h"
-#include "lstd/memory/stack_array.h"
-#include "lstd/memory/string.h"
+import "lstd.h";
 #include "lstd/platform/windows_no_crt/common_functions.h"
 
 //
@@ -85,20 +83,20 @@
 //---- Define constructor and implicit cast operators to convert back<>forth between your math types and ImVec2/ImVec4.
 // This will be inlined as part of ImVec2 and ImVec4 class declarations.
 #define IM_VEC2_CLASS_EXTRA     \
-    ImVec2(const lstd::v2 &f) { \
+    ImVec2(const float2 &f) { \
         x = f.x;                \
         y = f.y;                \
     }                           \
-    operator LSTD_NAMESPACE::v2() const { return LSTD_NAMESPACE::v2(x, y); }
+    operator LSTD_NAMESPACE::float2() const { return float2(x, y); }
 
 #define IM_VEC4_CLASS_EXTRA     \
-    ImVec4(const lstd::v4 &f) { \
+    ImVec4(const float4 &f) { \
         x = f.x;                \
         y = f.y;                \
         z = f.z;                \
         w = f.w;                \
     }                           \
-    operator LSTD_NAMESPACE::v4() const { return LSTD_NAMESPACE::v4(x, y, z, w); }
+    operator LSTD_NAMESPACE::float4() const { return float4(x, y, z, w); }
 
 //---- Using 32-bits vertex indices (default is 16-bits) is one way to allow large meshes with more than 64K vertices.
 // Your renderer back-end will need to support it (most example renderer back-ends support both 16/32-bits indices).

@@ -1,4 +1,4 @@
-#include "pch.h"
+#include <driver.h>
 #include "state.h"
 
 f64 evaluate_function_at(f64 x, function_entry *f, ast *node) {
@@ -28,7 +28,7 @@ f64 evaluate_function_at(f64 x, function_entry *f, ast *node) {
 
         f64 result = t->Coeff;
         for (auto [k, exp] : t->Letters) {
-            if (has(f->Parameters, *k)) {
+            if (has(&f->Parameters, *k)) {
                 result *= pow(*f->Parameters[*k], *exp);
             } else {
                 // @TODO
@@ -51,8 +51,8 @@ void render_viewport() {
     ImGui::Begin("Graph", null, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav);
     ImGui::PopStyleVar(1);
 
-    v2 viewportPos = ImGui::GetWindowPos();
-    v2 viewportSize = ImGui::GetWindowSize();
+    float2 viewportPos = ImGui::GetWindowPos();
+    float2 viewportSize = ImGui::GetWindowSize();
     GraphState->ViewportPos = viewportPos;
     GraphState->ViewportSize = viewportSize;
     {
@@ -66,54 +66,54 @@ void render_viewport() {
         //
         // +- (100, 100) [pixels] so we draw just a bit outside of the screen, for safety.
         //
-        v2 topLeft = viewportPos - v2(100, 100);
-        v2 bottomRight = viewportPos + viewportSize + v2(100, 100);
+        float2 topLeft = viewportPos - float2(100, 100);
+        float2 bottomRight = viewportPos + viewportSize + float2(100, 100);
 
         // This means that 0,0 in graph space is the center of the viewport,
         // this offsets our graph space and viewport space (which may introduce unnecessary complications, but solves
         // the problem of the origin moving when resizing the window, which doesn't look cosmetically pleasing).
-        v2 viewportCenter = viewportPos + viewportSize / 2;
+        float2 viewportCenter = viewportPos + viewportSize / 2;
 
-        v2 origin = viewportCenter - GraphState->Camera.Position;  // Camera transform
+        float2 origin = viewportCenter - GraphState->Camera.Position;  // Camera transform
 
         f32 xmin = topLeft.x, xmax = bottomRight.x;
         f32 ymin = topLeft.y, ymax = bottomRight.y;
 
         f32 thickness = 1;
 
-        v2 step = v2(1, 1);
+        float2 step = float2(1, 1);
 
         step *= GraphState->Camera.Scale;  // Camera transform
 
-        v2 steps = (bottomRight - topLeft) / step;
+        float2 steps = (bottomRight - topLeft) / step;
 
-        v2 offset = topLeft - origin;
+        float2 offset = topLeft - origin;
         offset.x = (f32) fmod(offset.x, step.x);
         offset.y = (f32) fmod(offset.y, step.y);
 
-        v2 firstLine = topLeft - offset;
+        float2 firstLine = topLeft - offset;
 
         // Draw lines
-        v2 p = firstLine;  // Stores the position of the next line to draw
+        float2 p = firstLine;  // Stores the position of the next line to draw
         For(range((s64) steps.x)) {
-            d->AddLine(v2(p.x, ymin), v2(p.x, ymax), 0xddcfcfcf, thickness);
+            d->AddLine(float2(p.x, ymin), float2(p.x, ymax), 0xddcfcfcf, thickness);
 
             f32 ux = (p.x - origin.x) / GraphState->Camera.Scale.x;
-            d->AddText(v2(p.x + 3, origin.y), 0xffcfcfcf, mprint("{}", (s64) round(ux)));
+            d->AddText(float2(p.x + 3, origin.y), 0xffcfcfcf, mprint("{}", (s64) round(ux)));
             p.x += step.x;
         }
 
         For(range((s64) steps.y)) {
-            d->AddLine(v2(xmin, p.y), v2(xmax, p.y), 0xddcfcfcf, thickness);
+            d->AddLine(float2(xmin, p.y), float2(xmax, p.y), 0xddcfcfcf, thickness);
 
             f32 uy = (p.y - origin.y) / GraphState->Camera.Scale.y;
-            d->AddText(v2(origin.x + 3, p.y), 0xffcfcfcf, mprint("{}", (s64) round(uy)));
+            d->AddText(float2(origin.x + 3, p.y), 0xffcfcfcf, mprint("{}", (s64) round(uy)));
             p.y += step.y;
         }
 
         // Draw origin lines
-        d->AddLine(v2(origin.x, ymin), v2(origin.x, ymax), 0xddebb609, thickness * 2);
-        d->AddLine(v2(xmin, origin.y), v2(xmax, origin.y), 0xddebb609, thickness * 2);
+        d->AddLine(float2(origin.x, ymin), float2(origin.x, ymax), 0xddebb609, thickness * 2);
+        d->AddLine(float2(xmin, origin.y), float2(xmax, origin.y), 0xddebb609, thickness * 2);
 
         // Draw function graph
         For(GraphState->Functions) {
@@ -132,7 +132,7 @@ void render_viewport() {
                 f64 uy1 = evaluate_function_at(ux1, &it, it.FormulaRoot);
                 f64 y1 = (-uy1) * GraphState->Camera.Scale.y + origin.y;  // negative y means up
 
-                d->AddLine(v2(x0, y0), v2(x1, y1), ImColor(it.Color), thickness * 2.5f);
+                d->AddLine(float2((f32) x0, (f32) y0), float2((f32) x1, (f32) y1), ImColor(it.Color), thickness * 2.5f);
 
                 ux0 = ux1;
                 y0 = y1;

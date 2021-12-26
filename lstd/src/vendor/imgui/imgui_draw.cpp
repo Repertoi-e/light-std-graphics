@@ -3667,7 +3667,7 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col
                 float u1 = glyph->U0;
                 float v1 = glyph->V0;
                 float u2 = glyph->U1;
-                float v2 = glyph->V1;
+                float float2 = glyph->V1;
 
                 // CPU side clipping used to fit text in their frame when the frame is too small. Only does clipping for axis aligned quads.
                 if (cpu_fine_clip)
@@ -3679,7 +3679,7 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col
                     }
                     if (y1 < clip_rect.y)
                     {
-                        v1 = v1 + (1.0f - (y2 - clip_rect.y) / (y2 - y1)) * (v2 - v1);
+                        v1 = v1 + (1.0f - (y2 - clip_rect.y) / (y2 - y1)) * (float2 - v1);
                         y1 = clip_rect.y;
                     }
                     if (x2 > clip_rect.z)
@@ -3689,7 +3689,7 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col
                     }
                     if (y2 > clip_rect.w)
                     {
-                        v2 = v1 + ((clip_rect.w - y1) / (y2 - y1)) * (v2 - v1);
+                        float2 = v1 + ((clip_rect.w - y1) / (y2 - y1)) * (float2 - v1);
                         y2 = clip_rect.w;
                     }
                     if (y1 >= y2)
@@ -3708,8 +3708,8 @@ void ImFont::RenderText(ImDrawList* draw_list, float size, ImVec2 pos, ImU32 col
                     idx_write[3] = (ImDrawIdx)(vtx_current_idx); idx_write[4] = (ImDrawIdx)(vtx_current_idx+2); idx_write[5] = (ImDrawIdx)(vtx_current_idx+3);
                     vtx_write[0].pos.x = x1; vtx_write[0].pos.y = y1; vtx_write[0].col = glyph_col; vtx_write[0].uv.x = u1; vtx_write[0].uv.y = v1;
                     vtx_write[1].pos.x = x2; vtx_write[1].pos.y = y1; vtx_write[1].col = glyph_col; vtx_write[1].uv.x = u2; vtx_write[1].uv.y = v1;
-                    vtx_write[2].pos.x = x2; vtx_write[2].pos.y = y2; vtx_write[2].col = glyph_col; vtx_write[2].uv.x = u2; vtx_write[2].uv.y = v2;
-                    vtx_write[3].pos.x = x1; vtx_write[3].pos.y = y2; vtx_write[3].col = glyph_col; vtx_write[3].uv.x = u1; vtx_write[3].uv.y = v2;
+                    vtx_write[2].pos.x = x2; vtx_write[2].pos.y = y2; vtx_write[2].col = glyph_col; vtx_write[2].uv.x = u2; vtx_write[2].uv.y = float2;
+                    vtx_write[3].pos.x = x1; vtx_write[3].pos.y = y2; vtx_write[3].col = glyph_col; vtx_write[3].uv.x = u1; vtx_write[3].uv.y = float2;
                     vtx_write += 4;
                     vtx_current_idx += 4;
                     idx_write += 6;

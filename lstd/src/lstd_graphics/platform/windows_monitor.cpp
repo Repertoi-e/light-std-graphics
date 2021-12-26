@@ -2,12 +2,13 @@
 
 #if OS == WINDOWS
 
-#include "lstd/fmt/fmt.h"
+#include "lstd/platform/windows.h"
 #include "lstd_graphics/video/monitor.h"
 #include "lstd_graphics/video/window.h"
-#include "lstd_platform/windows.h"
 
 import lstd.os;
+import lstd.fmt;
+import lstd.signal;
 
 #ifndef DPI_ENUMS_DECLARED
 typedef enum {
@@ -84,11 +85,11 @@ void win32_monitor_uninit() {
     free_signal(&MonitorEvent);
 
     For(Monitors) {
-        free(it->Name);
-        free(it->DisplayModes);
+        free(it->Name.Data);
+        free(it->DisplayModes.Data);
         free(it);
     }
-    free(Monitors);
+    free(Monitors.Data);
 
     SystemParametersInfoW(SPI_SETFOREGROUNDLOCKTIMEOUT, 0, UIntToPtr(ForegroundLockTimeout), SPIF_SENDCHANGE);
 
@@ -122,6 +123,11 @@ void win32_monitor_init() {
         SetProcessDPIAware();
     }
 
+    PUSH_ALLOC(platform_get_persistent_allocator()) {
+        make_dynamic(&Monitors, 8);
+        make_dynamic(&MonitorEvent.Callbacks, 8);
+    }
+ 
     win32_poll_monitors();
 }
 
@@ -179,7 +185,7 @@ file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *di
 
             if (GetMonitorInfoW(handle, (MONITORINFO *) &mi)) {
                 auto *mon = (monitor *) data;
-                if (compare_c_string(mi.szDevice, mon->PlatformData.Win32.AdapterName) == -1) {
+                if (compare_string(mi.szDevice, mon->PlatformData.Win32.AdapterName) == -1) {
                     mon->PlatformData.Win32.hMonitor = handle;
                 }
             }
@@ -194,17 +200,18 @@ file_scope monitor *create_monitor(DISPLAY_DEVICEW *adapter, DISPLAY_DEVICEW *di
 file_scope void do_monitor_event(monitor *mon, monitor_event::action action, bool insertLast) {
     if (action == monitor_event::CONNECTED) {
         PUSH_ALLOC(platform_get_persistent_allocator()) {
-            array_insert_at(Monitors, insertLast ? Monitors.Count : 0, mon);
+            insert_at_index(&Monitors, insertLast ? Monitors.Count : 0, mon);
         }
     } else {
-        array_remove_at(Monitors, find(Monitors, mon));
+        s64 index = find(Monitors, mon);
+        if (index != -1) remove_unordered_at_index(&Monitors, index);
 
-        free(mon->Name);
-        free(mon->DisplayModes);
+        free(mon->Name.Data);
+        free(mon->DisplayModes.Data);
         free(mon);
     }
 
-    MonitorEvent.emit({mon, action});
+    emit(&MonitorEvent, monitor_event{mon, action});
 }
 
 // Splits a color depth into red, green and blue bit depths
@@ -271,13 +278,19 @@ file_scope display_mode choose_video_mode(monitor *mon, display_mode desired) {
 }
 
 s64 monitor_connect_callback(delegate<void(monitor_event)> cb) { return connect(&MonitorEvent, cb); }
-bool monitor_disconnect_callback(s64 cb) { return disconenct(&MonitorEvent, cb); }
+bool monitor_disconnect_callback(s64 cb) { return disconnect(&MonitorEvent, cb); }
 
 rect get_work_area(monitor *mon) {
     MONITORINFO mi;
     mi.cbSize = sizeof(MONITORINFO);
     GetMonitorInfoW(mon->PlatformData.Win32.hMonitor, &mi);
-    return {mi.rcWork.left, mi.rcWork.top, mi.rcWork.right - mi.rcWork.left, mi.rcWork.bottom - mi.rcWork.top};
+
+    rect result;
+    result.top = mi.rcWork.top;
+    result.left = mi.rcWork.left;
+    result.bottom = mi.rcWork.bottom;
+    result.right = mi.rcWork.right;
+    return result;
 }
 
 bool set_display_mode(monitor *mon, display_mode desired) {
@@ -359,12 +372,14 @@ file_scope void get_display_modes(array<display_mode> &modes, monitor *mon) {
                 continue;
             }
         }
-        add(modes, mode);
+
+        if (!modes.Data) make_dynamic(&modes, 8);
+        add(&modes, mode);
     }
 
     if (!modes.Count) {
         // Hack: Report the current mode if no valid modes were found
-        add(modes, monitor_get_current_display_mode(mon));
+        add(&modes, monitor_get_current_display_mode(mon));
     }
 }
 
@@ -372,9 +387,9 @@ file_scope void get_display_modes(array<display_mode> &modes, monitor *mon) {
 void win32_poll_monitors() {
     array<monitor *> disconnected;
     PUSH_ALLOC(platform_get_persistent_allocator()) {
-        clone(&disconnected, Monitors);
+        disconnected = clone(Monitors);
     }
-    defer(free(disconnected));
+    defer(free(disconnected.Data));
 
     DISPLAY_DEVICEW adapter, display;
     for (DWORD adapterIndex = 0;; adapterIndex++) {
@@ -398,9 +413,9 @@ void win32_poll_monitors() {
             bool toContinue = false;
             For_as(index, range(disconnected.Count)) {
                 auto *it = disconnected[index];
-                if (it && compare_c_string(it->PlatformData.Win32.DisplayName, display.DeviceName) == -1) {
-                    disconnected[index] = null;
-                    toContinue          = true;
+                if (it && compare_string(it->PlatformData.Win32.DisplayName, display.DeviceName) == -1) {
+                    *(disconnected.Data + index) = null;
+                    toContinue                   = true;
                     break;
                 }
             }
@@ -416,9 +431,9 @@ void win32_poll_monitors() {
             bool toContinue = false;
             For_as(index, range(disconnected.Count)) {
                 auto *it = disconnected[index];
-                if (it && compare_c_string(it->PlatformData.Win32.AdapterName, adapter.DeviceName) == -1) {
-                    disconnected[index] = null;
-                    toContinue          = true;
+                if (it && compare_string(it->PlatformData.Win32.AdapterName, adapter.DeviceName) == -1) {
+                    *(disconnected.Data + index) = null;
+                    toContinue              = true;
                     break;
                 }
             }
@@ -460,7 +475,7 @@ monitor *monitor_from_window(window win) {
     return result;
 }
 
-v2i get_pos(monitor *mon) {
+int2 get_pos(monitor *mon) {
     DEVMODEW dm;
     zero_memory(&dm, sizeof(dm));
     dm.dmSize = sizeof(dm);
@@ -470,7 +485,7 @@ v2i get_pos(monitor *mon) {
     return {dm.DUMMYUNIONNAME.dmPosition.x, dm.DUMMYUNIONNAME.dmPosition.y};  // What's up with DUMMYUNIONNAME
 }
 
-v2 get_content_scale(monitor *mon) {
+float2 get_content_scale(monitor *mon) {
     HMONITOR handle = mon->PlatformData.Win32.hMonitor;
 
     u32 xdpi, ydpi;

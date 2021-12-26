@@ -1,6 +1,6 @@
 #include "texture.h"
 
-#include "../memory/bitmap.h"
+#include "bitmap.h"
 #include "api.h"
 
 extern texture_2D::impl g_D3DTexture2DImpl;  // Defined in d3d_texture.cpp

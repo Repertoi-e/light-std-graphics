@@ -1,11 +1,10 @@
 #pragma once
 
-#include <lstd/memory/hash_table.h>
+import "lstd.h";
+import lstd.fmt;
 
 #include <lstd_graphics/graphics.h>
 #include <lstd_graphics/video.h>
-
-#include <lstd/fmt/fmt.h>
 
 LSTD_USING_NAMESPACE;  // The library is in it's own namespace for the sake of not being too invasive. I don't really want a namespace though!
 
@@ -51,7 +50,7 @@ struct memory {
 
     // This also needs to be shared... @TODO: Comment on sharing the memory between the two modules
 #if defined DEBUG_MEMORY
-    debug_memory *DEBUG_memory = null;
+    debug_memory_node *DMNHead = null, *DMNTail = null;
 #endif
 
     // The exe provides us with these allocators.

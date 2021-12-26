@@ -3,11 +3,11 @@
 // so we need to provide replacement functions.
 //
 
-#include "lstd/memory/string.h"
 #include "lstd/platform/windows_no_crt/common_functions.h"
 #include "vendor/stb/stb_sprintf.h"
 
 import lstd.os;
+import lstd.string;
 
 extern "C" {
 const void *ft_memchr(const void *c, int d, size_t e) { return memchr(c, d, e); }

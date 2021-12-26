@@ -2,6 +2,10 @@
 
 #if OS == WINDOWS
 
+#pragma warning(disable : 4005)
+#pragma warning(disable : 5105)
+#pragma warning(disable : 5106)
+
 #define LSTD_JUST_DX
 #include "lstd/platform/windows.h"
 #undef LSTD_JUST_DX
@@ -11,7 +15,7 @@
 
 #include "lstd_graphics/graphics/api.h"
 #include "lstd_graphics/graphics/texture.h"
-#include "lstd_graphics/memory/pixel_buffer.h"
+#include "lstd_graphics/graphics/bitmap.h"
 
 void d3d_texture_2D_init(texture_2D *t) {
     D3D11_TEXTURE2D_DESC textureDesc;
@@ -96,7 +100,7 @@ void d3d_texture_2D_init(texture_2D *t) {
     DX_CHECK(t->Graphics->D3D.Device->CreateSamplerState(&samplerDesc, &t->D3D.SamplerState));
 }
 
-void d3d_texture_2D_set_data(texture_2D *t, pixel_buffer data) {
+void d3d_texture_2D_set_data(texture_2D *t, bitmap data) {
     // We have a very strict image format and don't support anything else at the moment...
     assert(t->Width == data.Width && t->Height == data.Height && data.BPP == 4);
 

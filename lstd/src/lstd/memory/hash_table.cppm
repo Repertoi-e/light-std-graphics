@@ -95,9 +95,7 @@ export {
 
     template <any_hash_table T>
     struct hash_table_iterator {
-        using hash_table_t = T;
-
-        hash_table_t *Table;
+        T *Table;
         s64 Index;
 
         hash_table_iterator(T *table, s64 index = 0) : Table(table), Index(index) { skip_empty_slots(); }
@@ -112,7 +110,7 @@ export {
         bool operator==(hash_table_iterator other) const { return Table == other.Table && Index == other.Index; }
         bool operator!=(hash_table_iterator other) const { return !(*this == other); }
 
-        key_value_pair<hash_table_t> operator*() {
+        key_value_pair<T> operator*() {
             auto *entry = Table->Entries.Data + Index;
             return {&entry->Key, &entry->Value};
         }
@@ -124,8 +122,8 @@ export {
         }
     };
 
-    auto begin(any_hash_table auto &table) { return hash_table_iterator(&table); }
-    auto end(any_hash_table auto &table) { return hash_table_iterator(&table, table.Allocated); }
+    auto begin(any_hash_table auto ref_volatile table) { return hash_table_iterator(&table); }
+    auto end(any_hash_table auto ref_volatile table) { return hash_table_iterator(&table, table.Allocated); }
 
     // Reserves space equal to the next power of two bigger than _size_, starting at _MINIMUM_SIZE_.
     //
@@ -287,18 +285,19 @@ export {
     }
 
     template <any_hash_table T>
-    bool operator==(T ref t, T ref u) {
+    bool operator==(T ref_volatile t, T ref_volatile u) {
         if (t.Entries.Count != u.Entries.Count) return false;
 
         for (auto [k, v] : t) {
-            if (!has(u, *k)) return false;
-            if (*v != *find(u, *k).Value) return false;
+            auto f = find(&u, *k);
+            if (!f.Value) return false;
+            if (!(*v == *f.Value)) return false;
         }
         return true;
     }
 
     template <any_hash_table T>
-    bool operator!=(T ref t, T ref u) { return !(t == u); }
+    bool operator!=(T ref_volatile t, T ref_volatile u) { return !(t == u); }
 
     template <any_hash_table T>
     T clone(T * src) {

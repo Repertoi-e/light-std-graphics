@@ -2,9 +2,15 @@
 
 #if OS == WINDOWS
 
+#pragma warning(disable : 4005)
+#pragma warning(disable : 5105)
+#pragma warning(disable : 5106)
+
 #define LSTD_JUST_DX
 #include "lstd/platform/windows.h"
 #undef LSTD_JUST_DX
+
+import lstd.context;
 
 #include <d3d11.h>
 
@@ -12,8 +18,8 @@
 #include "lstd_graphics/graphics/buffer.h"
 #include "lstd_graphics/graphics/shader.h"
 
-void d3d_buffer_init(buffer *b, const char *data) {
-    if (b->Usage == buffer_usage::Immutable) {
+void d3d_buffer_init(gbuffer *b, const char *data) {
+    if (b->Usage == gbuffer_usage::Immutable) {
         assert(data && "Immutable buffers must be created with initial data");
     }
 
@@ -23,16 +29,16 @@ void d3d_buffer_init(buffer *b, const char *data) {
         assert(b->Size <= numeric_info<u32>::max());
         desc.ByteWidth = (u32) b->Size;
 
-        if (b->Usage == buffer_usage::Immutable) desc.Usage = D3D11_USAGE_IMMUTABLE;
-        if (b->Usage == buffer_usage::Dynamic) desc.Usage = D3D11_USAGE_DYNAMIC;
-        if (b->Usage == buffer_usage::Staging) desc.Usage = D3D11_USAGE_STAGING;
+        if (b->Usage == gbuffer_usage::Immutable) desc.Usage = D3D11_USAGE_IMMUTABLE;
+        if (b->Usage == gbuffer_usage::Dynamic) desc.Usage = D3D11_USAGE_DYNAMIC;
+        if (b->Usage == gbuffer_usage::Staging) desc.Usage = D3D11_USAGE_STAGING;
 
-        if (b->Type == buffer_type::Vertex_Buffer) desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-        if (b->Type == buffer_type::Index_Buffer) desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-        if (b->Type == buffer_type::Shader_Uniform_Buffer) desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        if (b->Type == gbuffer_type::Vertex_Buffer) desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        if (b->Type == gbuffer_type::Index_Buffer) desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+        if (b->Type == gbuffer_type::Shader_Uniform_Buffer) desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 
-        if (b->Usage == buffer_usage::Dynamic) desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-        if (b->Usage == buffer_usage::Staging) desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        if (b->Usage == gbuffer_usage::Dynamic) desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        if (b->Usage == gbuffer_usage::Staging) desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
     }
 
     D3D11_SUBRESOURCE_DATA srData;
@@ -101,42 +107,53 @@ DXGI_FORMAT gtype_and_count_to_dxgi_format(gtype type, s64 count, bool normalize
     }
 }
 
-void d3d_buffer_set_input_layout(buffer *b, const buffer_layout &layout) {
+void d3d_buffer_set_input_layout(gbuffer *b, gbuffer_layout layout) {
     assert(b->Graphics->CurrentlyBoundShader);
     assert(b->Graphics->CurrentlyBoundShader->D3D.VSBlob);
 
-    b->Stride = layout.TotalSize;
-
     COM_SAFE_RELEASE(b->D3D.Layout);
 
-    auto *desc = malloc<D3D11_INPUT_ELEMENT_DESC>({.Count = layout.Elements.Count, .Alloc = TemporaryAllocator});
+    auto *desc = malloc<D3D11_INPUT_ELEMENT_DESC>({.Count = layout.Count, .Alloc = TemporaryAllocator});
     auto *p    = desc;
-    For(layout.Elements) {
-        const char *name = string_to_c_string_temp(it.Name);
-        *p++             = {name,
+
+    u32 accumSize = 0;
+
+    For(layout) {
+        auto bits = it.SizeInBits;
+        if (bits == 1) bits = 8;  // bools have 7 bits of padding
+
+        assert(it.Count > 0);
+
+        const char *name = string_to_c_string(it.Name, TemporaryAllocator);
+
+        *p++ = {name,
                 0,
                 gtype_and_count_to_dxgi_format(it.Type, it.Count, it.Normalized),
                 0,
-                it.AlignedByteOffset,
+                accumSize,
                 D3D11_INPUT_PER_VERTEX_DATA,
                 0};
+
+        accumSize += (u32) ((bits / 8) * it.Count);
     }
 
+    b->Stride = accumSize;
+
     auto *vs = (ID3DBlob *) b->Graphics->CurrentlyBoundShader->D3D.VSBlob;
-    DX_CHECK(b->Graphics->D3D.Device->CreateInputLayout(desc, (u32) layout.Elements.Count, vs->GetBufferPointer(), vs->GetBufferSize(), &b->D3D.Layout));
+    DX_CHECK(b->Graphics->D3D.Device->CreateInputLayout(desc, (u32) layout.Count, vs->GetBufferPointer(), vs->GetBufferSize(), &b->D3D.Layout));
 }
 
-void *d3d_buffer_map(buffer *b, buffer_map_access access) {
+void *d3d_buffer_map(gbuffer *b, gbuffer_map_access access) {
     D3D11_MAP d3dMap;
-    if (access == buffer_map_access::Read) {
+    if (access == gbuffer_map_access::Read) {
         d3dMap = D3D11_MAP_READ;
-    } else if (access == buffer_map_access::Read_Write) {
+    } else if (access == gbuffer_map_access::Read_Write) {
         d3dMap = D3D11_MAP_READ_WRITE;
-    } else if (access == buffer_map_access::Write) {
+    } else if (access == gbuffer_map_access::Write) {
         d3dMap = D3D11_MAP_WRITE;
-    } else if (access == buffer_map_access::Write_Discard_Previous) {
+    } else if (access == gbuffer_map_access::Write_Discard_Previous) {
         d3dMap = D3D11_MAP_WRITE_DISCARD;
-    } else if (access == buffer_map_access::Write_Unsynchronized) {
+    } else if (access == gbuffer_map_access::Write_Unsynchronized) {
         d3dMap = D3D11_MAP_WRITE_NO_OVERWRITE;
     } else {
         assert(false);
@@ -147,10 +164,10 @@ void *d3d_buffer_map(buffer *b, buffer_map_access access) {
     return ((D3D11_MAPPED_SUBRESOURCE *) (&b->D3D.MappedData))->pData;
 }
 
-void d3d_buffer_unmap(buffer *b) { b->Graphics->D3D.DeviceContext->Unmap(b->D3D.Buffer, 0); }
+void d3d_buffer_unmap(gbuffer *b) { b->Graphics->D3D.DeviceContext->Unmap(b->D3D.Buffer, 0); }
 
-void d3d_buffer_bind(buffer *b, primitive_topology topology, u32 offset, u32 stride, shader_type shaderType, u32 position) {
-    if (b->Type == buffer_type::Vertex_Buffer) {
+void d3d_buffer_bind(gbuffer *b, primitive_topology topology, u32 offset, u32 stride, shader_type shaderType, u32 position) {
+    if (b->Type == gbuffer_type::Vertex_Buffer) {
         if (stride == 0) stride = (u32) b->Stride;
 
         D3D_PRIMITIVE_TOPOLOGY d3dTopology = (D3D_PRIMITIVE_TOPOLOGY) 0;
@@ -165,9 +182,9 @@ void d3d_buffer_bind(buffer *b, primitive_topology topology, u32 offset, u32 str
 
         b->Graphics->D3D.DeviceContext->IASetInputLayout(b->D3D.Layout);
         b->Graphics->D3D.DeviceContext->IASetVertexBuffers(0, 1, &b->D3D.Buffer, &stride, &offset);
-    } else if (b->Type == buffer_type::Index_Buffer) {
+    } else if (b->Type == gbuffer_type::Index_Buffer) {
         b->Graphics->D3D.DeviceContext->IASetIndexBuffer(b->D3D.Buffer, DXGI_FORMAT_R32_UINT, offset);
-    } else if (b->Type == buffer_type::Shader_Uniform_Buffer) {
+    } else if (b->Type == gbuffer_type::Shader_Uniform_Buffer) {
         if (shaderType == shader_type::Vertex_Shader) {
             b->Graphics->D3D.DeviceContext->VSSetConstantBuffers(position, 1, &b->D3D.Buffer);
         } else if (shaderType == shader_type::Fragment_Shader) {
@@ -178,25 +195,25 @@ void d3d_buffer_bind(buffer *b, primitive_topology topology, u32 offset, u32 str
     }
 }
 
-void d3d_buffer_unbind(buffer *b) {
+void d3d_buffer_unbind(gbuffer *b) {
     ID3D11Buffer *buffer = null;
-    if (b->Type == buffer_type::Vertex_Buffer) {
+    if (b->Type == gbuffer_type::Vertex_Buffer) {
         u32 stride = 0, offset = 0;
         b->Graphics->D3D.DeviceContext->IASetInputLayout(null);
         b->Graphics->D3D.DeviceContext->IASetVertexBuffers(0, 1, &buffer, &stride, &offset);
-    } else if (b->Type == buffer_type::Index_Buffer) {
+    } else if (b->Type == gbuffer_type::Index_Buffer) {
         b->Graphics->D3D.DeviceContext->IASetIndexBuffer(null, DXGI_FORMAT_R32_UINT, 0);
-    } else if (b->Type == buffer_type::Shader_Uniform_Buffer) {
+    } else if (b->Type == gbuffer_type::Shader_Uniform_Buffer) {
     } else {
         assert(false);
     }
 }
 
-void d3d_buffer_release(buffer *b) {
+void d3d_buffer_release(gbuffer *b) {
     COM_SAFE_RELEASE(b->D3D.Buffer);
     COM_SAFE_RELEASE(b->D3D.Layout);
 }
 
-buffer::impl g_D3DBufferImpl = {d3d_buffer_init, d3d_buffer_set_input_layout, d3d_buffer_map, d3d_buffer_unmap, d3d_buffer_bind, d3d_buffer_unbind, d3d_buffer_release};
+gbuffer::impl g_D3DBufferImpl = {d3d_buffer_init, d3d_buffer_set_input_layout, d3d_buffer_map, d3d_buffer_unmap, d3d_buffer_bind, d3d_buffer_unbind, d3d_buffer_release};
 
 #endif

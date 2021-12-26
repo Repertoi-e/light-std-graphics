@@ -1,4 +1,4 @@
-#include "pch.h"
+#include <driver.h>
 #include "state.h"
 
 DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
@@ -9,7 +9,8 @@ DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
         reload_global_state();
 
         // Ensure at least one function entry exists
-        if (!GraphState->Functions) add(GraphState->Functions);
+        make_dynamic(&GraphState->Functions, 10);
+        if (!GraphState->Functions) add(&GraphState->Functions, function_entry{});
     }
 
     auto *cam = &GraphState->Camera;

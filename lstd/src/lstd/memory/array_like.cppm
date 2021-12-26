@@ -5,6 +5,8 @@ module;
 
 export module lstd.array_like;
 
+export import lstd.delegate;
+
 //
 // :CodeReusability: This file implements:
 //  * get, subarray, find, find_not, find_any_of, find_not_any_of, has, compare, compare_lexicographically,
@@ -28,9 +30,6 @@ export module lstd.array_like;
 //
 
 LSTD_BEGIN_NAMESPACE
-
-template <typename T>
-struct delegate;
 
 template <typename T>
 concept array_has_flag = requires(T t) {
@@ -58,7 +57,7 @@ export {
 
     // This returns the type of the _Data_ member of an array-like object
     template <any_array_like T>
-    using array_data_t = types::remove_pointer_t<decltype(T::Data)>;
+    using array_data_t = decltype(T::Data[0]);
 
     //
     // This function translates an index that may be negative to an actual index.

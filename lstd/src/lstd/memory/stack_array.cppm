@@ -60,8 +60,8 @@ export {
     constexpr bool operator==(any_stack_array auto a, any_stack_array auto b) { return compare(a, b) == -1; }
 
     // To make range based for loops work.
-    auto begin(any_stack_array auto &arr) { return arr.Data; }
-    auto end(any_stack_array auto &arr) { return arr.Data + arr.Count; }
+    auto begin(any_stack_array auto ref_volatile arr) { return arr.Data; }
+    auto end(any_stack_array auto ref_volatile arr) { return arr.Data + arr.Count; }
 
     template <typename D = void, typename... Types>
     constexpr stack_array<types::common_type_t<Types...>, sizeof...(Types)> make_stack_array(Types && ...t) { return {(Types &&) t...}; }

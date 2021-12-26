@@ -1,5 +1,6 @@
-#include "pch.h"
 #include "state.h"
+
+#include <driver.h>
 
 import lstd.os;
 
@@ -16,14 +17,16 @@ void copy_state_from_exe() {
 
     // We also tell imgui to use our allocator (we tell imgui to not implement default ones)
     // We mark allocations as LEAK because any leftover are handled by the exe and we don't to report them when this .dll terminates.
-    ImGui::SetAllocatorFunctions([](size_t size, void *) { return (void *) malloc<char>({.Count = (s64) size, .Alloc = Memory->Alloc, .Options = LEAK}); },
+    ImGui::SetAllocatorFunctions([](size_t size, void *) { return (void *) malloc<char>({.Count = (s64) size, .Alloc = Memory->PersistentAlloc, .Options = LEAK}); },
                                  [](void *ptr, void *) { free(ptr); });
 
     auto newContext           = Context;
-    newContext.Alloc          = Memory->Alloc;
+    newContext.Alloc          = Memory->PersistentAlloc;
     newContext.AllocAlignment = 16;  // For SIMD
     newContext.Log            = &cout;
-    newContext.TempAlloc      = Memory->TempAlloc;
+
+    *const_cast<allocator *>(&TemporaryAllocator) = Memory->TemporaryAlloc;
+
     OVERRIDE_CONTEXT(newContext);
 }
 

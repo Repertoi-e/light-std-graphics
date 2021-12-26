@@ -2,6 +2,10 @@
 
 #if OS == WINDOWS
 
+#pragma warning(disable : 4005)
+#pragma warning(disable : 5105)
+#pragma warning(disable : 5106)
+
 #define LSTD_JUST_DX
 #include "lstd/platform/windows.h"
 #undef LSTD_JUST_DX
@@ -9,12 +13,12 @@
 #include <d3d11.h>
 #include <dxgi.h>
 
-#include "lstd/fmt/fmt.h"
 #include "lstd_graphics/graphics/api.h"
 #include "lstd_graphics/graphics/texture.h"
 #include "lstd_graphics/video.h"
 
 import lstd.os;
+import lstd.fmt;
 
 // @TODO: These are so useful that we should include them in the API
 string utf16_to_utf8(const wchar *str, allocator alloc = {});
@@ -130,7 +134,7 @@ void d3d_init_target_window(graphics *g, graphics::target_window *targetWindow) 
     auto win = targetWindow->Window;
     assert(win);
 
-    v2i windowSize = win.get_size();
+    int2 windowSize = win.get_size();
 
     DXGI_SWAP_CHAIN_DESC desc;
     zero_memory(&desc, sizeof(desc));
@@ -246,10 +250,10 @@ void d3d_target_window_resized(graphics *g, graphics::target_window *targetWindo
 
 void d3d_set_viewport(graphics *g, rect viewport) {
     D3D11_VIEWPORT rect;
-    rect.TopLeftX = (f32) viewport.Top;
-    rect.TopLeftY = (f32) viewport.Left;
-    rect.Width    = (f32) viewport.width();
-    rect.Height   = (f32) viewport.height();
+    rect.TopLeftX = (f32) viewport.left;
+    rect.TopLeftY = (f32) viewport.top;
+    rect.Width    = (f32) viewport.right - viewport.left;
+    rect.Height   = (f32) viewport.bottom - viewport.top;
     rect.MinDepth = 0.0f;
     rect.MaxDepth = 1.0f;
 
@@ -258,10 +262,10 @@ void d3d_set_viewport(graphics *g, rect viewport) {
 
 void d3d_set_scissor_rect(graphics *g, rect scissorRect) {
     D3D11_RECT rect;
-    rect.left   = scissorRect.Left;
-    rect.top    = scissorRect.Top;
-    rect.right  = scissorRect.Right;
-    rect.bottom = scissorRect.Bot;
+    rect.top    = scissorRect.top;
+    rect.left   = scissorRect.left;
+    rect.bottom = scissorRect.bottom;
+    rect.right  = scissorRect.right;
 
     g->D3D.DeviceContext->RSSetScissorRects(1, &rect);
 }
@@ -281,15 +285,14 @@ void d3d_set_blend(graphics *g, bool enabled) {
 }
 
 void d3d_set_depth_testing(graphics *g, bool enabled) {
-    g->D3D.DeviceContext->OMSetDepthStencilState(enabled ? g->D3D.DepthStencilStates[0] : g->D3D.DepthStencilStates[1],
-                                                 0);
+    g->D3D.DeviceContext->OMSetDepthStencilState(enabled ? g->D3D.DepthStencilStates[0] : g->D3D.DepthStencilStates[1], 0);
 }
 
 void d3d_set_cull_mode(graphics *g, cull mode) {
     g->D3D.DeviceContext->RSSetState(g->CurrentTargetWindow->D3D.RasterStates[(s64) mode]);
 }
 
-void d3d_clear_color(graphics *g, v4 color) {
+void d3d_clear_color(graphics *g, float4 color) {
     auto *renderTarget = g->CurrentTargetWindow->D3D.BackBuffer;
     auto *depthStencil = g->CurrentTargetWindow->D3D.DepthStencilView;
     if (g->CurrentTargetWindow->CustomRenderTarget) {

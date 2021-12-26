@@ -5,7 +5,8 @@
 LSTD_BEGIN_NAMESPACE
 
 #define ref const &
-#define ref_volatile &&
+#define ref_volatile &
+#define ref_ref &&
 
 // Used in macros to get "unique" variable names
 #define LINE_NAME(name) _MACRO_CONCAT(name, __LINE__)
@@ -47,7 +48,7 @@ Deferrer<F> operator*(Defer_Dummy, F func) {
 #define assert(condition) ((void) 0)
 #endif
 
-template <typename T, typename TIter = decltype(types::declval<T>().begin()), typename = decltype(types::declval<T>().end())>
+template <typename T, typename TIter = decltype(begin(types::declval<T>())), typename = decltype(end(types::declval<T>()))>
 constexpr auto enumerate_impl(T ref in) {
     struct iterator {
         s64 I;
@@ -69,18 +70,18 @@ constexpr auto enumerate_impl(T ref in) {
     struct iterable_wrapper {
         T Iterable;
 
-        auto begin() { return iterator{0, Iterable.begin()}; }
-        auto end() { return iterator{0, Iterable.end()}; }
+        auto begin() { return iterator{0, begin(Iterable)}; }
+        auto end() { return iterator{0, end(Iterable)}; }
     };
 
-    return iterable_wrapper{(T &&) in};
+    return iterable_wrapper{(T ref_ref) in};
 }
 
 // Shortcut macros for "for each" loops (really up to personal style if you want to use this)
 //
 //  For(array) print(it);
 //
-#define For_as(x, in) for (auto ref_volatile x : in)
+#define For_as(x, in) for (auto ref_ref x : in)
 #define For(in) For_as(it, in)
 
 //

@@ -98,7 +98,7 @@ struct graphics {
         void (*SetDepthTesting)(graphics *g, bool enabled) = null;
         void (*SetCullMode)(graphics *g, cull mode)        = null;
 
-        void (*ClearColor)(graphics *g, v4 color)                                             = null;
+        void (*ClearColor)(graphics *g, float4 color)                                             = null;
         void (*Draw)(graphics *g, u32 vertices, u32 startVertexLocation)                      = null;
         void (*DrawIndexed)(graphics *g, u32 indices, u32 startIndex, u32 baseVertexLocation) = null;
         void (*Swap)(graphics *g)                                                             = null;
@@ -126,7 +126,7 @@ struct graphics {
 
     void set_cull_mode(cull mode);
 
-    void clear_color(v4 color);
+    void clear_color(float4 color);
 
     void draw(u32 vertices, u32 startVertexLocation = 0);
     void draw_indexed(u32 indices, u32 startIndex = 0, u32 baseVertexLocation = 0);

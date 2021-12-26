@@ -264,11 +264,11 @@ export {
     };
 
     // To make range based for loops work.
-    auto begin(string & str) { return string_iterator<false>(&str, 0); }
-    auto end(string & str) { return string_iterator<false>(&str, string_length(str)); }
+    auto begin(string ref_volatile str) { return string_iterator<false>(&str, 0); }
+    auto end(string ref_volatile str) { return string_iterator<false>(&str, string_length(str)); }
 
-    auto begin(const string &str) { return string_iterator<true>(&str, 0); }
-    auto end(const string &str) { return string_iterator<true>(&str, string_length(str)); }
+    auto begin(string ref str) { return string_iterator<true>(&str, 0); }
+    auto end(string ref str) { return string_iterator<true>(&str, string_length(str)); }
 }
 
 constexpr code_point string_get(const string &str, s64 index) {

@@ -235,10 +235,10 @@ struct vec_t {
         z = res.z;
         w = 0.f;
     }
-    void Cross(const vec_t &v1, const vec_t &v2) {
-        x = v1.y * v2.z - v1.z * v2.y;
-        y = v1.z * v2.x - v1.x * v2.z;
-        z = v1.x * v2.y - v1.y * v2.x;
+    void Cross(const vec_t &v1, const vec_t &float2) {
+        x = v1.y * float2.z - v1.z * float2.y;
+        y = v1.z * float2.x - v1.x * float2.z;
+        z = v1.x * float2.y - v1.y * float2.x;
         w = 0.f;
     }
     float Dot(const vec_t &v) const { return (x * v.x) + (y * v.y) + (z * v.z) + (w * v.w); }
@@ -291,16 +291,16 @@ vec_t Normalized(const vec_t &v) {
     res.Normalize();
     return res;
 }
-vec_t Cross(const vec_t &v1, const vec_t &v2) {
+vec_t Cross(const vec_t &v1, const vec_t &float2) {
     vec_t res;
-    res.x = v1.y * v2.z - v1.z * v2.y;
-    res.y = v1.z * v2.x - v1.x * v2.z;
-    res.z = v1.x * v2.y - v1.y * v2.x;
+    res.x = v1.y * float2.z - v1.z * float2.y;
+    res.y = v1.z * float2.x - v1.x * float2.z;
+    res.z = v1.x * float2.y - v1.y * float2.x;
     res.w = 0.f;
     return res;
 }
 
-float Dot(const vec_t &v1, const vec_t &v2) { return (v1.x * v2.x) + (v1.y * v2.y) + (v1.z * v2.z); }
+float Dot(const vec_t &v1, const vec_t &float2) { return (v1.x * float2.x) + (v1.y * float2.y) + (v1.z * float2.z); }
 
 vec_t BuildPlan(const vec_t &p_point1, const vec_t &p_normal) {
     vec_t normal, res;

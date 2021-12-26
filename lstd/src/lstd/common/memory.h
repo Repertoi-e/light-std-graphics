@@ -16,7 +16,7 @@
 
 #if defined DEBUG || defined DEBUG_OPTIMIZED
 #if !defined DEBUG_MEMORY && !defined FORCE_NO_DEBUG_MEMORY
-#define DEBUG_MEMORY
+// XXXXXXXXXXXXXXXXXXXXXXXXXXX #define DEBUG_MEMORY
 #endif
 #else
 // Don't enable extra info when in Release configuration unless predefined

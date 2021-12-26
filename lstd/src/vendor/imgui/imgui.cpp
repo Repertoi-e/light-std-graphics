@@ -834,7 +834,7 @@ CODE
 #include <TargetConditionals.h>
 #endif
 
-import lstd.path; // :WEMODIFIEDIMGUI: Use our API
+import lstd.os; // :WEMODIFIEDIMGUI: Use our API for reading/writing files
 
 // Visual Studio warnings
 #ifdef _MSC_VER
@@ -1337,10 +1337,10 @@ void ImTriangleBarycentricCoords(const ImVec2& a, const ImVec2& b, const ImVec2&
 {
     ImVec2 v0 = b - a;
     ImVec2 v1 = c - a;
-    ImVec2 v2 = p - a;
+    ImVec2 float2 = p - a;
     const float denom = v0.x * v1.y - v1.x * v0.y;
-    out_v = (v2.x * v1.y - v1.x * v2.y) / denom;
-    out_w = (v0.x * v2.y - v2.x * v0.y) / denom;
+    out_v = (float2.x * v1.y - v1.x * float2.y) / denom;
+    out_w = (v0.x * float2.y - float2.x * v0.y) / denom;
     out_u = 1.0f - out_v - out_w;
 }
 
@@ -1644,9 +1644,9 @@ void*   ImFileLoadToMemory(const char* filename, const char* mode, size_t* out_f
 {
     // :WEMODIFIEDIMGUI: Use our API
     assert(padding_bytes == 0);
-    assert(LSTD_NAMESPACE::compare_c_string(mode, "rb") == -1);
+    assert(LSTD_NAMESPACE::compare_string(mode, "rb") == -1);
     
-    auto [content, success] = LSTD_NAMESPACE::path_read_entire_file(filename);
+    auto [content, success] = os_read_entire_file(filename);
     if (!success) return null;
     *out_file_size = (size_t) content.Count;
     return content.Data;
@@ -11320,7 +11320,7 @@ void ImGui::SaveIniSettingsToDisk(const char* ini_filename)
     const char* ini_data = SaveIniSettingsToMemory(&ini_data_size);
 
     // :WEMODIFIEDIMGUI: Use our API
-    LSTD_NAMESPACE::path_write_to_file(ini_filename, ini_data, LSTD_NAMESPACE::path_write_mode::Overwrite_Entire);
+    os_write_to_file(ini_filename, ini_data, file_write_mode::Overwrite_Entire);
     // ImFileHandle f = ImFileOpen(ini_filename, "wt");
     // if (!f)
     //     return;

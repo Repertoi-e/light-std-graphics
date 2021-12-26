@@ -3,14 +3,15 @@
 #include "api.h"
 
 import lstd.path;
+import lstd.os;
 
 LSTD_BEGIN_NAMESPACE
 
 extern shader::impl g_D3DShaderImpl;  // Defined in d3d_shader.cpp
 void shader::init_from_file(graphics *g, string file) {
-    clone(&FilePath, file);
+    FilePath = clone(file);
 
-    auto [source, sucess] = path_read_entire_file(file);
+    auto [source, sucess] = os_read_entire_file(file);
     if (!sucess) return;
 
     Graphics = g;
@@ -27,7 +28,7 @@ void shader::init_from_file(graphics *g, string file) {
 void shader::init_from_source(graphics *g, string source) {
     Graphics = g;
 
-    clone(&Source, source);
+    Source = clone(source);
 
     if (g->API == graphics_api::Direct3D) {
         Impl = g_D3DShaderImpl;

@@ -1,8 +1,8 @@
 #include "state.h"
 
 void camera_reinit(camera *cam) {
-    cam->Position = v2(0, 0);
-    cam->Scale = v2(50, 50);  // Good starting value (arbitrary)
+    cam->Position = float2(0, 0);
+    cam->Scale = float2(50, 50);  // Good starting value (arbitrary)
 
     cam->Panning = false;
     cam->ScrollY = 0;
@@ -24,7 +24,7 @@ void camera_update(camera *cam) {
     auto *win = Memory->MainWindow;
 
     vec2<s32> mouse = win->get_cursor_pos();
-    v2 delta = {(f32) mouse.x - GraphState->LastMouse.x, (f32) mouse.y - GraphState->LastMouse.y};
+    float2 delta = {(f32) mouse.x - GraphState->LastMouse.x, (f32) mouse.y - GraphState->LastMouse.y};
     GraphState->LastMouse = mouse;
 
     // This gets set when we listen for the scroll event
@@ -41,8 +41,8 @@ void camera_update(camera *cam) {
         }
         cam->Scale += cam->ZoomSpeed * cam->ScrollY * keyFactor * zoomFactor;
 
-        if (cam->Scale.x < cam->ScaleMin) cam->Scale = v2(cam->ScaleMin, cam->ScaleMin);
-        if (cam->Scale.x > cam->ScaleMax) cam->Scale = v2(cam->ScaleMax, cam->ScaleMax);
+        if (cam->Scale.x < cam->ScaleMin) cam->Scale = float2(cam->ScaleMin, cam->ScaleMin);
+        if (cam->Scale.x > cam->ScaleMax) cam->Scale = float2(cam->ScaleMax, cam->ScaleMax);
 
         cam->ScrollY = 0;
     }
@@ -59,8 +59,8 @@ void camera_update(camera *cam) {
     if (cam->Panning) {
         f32 speed = cam->PanSpeed * cam->ScaleMax / cam->Scale.x;
 
-        v2 up = v2(0, 1);
-        v2 right = v2(1, 0);
+        float2 up = float2(0, 1);
+        float2 right = float2(1, 0);
 
         cam->Position -= right * delta.x * speed;
         cam->Position -= up * delta.y * speed;

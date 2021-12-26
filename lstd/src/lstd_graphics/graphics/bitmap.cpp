@@ -3,6 +3,7 @@
 #include "vendor/stb/stb_image.h"
 
 import lstd.path;
+import lstd.os;
 
 bitmap make_bitmap(u8 *pixels, u32 width, u32 height, pixel_format format) {
     bitmap r;
@@ -21,18 +22,21 @@ bitmap make_bitmap(string p, bool flipVertically, pixel_format format) {
     defer(free(path.Data));
 
     auto [content, success] = os_read_entire_file(path);
-    if (!success) return;
+    if (!success) return {};
 
     // stbi_set_flip_vertically_on_load(flipVertically);
 
     s32 w, h, n;
-    u8 *loaded = stbi_load_from_memory(content.Data, (s32) content.Count, &w, &h, &n, (s32) format);
+    u8 *loaded = stbi_load_from_memory((u8 *) content.Data, (s32) content.Count, &w, &h, &n, (s32) format);
 
-    Pixels = loaded;
-    Width  = w;
-    Height = h;
-    Format = (pixel_format) n;
-    BPP    = (s32) Format;
+    bitmap b;
+
+    b.Pixels = loaded;
+    b.Width  = w;
+    b.Height = h;
+    b.Format = (pixel_format) n;
+    b.BPP    = (s32) b.Format;
+    return b;
 }
 
 void free_bitmap(bitmap *b) {

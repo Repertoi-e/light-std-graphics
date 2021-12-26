@@ -26,7 +26,7 @@ LSTD_BEGIN_NAMESPACE
 //
 // This means that this type can be just an array wrapper (a view) or it can also be used as a dynamic array type.
 // It's up to the programmer. It also may point to a buffer that came from a totally different place.
-// If this type has allocated (by explictly calling reserve() or any modifying functions which call reserve())
+// If this type has allocated (by explictly calling resize() or any modifying functions which call resize())
 // then the programmer must call free(arr.Data).
 //
 // free(arr.Data) will crash if the pointer is not a heap allocated block (which should contain an allocation header).
@@ -83,7 +83,10 @@ export {
     };
 
     template <typename T>
-    constexpr T &get_operator_square_brackets(array<T> * arr, s64 index) { return arr->Data[index]; }
+    constexpr T &get_operator_square_brackets(array<T> * arr, s64 index) {
+        index = translate_index(index, arr->Count);
+        return arr->Data[index];
+    }
 
     template <typename T>
     concept any_array = types::is_same_template_decayed<T, array<s32>>;
@@ -149,6 +152,9 @@ export {
 
     // Removes element at specified index and moves following elements back
     void remove_ordered_at_index(any_array auto *arr, s64 index);
+
+    // Removes the last element
+    void pop(any_array auto *arr) { remove_ordered_at_index(arr, -1); }
 
     // Removes element at specified index and moves the last element to the empty slot.
     // This is faster than remove because it doesn't move everything back
@@ -226,6 +232,11 @@ bool is_dynamically_allocated(any_array auto *arr) {
 }
 
 void resize(any_array auto *arr, s64 n) {
+    if (!arr->Data) {
+        make_dynamic(arr, n);
+        return;
+    }
+
     assert(n >= arr->Count && "New space not enough to fit the old elements");
     arr->Data = realloc(arr->Data, {.NewCount = n});
 }
@@ -311,7 +322,7 @@ void remove_unordered_at_index(any_array auto *arr, s64 index) {
 
     // No need when removing the last element
     if (offset != arr->Count - 1) {
-        *where = arr->Data + arr->Count - 1;
+        *where = *(arr->Data + arr->Count - 1);
     }
     --arr->Count;
 }

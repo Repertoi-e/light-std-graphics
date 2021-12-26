@@ -1,30 +1,30 @@
 #pragma once
 
-#include "pch.h"
+#include <driver.h>
 
 inline s32 op_precedence(string op, bool unary = false) {
-    if (op == "sentinel") return 0;
+    if (strings_match(op, "sentinel")) return 0;
 
-    if (op == "+" && !unary) return 1;
-    if (op == "-" && !unary) return 1;
+    if (strings_match(op, "+") && !unary) return 1;
+    if (strings_match(op, "-") && !unary) return 1;
 
-    if (op == "+") return 2;
-    if (op == "-") return 2;
+    if (strings_match(op, "+")) return 2;
+    if (strings_match(op, "-")) return 2;
 
-    if (op == "*") return 2;
-    if (op == "/") return 2;
+    if (strings_match(op, "*")) return 2;
+    if (strings_match(op, "/")) return 2;
 
-    if (op == "^") return 3;
+    if (strings_match(op, "^")) return 3;
 
     assert(false);
     return -1;
 }
 
-constexpr s32 LEFT_ASSOCIATIVE = 0;
+constexpr s32 LEFT_ASSOCIATIVE  = 0;
 constexpr s32 RIGHT_ASSOCIATIVE = 1;
 
 inline s32 op_associativity(string op) {
-    if (op == "^") return RIGHT_ASSOCIATIVE;
+    if (strings_match(op, "^")) return RIGHT_ASSOCIATIVE;
     return LEFT_ASSOCIATIVE;
 }
 
@@ -75,8 +75,8 @@ struct token_stream {
     string Error = "";  // If there was an error, it gets stored here
 };
 
-inline void free(token_stream &stream) {
-    free(stream.Tokens);
+inline void free(token_stream *stream) {
+    free(stream->Tokens.Data);
 }
 
 inline bool is_op(code_point ch) { return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^'; }
@@ -85,20 +85,20 @@ inline bool is_parenthesis(code_point ch) { return ch == '(' || ch == ')'; }
 
 // errorPos = -1 means we calculate from _It_,
 // if we are tokenizing, then the caller must pass the correct position (since we don't have a full token array yet!)
-inline void error(token_stream &stream, string message, s64 errorPos = -1) {
-    if (stream.Error) return;
-    string_append(stream.Error, message);
-    string_append(stream.Error, "\n  ");
-    string_append(stream.Error, stream.Expression);
+inline void error(token_stream *stream, string message, s64 errorPos = -1) {
+    if (stream->Error) return;
+    string_append(&stream->Error, message);
+    string_append(&stream->Error, "\n  ");
+    string_append(&stream->Error, stream->Expression);
 
     if (errorPos == -1) {
-        if (stream.It) {
-            errorPos = stream.It[0].Str.Data - stream.Expression.Data;
+        if (stream->It) {
+            errorPos = stream->It[0].Str.Data - stream->Expression.Data;
         } else {
-            errorPos = stream.Expression.Length;
+            errorPos = string_length(stream->Expression);
         }
     }
-    string_append(stream.Error, tsprint("\n  {: >{}}", "^", errorPos + 1));
+    string_append(&stream->Error, mprint("\n  {: >{}}", "^", errorPos + 1));
 }
 
 struct ast {
@@ -143,12 +143,12 @@ inline void free_ast(ast *node) {
         free_ast(node->Left);
         free_ast(node->Right);
     } else if (node->Type == ast::TERM) {
-        free(((ast_term *) node)->Letters);
+        free_table(&((ast_term *) node)->Letters);
     }
 
     free(node);
 }
 
 [[nodiscard("Leak")]] token_stream tokenize(string s);
-void validate_expression(token_stream &stream);
-[[nodiscard("Leak")]] ast *parse_expression(token_stream &stream);
+void validate_expression(token_stream *stream);
+[[nodiscard("Leak")]] ast *parse_expression(token_stream *stream);

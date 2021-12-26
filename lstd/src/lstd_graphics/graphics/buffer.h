@@ -12,7 +12,9 @@ struct gbuffer_layout_element {
     s64 Count;
 };
 
-gbuffer_layout_element layout_element(string name, gtype type, s64 count = 1, bool normalized = false) {
+using gbuffer_layout = array<gbuffer_layout_element>;
+
+inline gbuffer_layout_element layout_element(string name, gtype type, s64 count = 1, bool normalized = false) {
     assert(type != gtype::Unknown);
     s64 sizeInBits = get_size_of_base_gtype_in_bits(type);
 
@@ -22,7 +24,7 @@ gbuffer_layout_element layout_element(string name, gtype type, s64 count = 1, bo
     return {name, get_scalar_gtype(type), sizeInBits, normalized, count};
 }
 
-gbuffer_layout_element layout_padding(s64 bytes) { return {"", gtype::Unknown, bytes * 8, false, 1}; }
+inline gbuffer_layout_element layout_padding(s64 bytes) { return {"", gtype::Unknown, bytes * 8, false, 1}; }
 
 enum class primitive_topology { PointList = 0,
                                 LineList,
@@ -80,39 +82,39 @@ struct gbuffer {
 #endif
 
     struct impl {
-        void (*Init)(buffer *b, char *initialData);
-        void (*SetLayout)(buffer *b, array<buffer_layout_element> layout);
+        void (*Init)(gbuffer *b, const char *initialData);
+        void (*SetLayout)(gbuffer *b, gbuffer_layout layout);
 
-        void *(*Map)(buffer *b, buffer_map_access access);
-        void (*Unmap)(buffer *b);
+        void *(*Map)(gbuffer *b, gbuffer_map_access access);
+        void (*Unmap)(gbuffer *b);
 
-        void (*Bind)(buffer *b, primitive_topology topology, u32 offset, u32 stride, shader_type shaderType, u32 position);
-        void (*Unbind)(buffer *b);
-        void (*Free)(buffer *b);
+        void (*Bind)(gbuffer *b, primitive_topology topology, u32 offset, u32 stride, shader_type shaderType, u32 position);
+        void (*Unbind)(gbuffer *b);
+        void (*Free)(gbuffer *b);
     };
-    impl *Impl;
+    impl *Impl = null;
 
     // The graphics object associated with this buffer
     graphics *Graphics = null;
 
-    buffer_type Type   = buffer_type::None;
-    buffer_usage Usage = buffer_usage::Default;
+    gbuffer_type Type   = gbuffer_type::None;
+    gbuffer_usage Usage = gbuffer_usage::Default;
 
     s64 Size   = 0;
     s64 Stride = 0;  // Determined by the buffer layout
 };
 
-void graphics_init_buffer(gbuffer *b, graphics *g, buffer_type type, buffer_usage usage, s64 size, char *initialData = null);
+void graphics_init_buffer(gbuffer *b, graphics *g, gbuffer_type type, gbuffer_usage usage, s64 size, const char *initialData = null);
 
-gbuffer graphics_create_buffer(graphics *g, buffer_type type, buffer_usage usage, s64 size, char *initialData = null) {
+inline gbuffer graphics_create_buffer(graphics *g, gbuffer_type type, gbuffer_usage usage, s64 size, const char *initialData = null) {
     gbuffer b;
     graphics_init_buffer(&b, g, type, usage, size, initialData);
     return b;
 }
 
-void set_layout(gbuffer *b, array<buffer_layout_element> layout);
+void set_layout(gbuffer *b, array<gbuffer_layout_element> layout);
 
-void *map(gbuffer *b, buffer_map_access access);
+void *map(gbuffer *b, gbuffer_map_access access);
 void unmap(gbuffer *b);
 
 void bind_vb(gbuffer *b, primitive_topology topology, u32 offset = 0, u32 customStride = 0);

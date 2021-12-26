@@ -81,7 +81,7 @@ struct window {
 
     // Use these routines to register callbacks in order to be notified about events.
     // See event.h
-    s64 connect_event(delegate<bool(const event &)> sb);
+    s64 connect_event(delegate<bool(event)> sb);
     bool disconnect_event(s64 cb);
 
     // Use this to get all current flags and set options, see the enum _flags_ above.
@@ -104,20 +104,20 @@ struct window {
 
     void set_cursor(cursor *curs);
 
-    v2i get_cursor_pos() const;
-    void set_cursor_pos(v2i pos);
+    int2 get_cursor_pos() const;
+    void set_cursor_pos(int2 pos);
     void set_cursor_pos(s32 x, s32 y) { set_pos({x, y}); }
 
-    v2i get_pos() const;
-    void set_pos(v2i pos);
+    int2 get_pos() const;
+    void set_pos(int2 pos);
     void set_pos(s32 x, s32 y) { set_pos({x, y}); }
 
-    v2i get_size() const;
-    void set_size(v2i size);
+    int2 get_size() const;
+    void set_size(int2 size);
     void set_size(s32 width, s32 height) { set_size({width, height}); }
 
     // May not map 1:1 with window size (e.g. Retina display on Mac)
-    v2i get_framebuffer_size() const;
+    int2 get_framebuffer_size() const;
 
     // Gets the full area the window occupies (including title bar, borders, etc.),
     // relative to the window's position. So to get the absolute top-left corner
@@ -125,7 +125,7 @@ struct window {
     rect get_adjusted_bounds() const;
 
     // You can call these with _DONT_CARE_ to reset.
-    void set_size_limits(v2i minDimension, v2i maxDimension);
+    void set_size_limits(int2 minDimension, int2 maxDimension);
     void set_size_limits(s32 minWidth, s32 minHeight, s32 maxWidth, s32 maxHeight) {
         set_size_limits({minWidth, minHeight}, {maxWidth, maxHeight});
     }
