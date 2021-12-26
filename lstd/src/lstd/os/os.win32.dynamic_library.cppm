@@ -24,7 +24,7 @@ export {
     void *os_dynamic_library_get_symbol(dynamic_library library, const char *name);
 
     // Call when done doing stuff with the dll
-    void release(dynamic_library library);
+    void free_dynamic_library(dynamic_library library);
 }
 
 dynamic_library os_dynamic_library_load(string path) {
@@ -32,7 +32,7 @@ dynamic_library os_dynamic_library_load(string path) {
     return (dynamic_library) result;
 }
 
-void release(dynamic_library library) {
+void free_dynamic_library(dynamic_library library) {
     if (library) {
         FreeLibrary((HMODULE) library);
     }

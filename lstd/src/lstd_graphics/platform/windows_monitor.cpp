@@ -204,7 +204,7 @@ file_scope void do_monitor_event(monitor *mon, monitor_event::action action, boo
         }
     } else {
         s64 index = find(Monitors, mon);
-        if (index != -1) remove_unordered_at_index(&Monitors, index);
+        if (index != -1) remove_ordered_at_index(&Monitors, index);
 
         free(mon->Name.Data);
         free(mon->DisplayModes.Data);
@@ -337,7 +337,7 @@ void restore_display_mode(monitor *mon) {
 }
 
 // Doesn't add duplicates and doesn't sort _out_
-file_scope void get_display_modes(array<display_mode> &modes, monitor *mon) {
+file_scope void get_display_modes(monitor *mon) {
     s32 modeIndex = 0;
     while (true) {
         DEVMODEW dm;
@@ -357,7 +357,7 @@ file_scope void get_display_modes(array<display_mode> &modes, monitor *mon) {
         split_bpp(dm.dmBitsPerPel, &mode.RedBits, &mode.GreenBits, &mode.BlueBits);
 
         bool toContinue = false;
-        For(modes) {
+        For(mon->DisplayModes) {
             if (it == mode) {
                 toContinue = true;
                 break;
@@ -373,13 +373,13 @@ file_scope void get_display_modes(array<display_mode> &modes, monitor *mon) {
             }
         }
 
-        if (!modes.Data) make_dynamic(&modes, 8);
-        add(&modes, mode);
+        if (!mon->DisplayModes.Allocated) make_dynamic(&mon->DisplayModes, 8);
+        add(&mon->DisplayModes, mode);
     }
 
-    if (!modes.Count) {
+    if (!mon->DisplayModes) {
         // Hack: Report the current mode if no valid modes were found
-        add(&modes, monitor_get_current_display_mode(mon));
+        add(&mon->DisplayModes, monitor_get_current_display_mode(mon));
     }
 }
 
@@ -449,7 +449,7 @@ void win32_poll_monitors() {
 
     For(Monitors) {
         PUSH_ALLOC(platform_get_persistent_allocator()) {
-            get_display_modes(it->DisplayModes, it);
+            get_display_modes(it);
         }
         quick_sort(it->DisplayModes.Data, it->DisplayModes.Count);
     }

@@ -53,8 +53,9 @@ export {
 
     template <typename T>
     struct array {
-        T *Data   = null;
-        s64 Count = 0;
+        T *Data       = null;
+        s64 Count     = 0;
+        s64 Allocated = 0;
 
         // s64 Allocated = 0; // We now check the allocation header of _Data_ to save space on this structure.
 
@@ -102,16 +103,11 @@ export {
     // Coming up with a good value for the initial _n_ can improve performance.
     void make_dynamic(any_array auto *arr, s64 n, allocator alloc = {});
 
-    // Returns how many elements fit in _arr->Data_, i.e. the size of the buffer.
-    // This is not always == arr->Count. When the buffer fills we resize it to fit more.
-    s64 get_allocated(any_array auto arr);
-
+    // Returns true if arr->Allocated is not 0.
     // When DEBUG_MEMORY is defined we keep a global list of allocations,
-    // so we can check if the array is dynamically allocated.
-    //
-    // This can catch bugs. Calling routines that
-    // insert/remove/modify elements to a non-dynamic array is dangerous.
-    bool is_dynamically_allocated(any_array auto arr);
+    // so we can do extra safety checks (e.g. checking if arr->Data is
+    // actually allocated on the heap, or checking for cross-thread access).
+    bool is_dynamically_allocated_on_this_thread(any_array auto *arr);
 
     // Allocates a buffer (using the Context's allocator) and copies the old elements.
     // We try to call realloc which may actually save us an allocation.
@@ -126,7 +122,7 @@ export {
     void reset(any_array auto *arr) { arr->Count = 0; }
 
     // Checks if there is enough reserved space for _fit_ elements
-    bool has_space_for(any_array auto arr, s64 fit) { return arr.Count + fit <= get_allocated(arr); }
+    bool has_space_for(any_array auto arr, s64 fit) { return arr.Count + fit <= arr->Allocated; }
 
     // Overrides the _index_'th element in the array
     void set(any_array auto *arr, s64 index, auto element);
@@ -190,6 +186,8 @@ export {
     // Returns a deep copy of _src_
     auto clone(any_array auto src, allocator alloc = {}) {
         decltype(src) result;
+        if (!src) return result;
+
         make_dynamic(&result, src.Count, alloc);
         add_array(&result, src);
         return result;
@@ -204,31 +202,28 @@ void make_dynamic(any_array auto *arr, s64 n, allocator alloc) {
     // If alloc is null we use the Context's allocator
     arr->Data = malloc<T>({.Count = n, .Alloc = alloc});
     if (arr->Count) copy_memory(arr->Data, oldData, arr->Count * sizeof(T));
+    arr->Allocated = n;
 }
 
-// @Cleanup Decide if we want to store an _Allocated_ in the array object itself.
-// This would use more memory (the object becomes 24 bytes) but wouldn't rely on the allocation header?
-// Right now can't disable encoding an allocation header when using the temporary allocator
-// because we can't guarantee temporary dynamic arrays would work.
-s64 get_allocated(any_array auto arr) {
-    using T = types::remove_pointer_t<decltype(arr.Data)>;
-    return ((allocation_header *) arr.Data - 1)->Size / sizeof(T);
-}
-
-bool is_dynamically_allocated(any_array auto *arr) {
+bool is_dynamically_allocated_on_this_thread(any_array auto *arr) {
 #if defined DEBUG_MEMORY
     //
-    // Attempting to modify an array view...
-    // Data wasn't dynamically allocated.
+    // This assert will trip if attempting to modify an array view
+    // which points to data which wasn't dynamically allocated 
+    // (e.g. a constant c-style string or data on the stack).
     //
-    // Make sure you call make_dynamic(arr) beforehand.
+    // Make sure you have called make_dynamic(arr) beforehand
+    // to make sure the array/string has allocated its own buffer
+    // and has copied its contents there.
     //
-    // Attempting to modify an array from another thread...
+    // This also trips if you attempt to modify the array from another thread...
     // Caution! This container is not thread-safe!
     //
-    assert(debug_memory_list_contains((allocation_header *) arr->Data - 1));
+
+    // @TODO: We also need to check if address is inside arena allocators 
+    // assert(debug_memory_list_contains((allocation_header *) arr->Data - 1));
 #endif
-    return true;
+    return arr->Allocated;
 }
 
 void resize(any_array auto *arr, s64 n) {
@@ -239,21 +234,20 @@ void resize(any_array auto *arr, s64 n) {
 
     assert(n >= arr->Count && "New space not enough to fit the old elements");
     arr->Data = realloc(arr->Data, {.NewCount = n});
+    arr->Allocated = n;
 }
 
 void maybe_grow(any_array auto *arr, s64 fit) {
-    assert(is_dynamically_allocated(arr));
+    assert(is_dynamically_allocated_on_this_thread(arr));
 
-    s64 space = get_allocated(*arr);
-
-    if (arr->Count + fit <= space) return;
+    if (arr->Count + fit <= arr->Allocated) return;
 
     s64 target = max(ceil_pow_of_2(arr->Count + fit + 1), 8);
     resize(arr, target);
 }
 
 void set(any_array auto *arr, s64 index, auto element) {
-    assert(is_dynamically_allocated(arr));
+    assert(is_dynamically_allocated_on_this_thread(arr));
 
     auto i        = translate_index(index, arr->Count);
     *arr->Data[i] = element;
@@ -304,7 +298,7 @@ void remove_unordered(any_array auto *arr, auto element) {
 }
 
 void remove_ordered_at_index(any_array auto *arr, s64 index) {
-    assert(is_dynamically_allocated(arr));
+    assert(is_dynamically_allocated_on_this_thread(arr));
 
     s64 offset = translate_index(index, arr->Count);
 
@@ -314,7 +308,7 @@ void remove_ordered_at_index(any_array auto *arr, s64 index) {
 }
 
 void remove_unordered_at_index(any_array auto *arr, s64 index) {
-    assert(is_dynamically_allocated(arr));
+    assert(is_dynamically_allocated_on_this_thread(arr));
 
     s64 offset = translate_index(index, arr->Count);
 
@@ -328,7 +322,7 @@ void remove_unordered_at_index(any_array auto *arr, s64 index) {
 }
 
 void remove_range(any_array auto *arr, s64 begin, s64 end) {
-    assert(is_dynamically_allocated(arr));
+    assert(is_dynamically_allocated_on_this_thread(arr));
 
     s64 targetBegin = translate_index(begin, arr->Count);
     s64 targetEnd   = translate_index(end, arr->Count, true);
@@ -342,7 +336,7 @@ void remove_range(any_array auto *arr, s64 begin, s64 end) {
 }
 
 void replace_range(any_array auto *arr, s64 begin, s64 end, any_array auto replace) {
-    assert(is_dynamically_allocated(arr));
+    assert(is_dynamically_allocated_on_this_thread(arr));
 
     s64 targetBegin = translate_index(begin, arr->Count);
     s64 targetEnd   = translate_index(end, arr->Count, true);
@@ -367,7 +361,7 @@ void replace_range(any_array auto *arr, s64 begin, s64 end, any_array auto repla
 }
 
 void replace_all(any_array auto *arr, any_array auto search, any_array auto replace) {
-    assert(is_dynamically_allocated(arr));
+    assert(is_dynamically_allocated_on_this_thread(arr));
 
     if (!arr->Data || !arr->Count) return;
 

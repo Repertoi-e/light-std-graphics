@@ -11893,11 +11893,16 @@ void ImGui::SaveIniSettingsToDisk(const char* ini_filename)
 
     size_t ini_data_size = 0;
     const char* ini_data = SaveIniSettingsToMemory(&ini_data_size);
+
+    os_write_to_file(ini_filename, string(ini_data, ini_data_size), file_write_mode::Overwrite);
+
+    /*
     ImFileHandle f = ImFileOpen(ini_filename, "wt");
     if (!f)
         return;
     ImFileWrite(ini_data, sizeof(char), ini_data_size, f);
     ImFileClose(f);
+    */
 }
 
 // Call registered handlers (e.g. SettingsHandlerWindow_WriteAll() + custom handlers) to write their stuff into a text buffer

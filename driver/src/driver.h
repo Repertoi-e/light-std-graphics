@@ -46,12 +46,11 @@ struct memory {
     f32 FrameDelta;
 
     // The ImGui context must be shared
-    void *ImGuiContext = null;
-
-    // This also needs to be shared... @TODO: Comment on sharing the memory between the two modules
-#if defined DEBUG_MEMORY
-    debug_memory_node *DMNHead = null, *DMNTail = null;
-#endif
+    void *ImGuiContext;
+    
+    // ... and the allocators
+    ImGuiMemAllocFunc ImGuiMemAlloc;
+    ImGuiMemFreeFunc ImGuiMemFree;
 
     // The exe provides us with these allocators.
     allocator PersistentAlloc;

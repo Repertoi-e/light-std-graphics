@@ -5,7 +5,7 @@ REM @Platform
 REM In order to call this script inside Visual Studio, you need to launch devenv from vcvarsall.bat console...
 REM Otherwise Visual Studio can't find msbuild.exe.
 
-del bin\Debug\driver\*.pdb >NUL
+del bin\Debug\driver\%1-*.pdb >NUL
 
 REM In the exe, we don't check for the dll write time unless the buildlock file exists, 
 REM because in rare cases the handle used for checking for the write file makes it so the 

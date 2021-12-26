@@ -222,9 +222,8 @@ void debug_memory_maybe_verify_heap() {
 
 void check_for_overlapping_blocks(debug_memory_node *node) {
     // Check for overlapping memory blocks.
-    // We can do this because we keep the linked list sorted by the memory address
-    // of individual allocated blocks and we have info about their size.
-    // This might catch bugs in the allocator implementation/two allocators using the same pool.
+    // We can do this because we keep a sorted linked list of allocated blocks and we have info about their size.
+    // This might catch bugs in allocator implementations or when two allocators share a pool.
 
     auto *left = node->Prev;
     while (left->Freed) left = left->Prev;
@@ -256,6 +255,17 @@ void check_for_overlapping_blocks(debug_memory_node *node) {
     }
 }
 #endif
+
+file_scope void *just_pad(void *p, s64 userSize, u32 align) {
+    u32 padding          = calculate_padding_for_pointer_with_header(p, align, sizeof(allocation_header));
+    u32 alignmentPadding = padding - sizeof(allocation_header);
+
+    auto *result = (char *) p + alignmentPadding;
+#if defined DEBUG_MEMORY
+    fill_memory(result, CLEAN_LAND_FILL, userSize);
+#endif
+    return result;
+}
 
 file_scope void *encode_header(void *p, s64 userSize, u32 align, allocator alloc, u64 flags) {
     u32 padding          = calculate_padding_for_pointer_with_header(p, align, sizeof(allocation_header));
@@ -303,30 +313,55 @@ file_scope void *encode_header(void *p, s64 userSize, u32 align, allocator alloc
     return p;
 }
 
-// Without using the lstd.fmt module, i.e. without allocations.
-file_scope void log_file_and_line(source_location loc) {
-    write(Context.Log, loc.File);
-    write(Context.Log, ":");
-
+file_scope void write_number(s64 num) {
     char number[20];
-
-    auto line = loc.Line;
 
     auto *numberP  = number + 19;
     s64 numberSize = 0;
     {
-        while (line) {
-            *numberP-- = line % 10 + '0';
-            line /= 10;
+        while (num) {
+            *numberP-- = num % 10 + '0';
+            num /= 10;
             ++numberSize;
         }
     }
     write(Context.Log, numberP + 1, numberSize);
 }
 
+// Without using the lstd.fmt module, i.e. without allocations.
+file_scope void log_file_and_line(source_location loc) {
+    write(Context.Log, loc.File);
+    write(Context.Log, ":");
+    write_number(loc.Line);
+}
+
+file_scope debug_memory_node *override_node_if_freed_or_add_a_new_one(allocation_header *header) {
+    auto *node = list_search(header);
+    if (node->Header == header) {
+        if (!node->Freed) {
+            // Maybe this is a bug in the allocator implementation,
+            // or maybe two different allocators use the same pool.
+            assert(false && "Allocator implementation returned a live pointer which wasn't freed yet.");
+            return null;
+        }
+
+        node->Freed   = false;
+        node->FreedAt = {};
+
+        return node;
+    } else {
+        return list_add(header);
+    }
+}
+
 void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options, source_location loc) {
     if (!alloc) alloc = Context.Alloc;
     assert(alloc && "Context allocator was null. The programmer should set it before calling allocate functions.");
+
+    bool doHeader = true;
+
+    // @Hack, have a way to specify this more robustly?
+    if (alloc.Function == arena_allocator) doHeader = false;
 
     options |= Context.AllocOptions;
 
@@ -345,69 +380,63 @@ void *general_allocate(allocator alloc, s64 userSize, u32 alignment, u64 options
     }
 #endif
 
+    alignment = alignment < POINTER_SIZE ? POINTER_SIZE : alignment;
+    assert(is_pow_of_2(alignment));
+
+    s64 required = userSize + alignment;
+    if (doHeader) {
+        required += sizeof(allocation_header) + sizeof(allocation_header) % alignment;
+
+#if defined DEBUG_MEMORY
+        required += NO_MANS_LAND_SIZE;  // This is for the safety bytes after the requested block
+#endif
+    } else {
+        int a = 42;
+    }
+
+    void *block = alloc.Function(allocator_mode::ALLOCATE, alloc.Context, required, null, 0, options);
+    assert(block);
+
     if (Context.LogAllAllocations && !Context._LoggingAnAllocation) {
         auto newContext                 = Context;
         newContext._LoggingAnAllocation = true;
 
         PUSH_CONTEXT(newContext) {
-            write(Context.Log, ">>> Starting allocation at: ");
+            write(Context.Log, ">>> Starting allocation at:   ");
             log_file_and_line(loc);
+            // write(Context.Log, ", id: ");
+            // write_number(id);
+            write(Context.Log, ", block: ");
+            write_number((s64) block);
             write(Context.Log, "\n");
         }
     }
 
-    alignment = alignment < POINTER_SIZE ? POINTER_SIZE : alignment;
-    assert(is_pow_of_2(alignment));
-
-    s64 required = userSize + alignment + sizeof(allocation_header) + sizeof(allocation_header) % alignment;
-#if defined DEBUG_MEMORY
-    required += NO_MANS_LAND_SIZE;  // This is for the safety bytes after the requested block
-#endif
-
-    void *block = alloc.Function(allocator_mode::ALLOCATE, alloc.Context, required, null, 0, options);
-    assert(block);
-
-    auto *result = encode_header(block, userSize, alignment, alloc, options);
+    if (!doHeader) {
+        // We don't do headers for certain allocators, e.g. the arena allocator (which is the type of the temporary allocator too).
+        return just_pad(block, userSize, alignment);
+    } else {
+        auto *result = encode_header(block, userSize, alignment, alloc, options);
 
 #if defined DEBUG_MEMORY
-    auto *header = (allocation_header *) result - 1;
+        // We need to do this subtraction instead of using _newBlock_,
+        // because there might've been alignment padding.
+        auto *header = (allocation_header *) result - 1;
 
-    auto *node = list_search(header);
+        auto *node = override_node_if_freed_or_add_a_new_one(header);
 
-    debug_memory_node *nodeToEncode = null;
-    if (node->Header == header) {
-        if (!node->Freed) {
-            // Maybe this is a bug in the allocator implementation,
-            // or maybe two different allocators use the same pool.
-            assert(false && "Allocator implementation returning a pointer which is still live and wasn't freed yet");
-            return null;
-        }
+        check_for_overlapping_blocks(node);
 
-        // Overwrite node which was marked as freed.
-        node->Header = header;
-        nodeToEncode = node;
-    }
+        node->ID = AllocationCount;
+        atomic_inc(&AllocationCount);
 
-    if (!nodeToEncode) {
-        nodeToEncode = list_add(header);
-    }
+        node->AllocatedAt = loc;
 
-    check_for_overlapping_blocks(nodeToEncode);
-
-    nodeToEncode->ID = AllocationCount;
-    atomic_inc(&AllocationCount);
-
-    nodeToEncode->AllocatedAt = loc;
-
-    nodeToEncode->RID          = 0;
-    nodeToEncode->MarkedAsLeak = options & LEAK;
-
-    nodeToEncode->Freed = false;
-
-    nodeToEncode->FreedAt = {};
+        node->RID          = 0;
+        node->MarkedAsLeak = options & LEAK;
 #endif
-
-    return result;
+        return result;
+    }
 }
 
 void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_location loc) {
@@ -415,11 +444,36 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
 
     auto *header = (allocation_header *) ptr - 1;
 
+    void *block  = (byte *) header - header->AlignmentPadding;
+
+    if (Context.LogAllAllocations && !Context._LoggingAnAllocation) [[unlikely]] {
+        auto newContext                 = Context;
+        newContext._LoggingAnAllocation = true;
+
+        PUSH_CONTEXT(newContext) {
+            write(Context.Log, ">>> Starting reallocation at: ");
+            log_file_and_line(loc);
+            // write(Context.Log, ", id: ");
+            // write_number(node->ID);
+            write(Context.Log, ", block: ");
+            write_number((s64) block);
+            write(Context.Log, "\n");
+        }
+    }
+
 #if defined DEBUG_MEMORY
     debug_memory_maybe_verify_heap();
 
     auto *node = list_search(header);
     if (node->Header != header) {
+        //
+        // This may happen if you try to realloc a pointer allocated by another thread, a bumped pointer,
+        // a pointer to a stack buffer, a pointer to memory allocated by allocators which
+        // don't do headers (currently arena allocator -- temporary allocator).
+        //
+        // Reallocate only works on pointers on which we have encoded a header.
+        //
+
         // @TODO: Callstack
         panic(tprint("{!RED}Attempting to reallocate a memory block which was not allocated in the heap.{!} This happened at {!YELLOW}{}:{}{!} (in function: {!YELLOW}{}{!}).", loc.File, loc.Line, loc.Function));
         return null;
@@ -430,21 +484,12 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
         panic(tprint("{!RED}Attempting to reallocate a memory block which was freed.{!} The free happened at {!YELLOW}{}:{}{!} (in function: {!YELLOW}{}{!}).", node->FreedAt.File, node->FreedAt.Line, node->FreedAt.Function));
         return null;
     }
+
+    auto id = node->ID;
 #endif
 
     if (header->Size == newUserSize) [[unlikely]] {
         return ptr;
-    }
-
-    if (Context.LogAllAllocations && !Context._LoggingAnAllocation) [[unlikely]] {
-        auto newContext                 = Context;
-        newContext._LoggingAnAllocation = true;
-
-        PUSH_CONTEXT(newContext) {
-            write(Context.Log, ">>> Starting reallocation at: ");
-            log_file_and_line(loc);
-            write(Context.Log, "\n");
-        }
     }
 
     // The header stores just the size of the requested allocation
@@ -460,8 +505,6 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
 
     auto alloc = header->Alloc;
 
-    void *block = (byte *) header - header->AlignmentPadding;
-
     void *result = ptr;
 
     // Try to resize the block, this returns null if the block can't be resized and we need to move it.
@@ -471,34 +514,31 @@ void *general_reallocate(void *ptr, s64 newUserSize, u64 options, source_locatio
         void *newBlock = alloc.Function(allocator_mode::ALLOCATE, alloc.Context, newSize, null, 0, options);
         assert(newBlock);
 
+        // We can't just override the header in the node, because we need
+        // to keep the list sorted... so we need a new node.
         result = encode_header(newBlock, newUserSize, header->Alignment, alloc, options);
 
-        // We can't just override the header cause we need to keep the list sorted by the header address
+        // We need to do this subtraction instead of using _newBlock_,
+        // because there might've been alignment padding.
         header = (allocation_header *) result - 1;
 
 #if defined DEBUG_MEMORY
-        // See note in _general_free()_
-        node->Freed   = true;
-        node->FreedAt = loc;
-
         // @Volatile
-        auto id              = node->ID;
         auto rid             = node->RID;
         bool wasMarkedAsLeak = node->MarkedAsLeak;
 
-        node = list_add(header);
-#endif
+        node = override_node_if_freed_or_add_a_new_one(header);
 
         // Copy old state
-#if defined DEBUG_MEMORY
         node->ID           = id;
-        node->RID          = rid;
+        node->RID          = rid;  // We increment this below
         node->MarkedAsLeak = wasMarkedAsLeak;
-#endif
 
-        // Copy old stuff and free
+        // node->AllocatedAt = loc; // We set this below
+#endif
+        // Copy old data
         copy_memory_fast(result, ptr, oldUserSize);
-        alloc.Function(allocator_mode::FREE, alloc.Context, 0, block, oldSize, options);
+        general_free(ptr, 0, loc);  // options?
     } else {
         //
         // The block was resized sucessfully and it doesn't need moving
@@ -536,11 +576,36 @@ void general_free(void *ptr, u64 options, source_location loc) {
 
     auto *header = (allocation_header *) ptr - 1;
 
+    void *block = (byte *) header - header->AlignmentPadding;
+
+    if (Context.LogAllAllocations && !Context._LoggingAnAllocation) [[unlikely]] {
+        auto newContext                 = Context;
+        newContext._LoggingAnAllocation = true;
+
+        PUSH_CONTEXT(newContext) {
+            write(Context.Log, ">>> Starting free at:        ");
+            log_file_and_line(loc);
+            // write(Context.Log, ", id: ");
+            // write_number(id);
+            write(Context.Log, ", block: ");
+            write_number((s64) block);
+            write(Context.Log, "\n");
+        }
+    }
+
 #if defined DEBUG_MEMORY
     debug_memory_maybe_verify_heap();
 
     auto *node = list_search(header);
     if (node->Header != header) {
+        //
+        // This may happen if you try to free a pointer allocated by another thread, a bumped pointer,
+        // a pointer to a stack buffer, a pointer to memory allocated by allocators which
+        // don't do headers (currently arena allocator -- temporary allocator).
+        //
+        // Free only works on pointers on which we have encoded a header.
+        //
+
         // @TODO: Callstack
         panic(tprint("Attempting to free a memory block which was not heap allocated (in this thread)."));
 
@@ -553,11 +618,11 @@ void general_free(void *ptr, u64 options, source_location loc) {
         panic(tprint("{!RED}Attempting to free a memory block which was already freed.{!} The previous free happened at {!YELLOW}{}:{}{!} (in function: {!YELLOW}{}{!})", node->FreedAt.File, node->FreedAt.Line, node->FreedAt.Function));
         return;
     }
+
+    auto id = node->ID;
 #endif
 
-
-    auto alloc  = header->Alloc;
-    void *block = (byte *) header - header->AlignmentPadding;
+    auto alloc = header->Alloc;
 
     s64 extra = header->Alignment + sizeof(allocation_header) + sizeof(allocation_header) % header->Alignment;
 #if defined DEBUG_MEMORY
@@ -574,8 +639,6 @@ void general_free(void *ptr, u64 options, source_location loc) {
     node->FreedAt = loc;
 
     fill_memory(block, DEAD_LAND_FILL, size);
-
-    auto id = node->ID;
 #endif
 
     alloc.Function(allocator_mode::FREE, alloc.Context, 0, block, size, options);

@@ -170,7 +170,7 @@ void determine_new_parameters(function_entry *f, hash_table<code_point, f64> old
 }
 
 void ui_functions() {
-    ImGui::Begin("Functions", null);
+    ImGui::Begin("Functions kek", null);
     {
         s64 indexToRemove = -1;
 
