@@ -62,6 +62,8 @@ void imgui_renderer::draw(ImDrawData *drawData) {
     }
 
     if (IBSize <= drawData->TotalIdxCount) {
+        free_buffer(&IB);
+
         IBSize = drawData->TotalIdxCount + 10000;
         graphics_init_buffer(&IB, Graphics, gbuffer_type::Index_Buffer, gbuffer_usage::Dynamic, IBSize * sizeof(u32));
     }
@@ -125,6 +127,7 @@ void imgui_renderer::draw(ImDrawData *drawData) {
 
                 if (it.TextureId) ((texture_2D *) it.TextureId)->bind(0);
                 Graphics->draw_indexed(it.ElemCount, it.IdxOffset + idxOffset, it.VtxOffset + vtxOffset);
+                if (it.TextureId) ((texture_2D *) it.TextureId)->unbind();
             }
         }
         idxOffset += cmdList->IdxBuffer.Size;

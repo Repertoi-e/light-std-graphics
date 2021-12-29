@@ -345,10 +345,14 @@ int strtol(const char *nptr, char **endptr, int base) {
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 double strtod(const char *s, char **endptr) {
+    if (*s && *s == '-') {
+        return -strtod(s + 1, endptr);
+    }
+
     // This function stolen from either Rolf Neugebauer or Andrew Tolmach.
     // Probably Rolf.
     const char *begin = s;
-
+    
     double a = 0.0;
     int e    = 0;
     int c;
@@ -569,7 +573,8 @@ int vsscanf(const char *buf, const char *fmt, va_list args) {
     int qualifier;
     int base;
     int field_width;
-    int is_sign = 0;
+    int is_sign   = 0;
+    bool is_float = false;
 
     while (*fmt && *str) {
         /* skip any white space in format */
@@ -678,6 +683,14 @@ int vsscanf(const char *buf, const char *fmt, va_list args) {
                 is_sign = 1;
             case 'u':
                 break;
+            case 'f':
+            case 'F':
+            case 'e':
+            case 'E':
+            case 'g':
+            case 'G':
+                is_float = true;
+                break;
             case '%':
                 /* looking for '%' in str */
                 if (*str++ != '%')
@@ -688,70 +701,75 @@ int vsscanf(const char *buf, const char *fmt, va_list args) {
                 return num;
         }
 
-        /* have some sort of integer conversion.
+        if (is_float) {
+            float *f = (float *) va_arg(args, float *);
+            *f       = (float) strtod(str, &next);
+        } else {
+            /* have some sort of integer conversion.
 		 * first, skip white space in buffer.
 		 */
-        while (is_space(*str))
-            str++;
+            while (is_space(*str))
+                str++;
 
-        digit = *str;
-        if (is_sign && digit == '-')
-            digit = *(str + 1);
+            digit = *str;
+            if (is_sign && digit == '-')
+                digit = *(str + 1);
 
-        if (!digit || (base == 16 && !is_hex_digit(digit)) || (base == 10 && !is_digit(digit)) || (base == 8 && (!is_digit(digit) || digit > '7')) || (base == 0 && !is_digit(digit)))
-            break;
+            if (!digit || (base == 16 && !is_hex_digit(digit)) || (base == 10 && !is_digit(digit)) || (base == 8 && (!is_digit(digit) || digit > '7')) || (base == 0 && !is_digit(digit)))
+                break;
 
-        switch (qualifier) {
-            case 'H': /* that's 'hh' in format */
-                if (is_sign) {
-                    signed char *s = (signed char *) va_arg(args, signed char *);
-                    *s             = (signed char) simple_strtol(str, &next, base);
-                } else {
-                    unsigned char *s = (unsigned char *) va_arg(args, unsigned char *);
-                    *s               = (unsigned char) simple_strtoul(str, &next, base);
-                }
-                break;
-            case 'h':
-                if (is_sign) {
-                    short *s = (short *) va_arg(args, short *);
-                    *s       = (short) simple_strtol(str, &next, base);
-                } else {
-                    unsigned short *s = (unsigned short *) va_arg(args, unsigned short *);
-                    *s                = (unsigned short) simple_strtoul(str, &next, base);
-                }
-                break;
-            case 'l':
-                if (is_sign) {
-                    long *l = (long *) va_arg(args, long *);
-                    *l      = simple_strtol(str, &next, base);
-                } else {
-                    unsigned long *l = (unsigned long *) va_arg(args, unsigned long *);
-                    *l               = simple_strtoul(str, &next, base);
-                }
-                break;
-            case 'L':
-                if (is_sign) {
-                    long long *l = (long long *) va_arg(args, long long *);
-                    *l           = simple_strtoll(str, &next, base);
-                } else {
-                    unsigned long long *l = (unsigned long long *) va_arg(args, unsigned long long *);
-                    *l                    = simple_strtoull(str, &next, base);
-                }
-                break;
-            case 'Z':
-            case 'z': {
-                size_t *s = (size_t *) va_arg(args, size_t *);
-                *s        = (size_t) simple_strtoul(str, &next, base);
-            } break;
-            default:
-                if (is_sign) {
-                    int *i = (int *) va_arg(args, int *);
-                    *i     = (int) simple_strtol(str, &next, base);
-                } else {
-                    unsigned int *i = (unsigned int *) va_arg(args, unsigned int *);
-                    *i              = (unsigned int) simple_strtoul(str, &next, base);
-                }
-                break;
+            switch (qualifier) {
+                case 'H': /* that's 'hh' in format */
+                    if (is_sign) {
+                        signed char *s = (signed char *) va_arg(args, signed char *);
+                        *s             = (signed char) simple_strtol(str, &next, base);
+                    } else {
+                        unsigned char *s = (unsigned char *) va_arg(args, unsigned char *);
+                        *s               = (unsigned char) simple_strtoul(str, &next, base);
+                    }
+                    break;
+                case 'h':
+                    if (is_sign) {
+                        short *s = (short *) va_arg(args, short *);
+                        *s       = (short) simple_strtol(str, &next, base);
+                    } else {
+                        unsigned short *s = (unsigned short *) va_arg(args, unsigned short *);
+                        *s                = (unsigned short) simple_strtoul(str, &next, base);
+                    }
+                    break;
+                case 'l':
+                    if (is_sign) {
+                        long *l = (long *) va_arg(args, long *);
+                        *l      = simple_strtol(str, &next, base);
+                    } else {
+                        unsigned long *l = (unsigned long *) va_arg(args, unsigned long *);
+                        *l               = simple_strtoul(str, &next, base);
+                    }
+                    break;
+                case 'L':
+                    if (is_sign) {
+                        long long *l = (long long *) va_arg(args, long long *);
+                        *l           = simple_strtoll(str, &next, base);
+                    } else {
+                        unsigned long long *l = (unsigned long long *) va_arg(args, unsigned long long *);
+                        *l                    = simple_strtoull(str, &next, base);
+                    }
+                    break;
+                case 'Z':
+                case 'z': {
+                    size_t *s = (size_t *) va_arg(args, size_t *);
+                    *s        = (size_t) simple_strtoul(str, &next, base);
+                } break;
+                default:
+                    if (is_sign) {
+                        int *i = (int *) va_arg(args, int *);
+                        *i     = (int) simple_strtol(str, &next, base);
+                    } else {
+                        unsigned int *i = (unsigned int *) va_arg(args, unsigned int *);
+                        *i              = (unsigned int) simple_strtoul(str, &next, base);
+                    }
+                    break;
+            }
         }
         num++;
 

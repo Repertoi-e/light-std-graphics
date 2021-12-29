@@ -274,6 +274,9 @@ static BOOL __cdecl dllmain_crt_process_attach(HMODULE const instance,
 
     lstd_initterm(__xc_a, __xc_z);
 
+    // We do this to avoid reinitializing in __dyn_tls_init (in tlsdyn.cpp)
+    MainContext = (void *) &LSTD_NAMESPACE::Context;
+
     // __scrt_current_native_startup_state = __scrt_native_startup_state::initialized;
     // fail                                = false;
     //} __finally {

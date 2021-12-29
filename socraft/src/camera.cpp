@@ -1,12 +1,17 @@
 #include "game.h"
 
-void camera_reinit(camera *cam) {
+void camera_update() {
+    auto *c = &Game->Camera;
+
+    float4 qx = math::rotation_quat(float3(1, 0, 0), c->Rotation.x);
+    float4 qy = math::rotation_quat(float3(0, 1, 0), c->Rotation.y);
+    float4 qz = math::rotation_quat(float3(0, 0, 1), c->Rotation.z);
+
+    float4 q = math::qmul(math::qmul(qx, qy), qz);
+
+    c->ViewMatrix = math::mul(math::rotation_matrix(q), math::translation_matrix(c->Position));
 }
 
-void camera_reset_constants(camera *cam) {
-}
-
-void camera_update(camera *cam) {
-    auto win = Memory->MainWindow;
-
+void camera_init_perspective_matrix(f32 aspect) {
+    Game->Camera.PerspectiveMatrix = math::perspective_matrix(aspect, (f32) (90.0f * PI / 180), 0.1f, 1000.0f);
 }

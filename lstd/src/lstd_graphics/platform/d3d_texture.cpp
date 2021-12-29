@@ -14,10 +14,12 @@
 #include <d3dcompiler.h>
 
 #include "lstd_graphics/graphics/api.h"
-#include "lstd_graphics/graphics/texture.h"
 #include "lstd_graphics/graphics/bitmap.h"
+#include "lstd_graphics/graphics/texture.h"
 
 void d3d_texture_2D_init(texture_2D *t) {
+    if (t->Width == 0 || t->Height == 0) return;
+
     D3D11_TEXTURE2D_DESC textureDesc;
     zero_memory(&textureDesc, sizeof(textureDesc));
     {
@@ -66,8 +68,7 @@ void d3d_texture_2D_init(texture_2D *t) {
         }
 
         DX_CHECK(t->Graphics->D3D.Device->CreateTexture2D(&dsbDesc, null, &t->D3D.DepthStencilBuffer));
-        DX_CHECK(
-            t->Graphics->D3D.Device->CreateDepthStencilView(t->D3D.DepthStencilBuffer, null, &t->D3D.DepthStencilView));
+        DX_CHECK(t->Graphics->D3D.Device->CreateDepthStencilView(t->D3D.DepthStencilBuffer, null, &t->D3D.DepthStencilView));
     }
 
     D3D11_TEXTURE_ADDRESS_MODE addressMode;

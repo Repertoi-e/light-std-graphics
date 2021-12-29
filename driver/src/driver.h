@@ -47,7 +47,7 @@ struct memory {
 
     // The ImGui context must be shared
     void *ImGuiContext;
-    
+
     // ... and the allocators
     ImGuiMemAllocFunc ImGuiMemAlloc;
     ImGuiMemFreeFunc ImGuiMemFree;
@@ -94,5 +94,5 @@ inline graphics *Graphics = null;
 #define UPDATE_AND_RENDER(name, ...) void name(memory *m, graphics *g)
 typedef UPDATE_AND_RENDER(update_and_render_func);
 
-#define MAIN_WINDOW_EVENT(name, ...) bool name(const event &e)
+#define MAIN_WINDOW_EVENT(name, ...) bool name(event e)
 typedef MAIN_WINDOW_EVENT(main_window_event_func);
