@@ -3,7 +3,7 @@
 #include <driver.h>
 
 struct camera {
-    float3 Position = {};  // x, y, z
+    float3 Position = {0, 0, -4};  // x, y, z
     float3 Rotation = {};  // pitch, roll, yaw
 
     float4x4 PerspectiveMatrix;
@@ -52,7 +52,8 @@ inline chunk *get_chunk(s16 x, s16 y) {
 struct socraft_state {
     float4 ClearColor = {0.65f, 0.87f, 0.95f, 1.0f};
 
-    bool UI = true;
+    bool UI = false;
+    bool MouseGrabbed = false;
 
     bool ViewportDirty   = false;  // When the UI window holding the texture has been resized we need to reinit the texture
     texture_2D *Viewport = null;   // Render target

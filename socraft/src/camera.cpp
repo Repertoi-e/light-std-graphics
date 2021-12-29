@@ -13,5 +13,5 @@ void camera_update() {
 }
 
 void camera_init_perspective_matrix(f32 aspect) {
-    Game->Camera.PerspectiveMatrix = math::perspective_matrix(aspect, (f32) (90.0f * PI / 180), 0.1f, 1000.0f);
+    Game->Camera.PerspectiveMatrix = math::perspective_matrix(60.0f * (f32) PI / 180, aspect, 0.1f, 1000.0f, math::pos_z);
 }

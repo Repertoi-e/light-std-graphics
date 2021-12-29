@@ -34,6 +34,10 @@ DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
         Graphics = g;
 
         reload_global_state();
+        if (!Game->UI) {
+            int2 size = Memory->MainWindow.get_size();
+            camera_init_perspective_matrix((f32) size.x / size.y);
+        }
 
         // temp, put this initialization somewhere better?
         if (!Game->PlayerChunk) {
@@ -58,13 +62,16 @@ DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
         if (Game->UI) {
             if (Game->Viewport) {
                 Graphics->set_custom_render_target(Game->Viewport);
+                
                 g->set_cull_mode(cull::Back);
                 render_world();
+
                 Graphics->set_custom_render_target(null);
             }
             render_ui();
         } else {
             // No UI, just render to the screen
+            g->set_cull_mode(cull::Back);
             render_world();
         }
     }
@@ -74,10 +81,28 @@ DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
 
 DRIVER_API MAIN_WINDOW_EVENT(main_window_event, event e) {
     if (!Game) return false;
-    assert(e.Window == Memory->MainWindow);
+    
+    auto win = Memory->MainWindow;
+    assert(e.Window == win);
 
-    if (e.Type == event::Key_Pressed && e.KeyCode == Key_F1) {
-        Game->UI = !Game->UI;
+    if (e.Type == event::Key_Pressed) {
+        if (e.KeyCode == Key_F1) {
+            Game->UI = !Game->UI;
+        } else if (e.KeyCode == Key_Escape) {
+            if (Game->MouseGrabbed) {
+                win.set_cursor_mode(window::CURSOR_NORMAL);
+                Game->MouseGrabbed = false;
+            }
+        }
+    }
+
+    if (!Game->UI && !Game->MouseGrabbed && e.Type == event::Mouse_Button_Pressed) {
+        Game->MouseGrabbed = true;
+        win.set_cursor_mode(window::CURSOR_DISABLED);
+    }
+
+    if (!Game->UI && e.Type == event::Window_Framebuffer_Resized) {
+        camera_init_perspective_matrix((f32) e.Width / e.Height);
     }
 
     return false;

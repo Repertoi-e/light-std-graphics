@@ -300,6 +300,8 @@ s32 main() {
     imguiRenderer.init(g);
     defer(imguiRenderer.release());
 
+    g->set_target_window(m->MainWindow);
+
     while (true) {
         m->ReloadedThisFrame = check_for_dll_change();
         if (m->RequestReloadNextFrame) {
@@ -316,7 +318,6 @@ s32 main() {
         ImGui::Render();
 
         if (m->MainWindow.is_visible()) {
-            g->set_target_window(m->MainWindow);
             g->set_cull_mode(cull::None);
             imguiRenderer.draw(ImGui::GetDrawData());
             g->swap();

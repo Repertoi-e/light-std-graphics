@@ -17,10 +17,6 @@ void ui_main() {
 
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("Options")) {
-            if (ImGui::MenuItem("UI (F1 to toggle)", "", Game->UI)) {
-                Game->UI = !Game->UI;
-            }
-
             bool vsync = Memory->MainWindow.get_flags() & window::VSYNC;
             if (ImGui::MenuItem("VSync", "", vsync)) {
                 Memory->MainWindow.set_vsync(!vsync);
@@ -32,6 +28,9 @@ void ui_main() {
             ImGui::BeginTooltip();
             ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
             ImGui::TextUnformatted("This is a minecraft clone written (expect ImGui) from scratch in order to battle-test my C++ standard library replacement.");
+            ImGui::TextUnformatted("");
+            ImGui::TextUnformatted(" - Click the viewport to move around, press ESC to restore the mouse.");
+            ImGui::TextUnformatted(" - Press F1 to toggle editor UI.");
             ImGui::TextUnformatted("");
             ImGui::TextUnformatted("The project is under the MIT license.");
             ImGui::TextUnformatted("Source code: github.com/Repertoi-e/light-std-graphics/");
@@ -77,6 +76,15 @@ void ui_viewport() {
         }
 
         ImGui::Image(Game->Viewport, float2(size));
+
+        if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0)) {
+            int2 size = Memory->MainWindow.get_size();
+            camera_init_perspective_matrix((f32) size.x / size.y);
+            
+            Memory->MainWindow.set_cursor_mode(window::CURSOR_DISABLED);
+            Game->MouseGrabbed = true;
+        }
+
         ImGui::PopStyleVar();
     }
     ImGui::End();

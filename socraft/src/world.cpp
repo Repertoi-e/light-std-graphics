@@ -6,14 +6,14 @@ void rebuild_chunk_geometry(chunk *c) {
 
     chunk_vertex vertices[] =
         {
-            {float3(-1.0f, -1.0f, 1.0f), float4(0.0f, 0.0f, 1.0f, 1.0f)},
-            {float3(1.0f, -1.0f, 1.0f), float4(0.0f, 1.0f, 0.0f, 1.0f)},
-            {float3(1.0f, 1.0f, 1.0f), float4(0.0f, 1.0f, 1.0f, 1.0f)},
-            {float3(-1.0f, 1.0f, 1.0f), float4(1.0f, 0.0f, 0.0f, 1.0f)},
-            {float3(-1.0f, -1.0f, -1.0f), float4(1.0f, 0.0f, 1.0f, 1.0f)},
-            {float3(1.0f, -1.0f, -1.0f), float4(1.0f, 1.0f, 0.0f, 1.0f)},
-            {float3(1.0f, 1.0f, -1.0f), float4(1.0f, 1.0f, 1.0f, 1.0f)},
-            {float3(-1.0f, 1.0f, -1.0f), float4(0.0f, 0.0f, 0.0f, 1.0f)},
+            {float3(-1.0f, -1.0f, -1.0f), float4(0.0f, 0.0f, 1.0f, 1.0f)},
+            {float3(1.0f, -1.0f, -1.0f), float4(0.0f, 1.0f, 0.0f, 1.0f)},
+            {float3(1.0f, 1.0f, -1.0f), float4(0.0f, 1.0f, 1.0f, 1.0f)},
+            {float3(-1.0f, 1.0f, -1.0f), float4(1.0f, 0.0f, 0.0f, 1.0f)},
+            {float3(-1.0f, -1.0f, 1.0f), float4(1.0f, 0.0f, 1.0f, 1.0f)},
+            {float3(1.0f, -1.0f, 1.0f), float4(1.0f, 1.0f, 0.0f, 1.0f)},
+            {float3(1.0f, 1.0f, 1.0f), float4(1.0f, 1.0f, 1.0f, 1.0f)},
+            {float3(-1.0f, 1.0f, 1.0f), float4(0.0f, 0.0f, 0.0f, 1.0f)},
         };
 
     u32 indices[] =
