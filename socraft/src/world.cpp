@@ -6,35 +6,36 @@ void rebuild_chunk_geometry(chunk *c) {
 
     chunk_vertex vertices[] =
         {
-            {float3(-1.0f, 1.0f, -1.0f), float4(0.0f, 0.0f, 1.0f, 1.0f)},
-            {float3(1.0f, 1.0f, -1.0f), float4(0.0f, 1.0f, 0.0f, 1.0f)},
+            {float3(-1.0f, -1.0f, 1.0f), float4(0.0f, 0.0f, 1.0f, 1.0f)},
+            {float3(1.0f, -1.0f, 1.0f), float4(0.0f, 1.0f, 0.0f, 1.0f)},
             {float3(1.0f, 1.0f, 1.0f), float4(0.0f, 1.0f, 1.0f, 1.0f)},
             {float3(-1.0f, 1.0f, 1.0f), float4(1.0f, 0.0f, 0.0f, 1.0f)},
             {float3(-1.0f, -1.0f, -1.0f), float4(1.0f, 0.0f, 1.0f, 1.0f)},
             {float3(1.0f, -1.0f, -1.0f), float4(1.0f, 1.0f, 0.0f, 1.0f)},
-            {float3(1.0f, -1.0f, 1.0f), float4(1.0f, 1.0f, 1.0f, 1.0f)},
-            {float3(-1.0f, -1.0f, 1.0f), float4(0.0f, 0.0f, 0.0f, 1.0f)},
+            {float3(1.0f, 1.0f, -1.0f), float4(1.0f, 1.0f, 1.0f, 1.0f)},
+            {float3(-1.0f, 1.0f, -1.0f), float4(0.0f, 0.0f, 0.0f, 1.0f)},
         };
 
     u32 indices[] =
     {
-        3,1,0,
-        2,1,3,
-
-        0,5,4,
-        1,5,0,
-
-        3,4,7,
-        0,4,3,
-
-        1,6,5,
-        2,6,1,
-
-        2,7,6,
-        3,7,2,
-
-        6,4,5,
-        7,4,6
+        // front
+        2, 1, 0,
+		0, 3, 2,
+		// right
+		6, 5, 1,
+		1, 2, 6,
+		// back
+		5, 6, 7,
+		7, 4, 5,
+		// left
+		3, 0, 4,
+		4, 7, 3,
+		// bottom
+		1, 5, 4,
+		4, 0, 1,
+		// top
+		6, 2, 3,
+		3, 7, 6
     };
 
     auto vbSize = sizeof(vertices);
@@ -51,13 +52,15 @@ void rebuild_chunk_geometry(chunk *c) {
     auto ibSize = sizeof(indices);
     graphics_init_buffer(&c->IB, Graphics, gbuffer_type::Index_Buffer, gbuffer_usage::Dynamic, ibSize);
 
-    auto *vb = (ImDrawVert *) map(&c->VB, gbuffer_map_access::Write_Discard_Previous);
+    auto *vb = map(&c->VB, gbuffer_map_access::Write_Discard_Previous);
     copy_memory_fast(vb, vertices, sizeof(vertices));
     unmap(&c->VB);
 
-    auto *ib = (u32 *) map(&c->IB, gbuffer_map_access::Write_Discard_Previous);
+    auto *ib = map(&c->IB, gbuffer_map_access::Write_Discard_Previous);
     copy_memory_fast(ib, indices, sizeof(indices));
     unmap(&c->IB);
+
+    c->Indices = sizeof(indices) / sizeof(u32);
 }
 
 void render_world() {
@@ -76,7 +79,7 @@ void render_world() {
         bind_ib(&c->IB);
 
         auto *ub = map(&Game->ChunkUB, gbuffer_map_access::Write_Discard_Previous);
-        auto mvp = math::mul(Game->Camera.ViewMatrix, Game->Camera.PerspectiveMatrix);
+        auto mvp = math::mul(Game->Camera.PerspectiveMatrix, Game->Camera.ViewMatrix);
         copy_memory_fast(ub, &mvp, sizeof(float4x4));
         unmap(&Game->ChunkUB);
 

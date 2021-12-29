@@ -9,7 +9,7 @@ void camera_update() {
 
     float4 q = math::qmul(math::qmul(qx, qy), qz);
 
-    c->ViewMatrix = math::mul(math::rotation_matrix(q), math::translation_matrix(c->Position));
+    c->ViewMatrix = math::mul(math::rotation_matrix(q), math::translation_matrix(-c->Position));
 }
 
 void camera_init_perspective_matrix(f32 aspect) {

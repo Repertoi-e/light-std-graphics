@@ -58,6 +58,7 @@ DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
         if (Game->UI) {
             if (Game->Viewport) {
                 Graphics->set_custom_render_target(Game->Viewport);
+                g->set_cull_mode(cull::Back);
                 render_world();
                 Graphics->set_custom_render_target(null);
             }

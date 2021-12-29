@@ -51,8 +51,8 @@ void ui_scene_properties() {
         ImGui::Text("  %.3f ms/frame", 1000.0f / ImGui::GetIO().Framerate);
         ImGui::Text("  (%.1f FPS)", ImGui::GetIO().Framerate);
         ImGui::Text("");
-        ImGui::SliderFloat3("Pos", &Game->Camera.Position.x, -100, 100);
-        ImGui::SliderFloat3("Rot", &Game->Camera.Rotation.x, -100, 100);
+        ImGui::SliderFloat3("Pos", &Game->Camera.Position.x, -4, 4);
+        ImGui::SliderFloat3("Rot", &Game->Camera.Rotation.x, -4, 4);
         ImGui::Text("");
         ImGui::Text("Clear color:");
         ImGui::ColorPicker3("", &Game->ClearColor.x, ImGuiColorEditFlags_NoAlpha);
