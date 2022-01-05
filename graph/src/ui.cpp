@@ -90,10 +90,23 @@ void ui_scene_properties() {
 string validate_and_parse_formula(function_entry *f) {
     // This function returns an error message (if there was one!).
 
-    token_stream tokens;
+    auto s = string(f->Formula);
+    auto it = string_find(s, '{');
 
+    string range;
+    if (it != -1) {
+        range = substring(s, it + 1, string_length(s));
+        if (range && range[-1] != '}') {
+            return "Expected } for end of range";
+        }
+        if (range) range = substring(range, 0, -1);
+
+        s     = substring(s, 0, it);
+    }
+
+    token_stream tokens;
     PUSH_ALLOC(TemporaryAllocator) {
-        tokens = tokenize(string(f->Formula));
+        tokens = tokenize(s);
         if (tokens.Error) {
             return tokens.Error;
         }
@@ -112,6 +125,29 @@ string validate_and_parse_formula(function_entry *f) {
 
     // Store the AST
     f->FormulaRoot = root;
+    f->HasRange = range.Count;
+
+    if (range) {
+        token_stream rangeTokens;
+        PUSH_ALLOC(TemporaryAllocator) {
+            rangeTokens = tokenize(range);
+            if (rangeTokens.Error) {
+                return rangeTokens.Error;
+            }
+
+            auto t = rangeTokens.Tokens;
+            if (t.Count != 2 || t[0].Type != token::NUMBER || t[1].Type != token::NUMBER) {
+                return "Invalid range - specify two numbers separated by a space";
+            }
+
+            f->Begin = t[0].F64Value;
+            f->End   = t[1].F64Value;
+
+            if (f->End <= f->Begin) {
+                return "Invalid range - second number should be larger";
+            }
+        }
+    }
 
     return "";
 }
@@ -170,7 +206,7 @@ void determine_new_parameters(function_entry *f, hash_table<code_point, f64> old
 }
 
 void ui_functions() {
-    ImGui::Begin("Functions kek", null);
+    ImGui::Begin("Functions", null);
     {
         s64 indexToRemove = -1;
 

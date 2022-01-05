@@ -107,7 +107,7 @@ void render_viewport() {
             d->AddLine(float2(xmin, p.y), float2(xmax, p.y), 0xddcfcfcf, thickness);
 
             f32 uy = (p.y - origin.y) / GraphState->Camera.Scale.y;
-            d->AddText(float2(origin.x + 3, p.y), 0xffcfcfcf, mprint("{}", (s64) round(uy)));
+            d->AddText(float2(origin.x + 3, p.y), 0xffcfcfcf, mprint("{}", (s64) -round(uy)));
             p.y += step.y;
         }
 
@@ -119,14 +119,24 @@ void render_viewport() {
         For(GraphState->Functions) {
             if (!it.FormulaRoot) continue;
 
-            f64 x0 = firstLine.x - step.x;
-            f64 x1 = firstLine.x;
+            f64 x0 = firstLine.x;
+
+            f64 end = xmax;
+            if (it.HasRange) {
+                f64 b = it.Begin * GraphState->Camera.Scale.x + origin.x;
+                f64 e = it.End * GraphState->Camera.Scale.x + origin.x;
+
+                x0  = max(x0, b);
+                end = min(end, e);
+            }
+
+            f64 x1 = x0; // + step.x;
 
             f64 ux0 = (x0 - origin.x) / GraphState->Camera.Scale.x;
             f64 uy0 = evaluate_function_at(ux0, &it, it.FormulaRoot);
             f64 y0 = (-uy0) * GraphState->Camera.Scale.y + origin.y;  // negative y means up
 
-            while (x0 < xmax) {
+            while (x0 < end) {
                 f64 ux1 = (x1 - origin.x) / GraphState->Camera.Scale.x;
 
                 f64 uy1 = evaluate_function_at(ux1, &it, it.FormulaRoot);

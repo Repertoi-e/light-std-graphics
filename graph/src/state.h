@@ -40,6 +40,9 @@ struct function_entry {
     string FormulaMessage;
     ast *FormulaRoot = null;
 
+    bool HasRange = false;
+    f64 Begin, End;
+
     hash_table<code_point, f64> Parameters;
 
     float4 Color = {1.0, 0.2f, 0.3f, 0.8f};

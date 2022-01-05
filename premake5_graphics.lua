@@ -1,6 +1,6 @@
 
 -- Which dll should the driver run
-VEHICLE = "socraft"
+VEHICLE = "graph"
 
 project "driver"
 	location "%{prj.name}"
