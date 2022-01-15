@@ -78,11 +78,7 @@ void ui_viewport() {
         ImGui::Image(Game->Viewport, float2(size));
 
         if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0)) {
-            int2 size = Memory->MainWindow.get_size();
-            camera_init_perspective_matrix((f32) size.x / size.y);
-            
-            Memory->MainWindow.set_cursor_mode(window::CURSOR_DISABLED);
-            Game->MouseGrabbed = true;
+            grab_mouse();
         }
 
         ImGui::PopStyleVar();

@@ -63,30 +63,45 @@ void rebuild_chunk_geometry(chunk *c) {
     c->Indices = sizeof(indices) / sizeof(u32);
 }
 
+void ensure_render_initted() {
+    if (Game->RenderInitted) return;
+
+    // @TODO: Asset system + reloading
+    Game->ChunkShader.Name = "Chunk Shader";
+    Game->ChunkShader.init_from_file(Graphics, "data/Chunk.hlsl");
+
+    graphics_init_buffer(&Game->ChunkShaderUB, Graphics, gbuffer_type::Shader_Uniform_Buffer, gbuffer_usage::Dynamic, sizeof(float4x4));
+
+    Game->RenderInitted = true;
+}
+
 void render_world() {
     Graphics->clear_color(Game->ClearColor);
 
-    Game->ChunkShader.bind();
+    /*
+    if (Game->VisibleChunks) {
+        Game->ChunkShader.bind();
 
-    auto *c = Game->PlayerChunk;
-    if (c->Dirty) {
-        rebuild_chunk_geometry(c);
-        c->Dirty = false;
-    }
+        auto *c = Game->PlayerChunk;
+        if (c->Dirty) {
+            rebuild_chunk_geometry(c);
+            c->Dirty = false;
+        }
 
-    if (c->Indices) {
-        bind_vb(&c->VB, primitive_topology::TriangleList);
-        bind_ib(&c->IB);
+        if (c->Indices) {
+            bind_vb(&c->VB, primitive_topology::TriangleList);
+            bind_ib(&c->IB);
 
-        auto *ub = map(&Game->ChunkUB, gbuffer_map_access::Write_Discard_Previous);
-        auto mvp = math::mul(Game->Camera.PerspectiveMatrix, Game->Camera.ViewMatrix);
-        copy_memory_fast(ub, &mvp, sizeof(float4x4));
-        unmap(&Game->ChunkUB);
+            auto *ub = map(&Game->ChunkShaderUB, gbuffer_map_access::Write_Discard_Previous);
+            auto mvp = math::mul(Game->Camera.PerspectiveMatrix, Game->Camera.ViewMatrix);
+            copy_memory_fast(ub, &mvp, sizeof(float4x4));
+            unmap(&Game->ChunkShaderUB);
 
-        bind_ub(&Game->ChunkUB, shader_type::Vertex_Shader, 0);
+            bind_ub(&Game->ChunkShaderUB, shader_type::Vertex_Shader, 0);
 
-        Graphics->draw_indexed(c->Indices, 0, 0);
+            Graphics->draw_indexed(c->Indices, 0, 0);
 
-        unbind(&Game->ChunkUB);
-    }
+            unbind(&Game->ChunkShaderUB);
+        }
+    }*/
 }

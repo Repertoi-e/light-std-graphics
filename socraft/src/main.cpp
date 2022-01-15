@@ -28,26 +28,39 @@ void reinit_render_target(s32 width, s32 height) {
     Game->Viewport->init_as_render_target(Graphics, width, height);
 }
 
+void grab_mouse() {
+    Memory->MainWindow.set_cursor_mode(window::CURSOR_DISABLED);
+    Game->MouseGrabbed              = true;
+}
+
+void ungrab_mouse() {
+    Memory->MainWindow.set_cursor_mode(window::CURSOR_NORMAL);
+    Game->MouseGrabbed              = false;
+}
+
 DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
     if (m->ReloadedThisFrame) {
         Memory   = m;
         Graphics = g;
 
         reload_global_state();
+
+        // When we don't draw the editor UI and we need to generate the perspective matrix the first time 
         if (!Game->UI) {
             int2 size = Memory->MainWindow.get_size();
             camera_init_perspective_matrix((f32) size.x / size.y);
         }
 
-        // temp, put this initialization somewhere better?
-        if (!Game->PlayerChunk) {
-            Game->PlayerChunk = get_chunk(0, 0);
+        ensure_render_initted();
 
-            Game->ChunkShader.Name = "Chunk Shader";
-            Game->ChunkShader.init_from_file(g, "data/Chunk.hlsl");
+        /*
+        if (!Game->VisibleChunks) {
+            make_dynamic(&Game->VisibleChunks, (CHUNK_RANGE + 1) * (CHUNK_RANGE + 1));
 
-            graphics_init_buffer(&Game->ChunkUB, g, gbuffer_type::Shader_Uniform_Buffer, gbuffer_usage::Dynamic, sizeof(float4x4));
-        }
+            For(Game->VisibleChunks.Count) {
+                Game->VisibleChunks[it] = get_chunk();
+            }
+        }*/
     }
 
     camera_update();
@@ -90,19 +103,17 @@ DRIVER_API MAIN_WINDOW_EVENT(main_window_event, event e) {
             Game->UI = !Game->UI;
         } else if (e.KeyCode == Key_Escape) {
             if (Game->MouseGrabbed) {
-                win.set_cursor_mode(window::CURSOR_NORMAL);
-                Game->MouseGrabbed = false;
+                ungrab_mouse();
             }
         }
     }
 
-    if (!Game->UI && !Game->MouseGrabbed && e.Type == event::Mouse_Button_Pressed) {
-        Game->MouseGrabbed = true;
-        win.set_cursor_mode(window::CURSOR_DISABLED);
-    }
-
     if (!Game->UI && e.Type == event::Window_Framebuffer_Resized) {
         camera_init_perspective_matrix((f32) e.Width / e.Height);
+    }
+
+    if (!Game->UI && !Game->MouseGrabbed && e.Type == event::Mouse_Button_Pressed) {
+        grab_mouse();
     }
 
     return false;

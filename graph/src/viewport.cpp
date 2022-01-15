@@ -115,9 +115,12 @@ void render_viewport() {
         d->AddLine(float2(origin.x, ymin), float2(origin.x, ymax), 0xddebb609, thickness * 2);
         d->AddLine(float2(xmin, origin.y), float2(xmax, origin.y), 0xddebb609, thickness * 2);
 
+        float4 lastColor;
+
         // Draw function graph
         For(GraphState->Functions) {
             if (!it.FormulaRoot) continue;
+            lastColor = it.Color;
 
             f64 x0 = firstLine.x;
 
@@ -151,6 +154,14 @@ void render_viewport() {
                 x1 += step.x * 0.1;
             }
         }
+
+        // f32 x0 = (1.5f) * GraphState->Camera.Scale.x + origin.x;
+        // f32 x1 = (4.5f) * GraphState->Camera.Scale.x + origin.x;
+        // f32 y0 = (-2.0f) * GraphState->Camera.Scale.y + origin.y;
+        // f32 y1 = (2.0f) * GraphState->Camera.Scale.y + origin.y;
+
+        // d->AddLine(float2(x0, y0), float2(x0, y1), ImColor(lastColor), thickness * 2.5f);
+        // d->AddLine(float2(x1, y0), float2(x1, y1), ImColor(lastColor), thickness * 2.5f);
     }
     ImGui::End();
 }

@@ -22,32 +22,26 @@ struct chunk_vertex {
 };
 
 struct chunk {
-    s16 X, Y;
-
-    chunk *N = null;
-    chunk *E = null;
-    chunk *S = null;
-    chunk *W = null;
-
-    bool Dirty;
-
     byte Blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_HEIGHT];
 
+    // Mesh:
+    bool Dirty;
     gbuffer VB, IB;
     u32 Indices = 0;
 };
 
-inline chunk *get_chunk(s16 x, s16 y) {
+inline chunk *get_chunk() {
     auto *c = malloc<chunk>();
-
-    c->X     = x;
-    c->Y     = y;
     c->Dirty = true;
-
     fill_memory(c->Blocks, 0, sizeof(c->Blocks));
-
     return c;
 }
+
+struct player {
+    float3 Position;
+};
+
+#define CHUNK_RANGE 3
 
 struct socraft_state {
     float4 ClearColor = {0.65f, 0.87f, 0.95f, 1.0f};
@@ -55,17 +49,22 @@ struct socraft_state {
     bool UI = false;
     bool MouseGrabbed = false;
 
-    bool ViewportDirty   = false;  // When the UI window holding the texture has been resized we need to reinit the texture
-    texture_2D *Viewport = null;   // Render target
     int2 ViewportSize    = {};     // Size of the texture in pixels
+    texture_2D *Viewport = null;   // Render target
+    bool ViewportDirty   = false;  // When the UI window holding the texture has been resized we need to reinit the texture
 
     camera Camera;
-
-    chunk *PlayerChunk = null;
-
-    gbuffer ChunkUB;  // The MVP matrix that gets uploaded to the GPU for each chunk drawn
+    player Player;
+    
+    hash_table<int2, chunk *> Chunks;
+    
+    bool RenderInitted = false;
     shader ChunkShader;
+    gbuffer ChunkShaderUB;  // The MVP matrix that gets uploaded to the GPU for each chunk mesh
 };
+
+void grab_mouse();
+void ungrab_mouse();
 
 void reload_global_state();
 
@@ -79,6 +78,7 @@ inline void render_ui() {
     ui_viewport();
 }
 
+void ensure_render_initted();
 void render_world();
 
 inline socraft_state *Game = null;
