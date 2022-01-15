@@ -12,6 +12,8 @@ import lstd.path;
 s64 MemoryInBytes = 64_MiB;
 u32 WindowWidth = 800, WindowHeight = 400, TargetFPS = 60;
 
+window MainWindow;
+
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
@@ -80,7 +82,7 @@ file_scope bool check_for_dll_change() {
     return false;
 }
 
-void init_imgui_for_our_windows(window mainWindow);
+void init_imgui_for_our_windows();
 void imgui_for_our_windows_new_frame();
 
 // @TODO: Provide a library construct for parsing arguments automatically
@@ -239,8 +241,16 @@ s32 main() {
 
     string windowTitle = "Socraft";
 
-    auto windowFlags = window::SHOWN | window::RESIZABLE | window::VSYNC | window::FOCUS_ON_SHOW | window::CLOSE_ON_ALT_F4 | window::SCALE_TO_MONITOR;
-    m->MainWindow    = create_window(windowTitle, window::DONT_CARE, window::DONT_CARE, WindowWidth, WindowHeight, windowFlags);
+    auto windowFlags = SHOWN | RESIZABLE | VSYNC | FOCUS_ON_SHOW | CLOSE_ON_ALT_F4 | SCALE_TO_MONITOR;
+    MainWindow = create_window(windowTitle, DONT_CARE, DONT_CARE, WindowWidth, WindowHeight, windowFlags);
+
+    // Setup API the DLL can use
+    m->MainWindow.GetSize = []() { return get_size(MainWindow); };
+    m->MainWindow.IsVisible = []() { return is_visible(MainWindow); };
+    m->MainWindow.IsVsync   = []() -> bool { return get_flags(MainWindow) & VSYNC; };
+    m->MainWindow.SetVsync  = [](bool enabled) { set_vsync(MainWindow, enabled); };
+    m->MainWindow.GrabMouse = []() { set_cursor_mode(MainWindow, CURSOR_DISABLED); };
+    m->MainWindow.UngrabMouse = []() { set_cursor_mode(MainWindow, CURSOR_NORMAL); };
 
     auto icon = make_bitmap("data/icon.png", false, pixel_format::RGBA);
 
@@ -248,12 +258,12 @@ s32 main() {
     make_dynamic(&icons, 1);
 
     add(&icons, icon);
-    m->MainWindow.set_icon(icons);
+    set_icon(MainWindow, icons);
 
     free(icon.Pixels);
     free(icons.Data);
 
-    m->MainWindow.connect_event(delegate<bool(event e)>([](auto e) {
+    connect_event(MainWindow, delegate<bool(event e)>([](auto e) {
         if (MainWindowEvent) return MainWindowEvent(e);
         return false;
     }));
@@ -294,13 +304,13 @@ s32 main() {
     m->ImGuiContext = ImGui::GetCurrentContext();
     defer(ImGui::DestroyContext());  // To save the .ini file
 
-    init_imgui_for_our_windows(m->MainWindow);
+    init_imgui_for_our_windows();
 
     imgui_renderer imguiRenderer;
     imguiRenderer.init(g);
     defer(imguiRenderer.release());
 
-    g->set_target_window(m->MainWindow);
+    g->set_target_window(MainWindow);
 
     while (true) {
         m->ReloadedThisFrame = check_for_dll_change();
@@ -310,14 +320,14 @@ s32 main() {
         }
 
         update_windows();
-        if (m->MainWindow.is_destroying()) break;
+        if (is_destroying(MainWindow)) break;
 
         imgui_for_our_windows_new_frame();
         ImGui::NewFrame();
         if (UpdateAndRender) UpdateAndRender(Memory, Graphics);
         ImGui::Render();
 
-        if (m->MainWindow.is_visible()) {
+        if (is_visible(MainWindow)) {
             g->set_cull_mode(cull::None);
             imguiRenderer.draw(ImGui::GetDrawData());
             g->swap();
@@ -460,7 +470,7 @@ file_scope void imgui_init_photoshop_style() {
     style->WindowRounding    = 4.0f;
 }
 
-file_scope void init_imgui_for_our_windows(window mainWindow) {
+file_scope void init_imgui_for_our_windows() {
     ImGuiIO &io = ImGui::GetIO();
     io.Fonts    = malloc<ImFontAtlas>();
 
@@ -472,7 +482,7 @@ file_scope void init_imgui_for_our_windows(window mainWindow) {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    bd->Window = mainWindow;
+    bd->Window = MainWindow;
 
     // We tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
     ImGuiStyle &style = ImGui::GetStyle();
@@ -521,7 +531,7 @@ file_scope void init_imgui_for_our_windows(window mainWindow) {
     io.KeyMap[ImGuiKey_Z]           = Key_Z;
 
     bd->InstalledCallbacks = true;
-    mainWindow.connect_event(common_event_callback);
+    connect_event(MainWindow, common_event_callback);
 
     bd->MouseCursors[0] = make_cursor(OS_ARROW);
     bd->MouseCursors[1] = make_cursor(OS_IBEAM);
@@ -543,12 +553,10 @@ file_scope void imgui_for_our_windows_new_frame() {
     ImGuiIO &io = ImGui::GetIO();
     assert(io.Fonts->IsBuilt());
 
-    auto mainWindow = bd->Window;
-
-    int2 windowSize = mainWindow.get_size();
+    int2 windowSize = get_size(MainWindow);
     s32 w = windowSize.x, h = windowSize.y;
 
-    int2 frameBufferSize = mainWindow.get_framebuffer_size();
+    int2 frameBufferSize = get_framebuffer_size(MainWindow);
     io.DisplaySize       = ImVec2((f32) w, (f32) h);
     if (w > 0 && h > 0) io.DisplayFramebufferScale = ImVec2((f32) frameBufferSize.x / w, (f32) frameBufferSize.y / h);
 
@@ -570,31 +578,31 @@ file_scope void imgui_for_our_windows_new_frame() {
 
     auto win = bd->Window;
 
-    bool focused       = win.get_flags() & window::FOCUSED;
+    bool focused       = get_flags(win) & FOCUSED;
     window mouseWindow = (bd->MouseWindow == win || focused) ? win : window{};
 
     // Set OS mouse position from Dear ImGui if requested (rarely used, only when
     // ImGuiConfigFlags_NavEnableSetMousePos is enabled by user).
     if (io.WantSetMousePos && focused) {
-        win.set_cursor_pos((s32) mousePosPrev.x, (s32) mousePosPrev.y);
+        set_cursor_pos(win, (s32) mousePosPrev.x, (s32) mousePosPrev.y);
     }
 
-    if ((io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange) || mainWindow.get_cursor_mode() == window::CURSOR_DISABLED)
+    if ((io.ConfigFlags & ImGuiConfigFlags_NoMouseCursorChange) || get_cursor_mode(MainWindow) == CURSOR_DISABLED)
         return;
 
     // Set Dear ImGui mouse position from OS position
     if (mouseWindow) {
-        auto mousePos = win.get_cursor_pos();
+        auto mousePos = get_cursor_pos(win);
         io.MousePos   = ImVec2((f32) mousePos.x, (f32) mousePos.y);
     }
 
     ImGuiMouseCursor imguiCursor = ImGui::GetMouseCursor();
     if (imguiCursor == ImGuiMouseCursor_None || io.MouseDrawCursor) {
         // Hide OS mouse cursor if imgui is drawing it or if it wants no cursor
-        win.set_cursor_mode(window::CURSOR_HIDDEN);
+        set_cursor_mode(win, CURSOR_HIDDEN);
     } else {
         // Show OS mouse cursor
-        win.set_cursor(bd->MouseCursors[imguiCursor]);
-        win.set_cursor_mode(window::CURSOR_NORMAL);
+        set_cursor(win, bd->MouseCursors[imguiCursor]);
+        set_cursor_mode(win, CURSOR_NORMAL);
     }
 }

@@ -265,8 +265,8 @@ struct event {
 
         struct {
             u32 X, Y;    // Set on Mouse_Moved and Window_Moved
-            u32 DX, DY;  // Only set on Mouse_Moved
-        };
+            s32 DX, DY;  // Only set on Mouse_Moved
+        }; 
 
         code_point CP;  // Only set on Code_Point_Typed
 

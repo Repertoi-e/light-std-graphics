@@ -4,8 +4,6 @@
 
 import lstd.delegate;
 
-struct window;
-
 struct display_mode {
     // Use this on RGB bits or refresh rate when setting the display mode for a monitor
     static constexpr s32 DONT_CARE = -1;
@@ -57,7 +55,7 @@ struct monitor {
 
     // The handle to the window whose video mode is current on this monitor
     // i.e. fullscreen. By default it's an invalid handle - if no window is fullscreen.
-    window Window;
+    void *Window;
 
     array<display_mode> DisplayModes;
     display_mode CurrentMode;

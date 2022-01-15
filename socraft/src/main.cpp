@@ -28,16 +28,6 @@ void reinit_render_target(s32 width, s32 height) {
     Game->Viewport->init_as_render_target(Graphics, width, height);
 }
 
-void grab_mouse() {
-    Memory->MainWindow.set_cursor_mode(window::CURSOR_DISABLED);
-    Game->MouseGrabbed              = true;
-}
-
-void ungrab_mouse() {
-    Memory->MainWindow.set_cursor_mode(window::CURSOR_NORMAL);
-    Game->MouseGrabbed              = false;
-}
-
 DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
     if (m->ReloadedThisFrame) {
         Memory   = m;
@@ -47,25 +37,16 @@ DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
 
         // When we don't draw the editor UI and we need to generate the perspective matrix the first time 
         if (!Game->UI) {
-            int2 size = Memory->MainWindow.get_size();
+            int2 size = Memory->MainWindow.GetSize();
             camera_init_perspective_matrix((f32) size.x / size.y);
         }
 
         ensure_render_initted();
-
-        /*
-        if (!Game->VisibleChunks) {
-            make_dynamic(&Game->VisibleChunks, (CHUNK_RANGE + 1) * (CHUNK_RANGE + 1));
-
-            For(Game->VisibleChunks.Count) {
-                Game->VisibleChunks[it] = get_chunk();
-            }
-        }*/
     }
 
     camera_update();
 
-    if (Memory->MainWindow.is_visible()) {
+    if (Memory->MainWindow.IsVisible()) {
         if (Game->ViewportDirty) {
             reinit_render_target(Game->ViewportSize.x, Game->ViewportSize.y);
             camera_init_perspective_matrix((f32) Game->ViewportSize.x / Game->ViewportSize.y);
@@ -95,15 +76,13 @@ DRIVER_API UPDATE_AND_RENDER(update_and_render, memory *m, graphics *g) {
 DRIVER_API MAIN_WINDOW_EVENT(main_window_event, event e) {
     if (!Game) return false;
     
-    auto win = Memory->MainWindow;
-    assert(e.Window == win);
-
     if (e.Type == event::Key_Pressed) {
         if (e.KeyCode == Key_F1) {
             Game->UI = !Game->UI;
         } else if (e.KeyCode == Key_Escape) {
             if (Game->MouseGrabbed) {
-                ungrab_mouse();
+                Memory->MainWindow.UngrabMouse();
+                Game->MouseGrabbed = false;
             }
         }
     }
@@ -113,7 +92,12 @@ DRIVER_API MAIN_WINDOW_EVENT(main_window_event, event e) {
     }
 
     if (!Game->UI && !Game->MouseGrabbed && e.Type == event::Mouse_Button_Pressed) {
-        grab_mouse();
+        Memory->MainWindow.GrabMouse();
+        Game->MouseGrabbed = true;
+    }
+
+    if (Game->MouseGrabbed && camera_event(e)) {
+        return true;
     }
 
     return false;

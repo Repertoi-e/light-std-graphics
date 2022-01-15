@@ -15,3 +15,20 @@ void camera_update() {
 void camera_init_perspective_matrix(f32 aspect) {
     Game->Camera.PerspectiveMatrix = math::perspective_matrix(60.0f * (f32) PI / 180, aspect, 0.1f, 1000.0f, math::pos_z);
 }
+
+bool camera_event(event e) {
+    auto *c = &Game->Camera;
+
+    if (e.Type == event::Mouse_Moved) {
+        f32 dx = -c->Sensitivity * e.DX;
+        f32 dy = -c->Sensitivity * e.DY;
+        
+        c->Rotation.y = (f32) fmod(c->Rotation.y + dx, M_TAU);
+        c->Rotation.x = clamp(c->Rotation.x + dy, -M_PI, M_PI);
+
+        return true;
+    }
+
+    return false;
+}
+

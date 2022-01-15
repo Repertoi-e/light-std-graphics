@@ -78,30 +78,35 @@ void ensure_render_initted() {
 void render_world() {
     Graphics->clear_color(Game->ClearColor);
 
-    /*
-    if (Game->VisibleChunks) {
-        Game->ChunkShader.bind();
+    Game->ChunkShader.bind();
 
-        auto *c = Game->PlayerChunk;
-        if (c->Dirty) {
-            rebuild_chunk_geometry(c);
-            c->Dirty = false;
-        }
+    int3 chunkCoords = {0,
+                        0,
+                        0};
 
-        if (c->Indices) {
-            bind_vb(&c->VB, primitive_topology::TriangleList);
-            bind_ib(&c->IB);
+    auto *c = *Game->Chunks[chunkCoords];
+    if (!c) {
+        c = *Game->Chunks[chunkCoords] = get_chunk();
+    }
 
-            auto *ub = map(&Game->ChunkShaderUB, gbuffer_map_access::Write_Discard_Previous);
-            auto mvp = math::mul(Game->Camera.PerspectiveMatrix, Game->Camera.ViewMatrix);
-            copy_memory_fast(ub, &mvp, sizeof(float4x4));
-            unmap(&Game->ChunkShaderUB);
+    if (c->Dirty) {
+        rebuild_chunk_geometry(c);
+        c->Dirty = false;
+    }
 
-            bind_ub(&Game->ChunkShaderUB, shader_type::Vertex_Shader, 0);
+    if (c->Indices) {
+        bind_vb(&c->VB, primitive_topology::TriangleList);
+        bind_ib(&c->IB);
 
-            Graphics->draw_indexed(c->Indices, 0, 0);
+        auto *ub = map(&Game->ChunkShaderUB, gbuffer_map_access::Write_Discard_Previous);
+        auto mvp = math::mul(Game->Camera.PerspectiveMatrix, Game->Camera.ViewMatrix);
+        copy_memory_fast(ub, &mvp, sizeof(float4x4));
+        unmap(&Game->ChunkShaderUB);
 
-            unbind(&Game->ChunkShaderUB);
-        }
-    }*/
+        bind_ub(&Game->ChunkShaderUB, shader_type::Vertex_Shader, 0);
+
+        Graphics->draw_indexed(c->Indices, 0, 0);
+
+        unbind(&Game->ChunkShaderUB);
+    }
 }

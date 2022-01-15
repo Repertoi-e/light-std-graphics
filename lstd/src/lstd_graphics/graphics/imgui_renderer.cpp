@@ -14,9 +14,8 @@ void imgui_renderer::init(graphics *g) {
 
     ImGuiPlatformIO &platformIO      = ImGui::GetPlatformIO();
     platformIO.Renderer_RenderWindow = [](auto *viewport, void *context) {
-        window win;
-        win.ID = (u32) (u64) viewport->PlatformHandle;
-        if (!win.is_visible()) return;
+        window win = viewport->PlatformHandle;
+        if (!is_visible(win)) return;
 
         auto *renderer = (imgui_renderer *) context;
         if (!(viewport->Flags & ImGuiViewportFlags_NoRendererClear)) {

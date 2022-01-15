@@ -47,6 +47,9 @@ Copyright 1984, 1995, 2000 by Stephen L. Moshier
 #define PI 3.1415926535897932384626433832795
 #define TAU 6.283185307179586476925286766559
 
+#define M_PI 3.1415926535897932384626433832795f
+#define M_TAU 6.283185307179586476925286766559f
+
 // Convenience storage literal operators, allows for specifying sizes like this:
 //  s64 a = 10_MiB;
 

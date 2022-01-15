@@ -4,6 +4,8 @@ module;
 
 export module lstd.hash;
 
+import "lstd/math/linalg.h";
+
 export import lstd.guid;
 export import lstd.string;
 
@@ -201,6 +203,25 @@ export {
         For(value.Data) hash = (hash << 5) + hash + it;
         return hash;
     }
+
+    
+    template <class T>
+    u64 get_hash(const vec<T, 1> &v) { return get_hash(v.x); }
+    template <class T>
+    u64 get_hash(const vec<T, 2> &v) { return get_hash(v.x) ^ (get_hash(v.y) << 1); }
+    template <class T>
+    u64 get_hash(const vec<T, 3> &v) { return get_hash(v.x) ^ (get_hash(v.y) << 1) ^ (get_hash(v.z) << 2); }
+    template <class T>
+    u64 get_hash(const vec<T, 4> &v) { return get_hash(v.x) ^ (get_hash(v.y) << 1) ^ (get_hash(v.z) << 2) ^ (get_hash(v.w) << 3); }
+
+    template <class T, int M>
+    u64 get_hash(const mat<T, M, 1> &v) { return get_hash(v.x); }
+    template <class T, int M>
+    u64 get_hash(const mat<T, M, 2> &v) { return get_hash(v.x) ^ (get_hash(v.y) << M); }
+    template <class T, int M>
+    u64 get_hash(const mat<T, M, 3> &v) { return get_hash(v.x) ^ (get_hash(v.y) << M) ^ (get_hash(v.z) << (M * 2)); }
+    template <class T, int M>
+    u64 get_hash(const mat<T, M, 4> &v) { return get_hash(v.x) ^ (get_hash(v.y) << M) ^ (get_hash(v.z) << (M * 2)) ^ (get_hash(v.w) << (M * 3)); }
 }
 
 LSTD_END_NAMESPACE

@@ -462,7 +462,7 @@ array<monitor *> get_monitors() { return Monitors; }
 monitor *get_primary_monitor() { return Monitors[0]; }
 
 monitor *monitor_from_window(window win) {
-    HMONITOR hMonitor = MonitorFromWindow((HWND) win.ID, MONITOR_DEFAULTTONEAREST);
+    HMONITOR hMonitor = MonitorFromWindow((HWND) win, MONITOR_DEFAULTTONEAREST);
 
     monitor *result = null;
     For(Monitors) {

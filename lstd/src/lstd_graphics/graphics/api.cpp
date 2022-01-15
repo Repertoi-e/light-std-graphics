@@ -36,14 +36,16 @@ void graphics::set_target_window(window win) {
         targetWindow         = add(&TargetWindows, target_window{});
         targetWindow->Window = win;
         if (win) {
-            targetWindow->CallbackID = win.connect_event({this, &graphics::window_event_handler});
+            targetWindow->CallbackID = connect_event(win, {this, &graphics::window_event_handler});
             Impl.InitTargetWindow(this, targetWindow);
 
             event e;
             e.Window = win;
             e.Type   = event::Window_Resized;
-            e.Width  = win.get_size().x;
-            e.Height = win.get_size().y;
+
+            int2 s = get_size(win);
+            e.Width  = s.x;
+            e.Height = s.y;
             window_event_handler(e);
         }
     } else {
@@ -85,7 +87,7 @@ void graphics::set_custom_render_target(texture_2D *target) {
 
     set_cull_mode(CurrentTargetWindow->CullMode);
 
-    int2 size = CurrentTargetWindow->Window.get_size();
+    int2 size = get_size(CurrentTargetWindow->Window);
     if (target) size = {target->Width, target->Height};
 
     rect r;
@@ -109,7 +111,7 @@ void graphics::set_cull_mode(cull mode) {
 
 void graphics::clear_color(float4 color) {
     assert(CurrentTargetWindow->Window);
-    if (!CurrentTargetWindow->Window.is_visible()) return;
+    if (!is_visible(CurrentTargetWindow->Window)) return;
 
     Impl.ClearColor(this, color);
 }
@@ -122,7 +124,7 @@ void graphics::draw_indexed(u32 indices, u32 startIndex, u32 baseVertexLocation)
 
 void graphics::swap() {
     assert(CurrentTargetWindow->Window);
-    if (!CurrentTargetWindow->Window.is_visible()) return;
+    if (!is_visible(CurrentTargetWindow->Window)) return;
 
     Impl.Swap(this);
 }
@@ -134,7 +136,7 @@ bool graphics::window_event_handler(const event &e) {
         assert(index != -1);
 
         target_window *targetWindow = TargetWindows.Data + index;
-        targetWindow->Window.disconnect_event(targetWindow->CallbackID);
+        disconnect_event(targetWindow->Window, targetWindow->CallbackID);
         Impl.ReleaseTargetWindow(this, targetWindow);
 
         remove_unordered_at_index(&TargetWindows, index);
@@ -143,7 +145,7 @@ bool graphics::window_event_handler(const event &e) {
         s64 index      = find(TargetWindows, &predicate);
         assert(index != -1);
 
-        if (!e.Window.is_visible()) return false;
+        if (!is_visible(e.Window)) return false;
         Impl.TargetWindowResized(this, TargetWindows.Data + index, e.Width, e.Height);
     }
     return false;
@@ -157,7 +159,7 @@ void graphics::free() {
 
     For(TargetWindows) {
         if (it.Window) {
-            it.Window.disconnect_event(it.CallbackID);
+            disconnect_event(it.Window, it.CallbackID);
             Impl.ReleaseTargetWindow(this, &it);
         }
     }

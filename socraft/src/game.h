@@ -8,6 +8,8 @@ struct camera {
 
     float4x4 PerspectiveMatrix;
     float4x4 ViewMatrix;
+
+    f32 Sensitivity = 0.003f;
 };
 
 void camera_update();
@@ -22,26 +24,25 @@ struct chunk_vertex {
 };
 
 struct chunk {
-    byte Blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_HEIGHT];
-
-    // Mesh:
+    // byte Blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+    
     bool Dirty;
     gbuffer VB, IB;
     u32 Indices = 0;
 };
 
 inline chunk *get_chunk() {
+    // @TODO: Chunk pool
     auto *c = malloc<chunk>();
     c->Dirty = true;
-    fill_memory(c->Blocks, 0, sizeof(c->Blocks));
+    // fill_memory(c->Blocks, 0, sizeof(c->Blocks));
     return c;
 }
 
 struct player {
-    float3 Position;
+   //  float3 Position;
+    int3 Chunk;
 };
-
-#define CHUNK_RANGE 3
 
 struct socraft_state {
     float4 ClearColor = {0.65f, 0.87f, 0.95f, 1.0f};
@@ -56,17 +57,18 @@ struct socraft_state {
     camera Camera;
     player Player;
     
-    hash_table<int2, chunk *> Chunks;
+    hash_table<int3, chunk *> Chunks;
     
     bool RenderInitted = false;
     shader ChunkShader;
     gbuffer ChunkShaderUB;  // The MVP matrix that gets uploaded to the GPU for each chunk mesh
 };
 
-void grab_mouse();
-void ungrab_mouse();
+inline socraft_state *Game = null;
 
 void reload_global_state();
+
+bool camera_event(event e);
 
 void ui_main();
 void ui_scene_properties();
@@ -81,4 +83,3 @@ inline void render_ui() {
 void ensure_render_initted();
 void render_world();
 
-inline socraft_state *Game = null;

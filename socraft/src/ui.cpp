@@ -17,9 +17,9 @@ void ui_main() {
 
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("Options")) {
-            bool vsync = Memory->MainWindow.get_flags() & window::VSYNC;
+            bool vsync = Memory->MainWindow.IsVsync();
             if (ImGui::MenuItem("VSync", "", vsync)) {
-                Memory->MainWindow.set_vsync(!vsync);
+                Memory->MainWindow.SetVsync(!vsync);
             }
             ImGui::EndMenu();
         }
@@ -50,6 +50,8 @@ void ui_scene_properties() {
         ImGui::Text("  %.3f ms/frame", 1000.0f / ImGui::GetIO().Framerate);
         ImGui::Text("  (%.1f FPS)", ImGui::GetIO().Framerate);
         ImGui::Text("");
+        ImGui::SliderFloat("Sensitivity", &Game->Camera.Sensitivity, 0.0f, 0.03f);
+        ImGui::Text("");
         ImGui::SliderFloat3("Pos", &Game->Camera.Position.x, -4, 4);
         ImGui::SliderFloat3("Rot", &Game->Camera.Rotation.x, -4, 4);
         ImGui::Text("");
@@ -78,7 +80,8 @@ void ui_viewport() {
         ImGui::Image(Game->Viewport, float2(size));
 
         if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(0)) {
-            grab_mouse();
+            Memory->MainWindow.GrabMouse();
+            Game->MouseGrabbed = true;
         }
 
         ImGui::PopStyleVar();

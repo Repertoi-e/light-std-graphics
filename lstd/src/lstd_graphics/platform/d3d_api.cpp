@@ -134,7 +134,7 @@ void d3d_init_target_window(graphics *g, graphics::target_window *targetWindow) 
     auto win = targetWindow->Window;
     assert(win);
 
-    int2 windowSize = win.get_size();
+    int2 windowSize = get_size(win);
 
     DXGI_SWAP_CHAIN_DESC desc;
     zero_memory(&desc, sizeof(desc));
@@ -143,17 +143,16 @@ void d3d_init_target_window(graphics *g, graphics::target_window *targetWindow) 
         desc.BufferDesc.Width  = windowSize.x;
         desc.BufferDesc.Height = windowSize.y;
         desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        desc.BufferDesc.RefreshRate.Numerator =
-            win.get_flags() & window::VSYNC ? monitor_from_window(win)->CurrentMode.RefreshRate : 0;
+        desc.BufferDesc.RefreshRate.Numerator = get_flags(win) & VSYNC ? monitor_from_window(win)->CurrentMode.RefreshRate : 0;
         desc.BufferDesc.RefreshRate.Denominator = 1;
         desc.BufferDesc.ScanlineOrdering        = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
         desc.BufferDesc.Scaling                 = DXGI_MODE_SCALING_UNSPECIFIED;
         desc.BufferDesc.Format                  = DXGI_FORMAT_R8G8B8A8_UNORM;
         desc.BufferUsage                        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        desc.OutputWindow                       = (HWND) win.ID;
+        desc.OutputWindow                       = (HWND) win;
         desc.SwapEffect                         = DXGI_SWAP_EFFECT_DISCARD;
         desc.SampleDesc.Count                   = 1;
-        desc.Windowed                           = !win.is_fullscreen();
+        desc.Windowed                           = !is_fullscreen(win);
     }
 
     IDXGIDevice *device;
@@ -312,7 +311,7 @@ void d3d_draw_indexed(graphics *g, u32 indices, u32 startIndex, u32 baseVertexLo
 }
 
 void d3d_swap(graphics *g) {
-    g->CurrentTargetWindow->D3D.SwapChain->Present(g->CurrentTargetWindow->Window.get_flags() & window::VSYNC ? 1 : 0, 0);
+    g->CurrentTargetWindow->D3D.SwapChain->Present(get_flags(g->CurrentTargetWindow->Window) & VSYNC ? 1 : 0, 0);
 }
 
 void d3d_release(graphics *g) {

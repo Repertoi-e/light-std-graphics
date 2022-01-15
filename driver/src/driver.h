@@ -25,6 +25,21 @@ LSTD_USING_NAMESPACE;  // The library is in it's own namespace for the sake of n
 #pragma warning(disable : 4251)
 #endif
 
+// All window related calls need to happen in the exe because of internal state kept by lstd.
+// The .dll gets it's own lstd. We could somehow tell it to share the state but that gets messy.
+// Instead we let the exe manage the main window, the dll can create and do it's own stuff with windows, etc.
+struct main_window_api {
+    int2 (*GetSize)();
+
+    bool (*IsVisible)();
+
+    bool (*IsVsync)();
+    void (*SetVsync)(bool enabled);
+
+    void (*GrabMouse)();
+    void (*UngrabMouse)();
+};
+
 // The permanent state of the game.
 // This does not get affected on reload.
 struct memory {
@@ -33,12 +48,11 @@ struct memory {
     // Gets set the first time the game loads as well!
     bool ReloadedThisFrame = false;
 
+    main_window_api MainWindow;
+
     // This gets set by the DLL.
     // Tells the exe to reload.
     bool RequestReloadNextFrame = false;
-
-    // The exe gives us the main window it has created.
-    window MainWindow;
 
     // Our target FPS by default is 60. If the PC we are running on doesn't manage to hit that, we need to reduce
     // it. Then the frame delta must change. So we shouldn't hardcode 1/60 spf (e.g. for physics calculations)

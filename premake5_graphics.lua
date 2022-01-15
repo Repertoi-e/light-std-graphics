@@ -31,9 +31,9 @@ project "graph"
 	-- Output dll in the same location as the driver
     targetdir("bin/%{cfg.buildcfg}/driver")
 	
-    -- Unique PDB name each time we build (in order to support debugging while hot-swapping the game dll)
     filter "system:windows"
-        symbolspath '$(OutDir)$(TargetName)-$([System.DateTime]::Now.ToString("ddMMyyyy_HHmmss_fff")).pdb'
+		-- Unique PDB name each time we build (in order to support debugging while hot-swapping the game dll)
+        --symbolspath '$(OutDir)$(TargetName)-$([System.DateTime]::Now.ToString("ddMMyyyy_HHmmss_fff")).pdb'
         links { "dxgi.lib", "d3d11.lib", "d3dcompiler.lib", "d3d11.lib", "d3d10.lib" }
 
 project "socraft"
@@ -48,7 +48,7 @@ project "socraft"
 	-- Output dll in the same location as the driver
     targetdir("bin/%{cfg.buildcfg}/driver")
 	
-    -- Unique PDB name each time we build (in order to support debugging while hot-swapping the game dll)
     filter "system:windows"
-        symbolspath '$(OutDir)$(TargetName)-$([System.DateTime]::Now.ToString("ddMMyyyy_HHmmss_fff")).pdb'
+		-- Unique PDB name each time we build (in order to support debugging while hot-swapping the game dll)
+        -- symbolspath '$(OutDir)$(TargetName)-$([System.DateTime]::Now.ToString("ddMMyyyy_HHmmss_fff")).pdb'
         links { "dxgi.lib", "d3d11.lib", "d3dcompiler.lib", "d3d11.lib", "d3d10.lib" }

@@ -78,12 +78,12 @@ struct window_data {
     display_mode DisplayMode;
     monitor *Monitor               = null;  // Non-null if we are fullscreen!
     cursor *Cursor                 = null;
-    window::cursor_mode CursorMode = window::CURSOR_NORMAL;
+    cursor_mode CursorMode =       CURSOR_NORMAL;
 
-    s32 AspectRatioNumerator = window::DONT_CARE, AspectRatioDenominator = window::DONT_CARE;
+    s32 AspectRatioNumerator = DONT_CARE, AspectRatioDenominator = DONT_CARE;
 
     // Min, max dimensions
-    s32 MinW = window::DONT_CARE, MinH = window::DONT_CARE, MaxW = window::DONT_CARE, MaxH = window::DONT_CARE;
+    s32 MinW = DONT_CARE, MinH = DONT_CARE, MaxW = DONT_CARE, MaxH = DONT_CARE;
 
     // Virtual cursor position when cursor is disabled
     int2 VirtualCursorPos;
@@ -103,8 +103,8 @@ file_scope auto MonitorCallback = [](const monitor_event &e) {
     auto *win = WindowsList;
     while (win) {
         if (win->Monitor == e.Monitor) {
-            int2 size = win->Handle.get_size();
-            win->Handle.set_fullscreen(null, size.x, size.y);
+            int2 size = get_size(win->Handle);
+            set_fullscreen(win->Handle, null, size.x, size.y);
         }
         win = win->Next;
     }
@@ -131,12 +131,12 @@ file_scope DWORD get_window_style(window_data *win) {
     } else {
         style |= WS_SYSMENU | WS_MINIMIZEBOX;
 
-        if (win->Flags & window::BORDERLESS) {
+        if (win->Flags & BORDERLESS) {
             style |= WS_POPUP;
 
         } else {
             style |= WS_CAPTION;
-            if (win->Flags & window::RESIZABLE) style |= WS_MAXIMIZEBOX | WS_THICKFRAME;
+            if (win->Flags & RESIZABLE) style |= WS_MAXIMIZEBOX | WS_THICKFRAME;
         }
     }
     return style;
@@ -144,7 +144,7 @@ file_scope DWORD get_window_style(window_data *win) {
 
 file_scope DWORD get_window_ex_style(window_data *win) {
     DWORD style = WS_EX_APPWINDOW;
-    if (win->Monitor || win->Flags & window::ALWAYS_ON_TOP) style |= WS_EX_TOPMOST;
+    if (win->Monitor || win->Flags & ALWAYS_ON_TOP) style |= WS_EX_TOPMOST;
     return style;
 }
 
@@ -209,89 +209,84 @@ window create_window(string title, s32 x, s32 y, s32 width, s32 height, u32 flag
     win->DisplayMode.Height  = height;
     win->DisplayMode.RedBits = win->DisplayMode.GreenBits = win->DisplayMode.BlueBits = 8;
 
-    win->DisplayMode.RefreshRate = window::DONT_CARE;
+    win->DisplayMode.RefreshRate = DONT_CARE;
 
-    win->Flags = flags & window::CREATION_FLAGS;
+    win->Flags = flags & CREATION_FLAGS;
 
     DWORD style   = get_window_style(win);
     DWORD exStyle = get_window_ex_style(win);
 
     int2 fullSize = get_full_window_size(style, exStyle, width, height, USER_DEFAULT_SCREEN_DPI);
 
-    s32 xpos = x == window::DONT_CARE ? CW_USEDEFAULT : x;
-    s32 ypos = y == window::DONT_CARE ? CW_USEDEFAULT : y;
-    if (x == window::CENTERED) xpos = (get_primary_monitor()->CurrentMode.Width - fullSize.x) / 2;
-    if (y == window::CENTERED) ypos = (get_primary_monitor()->CurrentMode.Height - fullSize.y) / 2;
+    s32 xpos = x == DONT_CARE ? CW_USEDEFAULT : x;
+    s32 ypos = y == DONT_CARE ? CW_USEDEFAULT : y;
+    if (x == CENTERED) xpos = (get_primary_monitor()->CurrentMode.Width - fullSize.x) / 2;
+    if (y == CENTERED) ypos = (get_primary_monitor()->CurrentMode.Height - fullSize.y) / 2;
 
-    win->hWnd = CreateWindowExW(exStyle, WindowClassName, L"", style, xpos, ypos, fullSize.x, fullSize.y, null, null, GetModuleHandleW(null), (void *) (u64) (win->Flags & window::SCALE_TO_MONITOR));
+    win->hWnd = CreateWindowExW(exStyle, WindowClassName, L"", style, xpos, ypos, fullSize.x, fullSize.y, null, null, GetModuleHandleW(null), (void *) (u64) (win->Flags & SCALE_TO_MONITOR));
 
     if (!win->hWnd) {
         print(">>> {}:{} Failed to create window.\n", __FILE__, __LINE__);
-
         free(win);
-
-        window handle;
-        return handle;
+        return null;
     }
 
-    window handle;
-    handle.ID = (u64) win->hWnd;
-
+    window handle = win->hWnd;
     win->Handle = handle;
 
-    SetWindowLongPtrW(win->hWnd, 0, (LONG_PTR) win);
+    SetWindowLongPtrW(handle, 0, (LONG_PTR) win);
 
     win->Next   = WindowsList;
     WindowsList = win;
 
-    handle.set_title(title);
+    set_title(handle, title);
 
     // Adjust window rect to account for DPI scaling of the window frame and
     // (if enabled) DPI scaling of the content area. This cannot be done until
     // we know what monitor the window was placed on
     RECT rect = {0, 0, width, height};
 
-    if (win->Flags & window::SCALE_TO_MONITOR) {
+    if (win->Flags & SCALE_TO_MONITOR) {
         float2 scale = get_content_scale(monitor_from_window(handle));
         rect.right   = (s32) (rect.right * scale.x);
         rect.bottom  = (s32) (rect.bottom * scale.y);
     }
 
-    ClientToScreen(win->hWnd, (POINT *) &rect.left);
-    ClientToScreen(win->hWnd, (POINT *) &rect.right);
+    ClientToScreen(handle, (POINT *) &rect.left);
+    ClientToScreen(handle, (POINT *) &rect.right);
 
     if (IS_WINDOWS_10_ANNIVERSARY_UPDATE_OR_GREATER()) {
-        AdjustWindowRectExForDpi(&rect, style, false, exStyle, GetDpiForWindow(win->hWnd));
+        AdjustWindowRectExForDpi(&rect, style, false, exStyle, GetDpiForWindow(handle));
     } else {
         AdjustWindowRectEx(&rect, style, false, exStyle);
     }
 
     // Only update the restored window rect as the window may be maximized
     WINDOWPLACEMENT wp = {sizeof(wp)};
-    GetWindowPlacement(win->hWnd, &wp);
+    GetWindowPlacement(handle, &wp);
     wp.rcNormalPosition = rect;
     wp.showCmd          = SW_HIDE;
-    SetWindowPlacement(win->hWnd, &wp);
+    SetWindowPlacement(handle, &wp);
 
-    SetPropW(win->hWnd, L"LSTD", win);
+    SetPropW(handle, L"LSTD", win);
 
-    ChangeWindowMessageFilterEx(win->hWnd, WM_DROPFILES, MSGFLT_ALLOW, null);
-    ChangeWindowMessageFilterEx(win->hWnd, WM_COPYDATA, MSGFLT_ALLOW, null);
-    ChangeWindowMessageFilterEx(win->hWnd, WM_COPYGLOBALDATA, MSGFLT_ALLOW, null);
-    DragAcceptFiles(win->hWnd, true);
+    ChangeWindowMessageFilterEx(handle, WM_DROPFILES, MSGFLT_ALLOW, null);
+    ChangeWindowMessageFilterEx(handle, WM_COPYDATA, MSGFLT_ALLOW, null);
+    ChangeWindowMessageFilterEx(handle, WM_COPYGLOBALDATA, MSGFLT_ALLOW, null);
+    DragAcceptFiles(handle, true);
 
-    if (win->Flags & window::ALPHA) update_framebuffer_transparency(win);
-    if (win->Flags & window::SHOWN) handle.show();
+    if (win->Flags & ALPHA) update_framebuffer_transparency(win);
+    if (win->Flags & SHOWN) show(handle);
 
     // If we couldn't get transparent, remove the flag
     BOOL enabled;
     if (FAILED(DwmIsCompositionEnabled(&enabled)) || !enabled) {
-        win->Flags &= ~window::ALPHA;
+        win->Flags &= ~ALPHA;
     }
 
-    auto wh     = handle.get_size();
-    win->Width  = wh.x;
-    win->Height = wh.y;
+    auto s = get_size(handle);
+    win->Width  = s.x;
+    win->Height = s.y;
 
     zero_memory(win->Keys.Data, sizeof(win->Keys.Data));
     zero_memory(win->LastFrameKeys.Data, sizeof(win->LastFrameKeys.Data));
@@ -305,23 +300,23 @@ window create_window(string title, s32 x, s32 y, s32 width, s32 height, u32 flag
     return handle;
 }
 
-s64 window::connect_event(delegate<bool(event)> sb) {
-    auto win = get_window_data(*this);
+s64 connect_event(window w, delegate<bool(event)> sb) {
+    auto win = get_window_data(w);
     return connect(&win->Event, sb);
 }
 
-bool window::disconnect_event(s64 cb) {
-    auto win = get_window_data(*this);
+bool disconnect_event(window w, s64 cb) {
+    auto win = get_window_data(w);
     return disconnect(&win->Event, cb);
 }
 
-u32 window::get_flags() const {
-    auto win = get_window_data(*this);
+u32 get_flags(window w) {
+    auto win = get_window_data(w);
     return win->Flags;
 }
 
-bool window::is_destroying() const {
-    auto win = get_window_data(*this);
+bool is_destroying(window w) {
+    auto win = get_window_data(w);
     return win->IsDestroying;
 }
 
@@ -351,7 +346,7 @@ file_scope void do_mouse_input_event(window_data *win, u32 button, bool pressed,
     assert(button <= Mouse_Button_Last);
     win->MouseButtons[button] = pressed;
 
-    int2 pos = win->Handle.get_cursor_pos();
+    int2 pos = get_cursor_pos(win->Handle);
 
     event e;
     e.Window        = win->Handle;
@@ -377,284 +372,6 @@ file_scope void do_mouse_move(window_data *win, int2 pos) {
     emit_while_false(&win->Event, e);
 }
 
-//
-// Here are a couple functions which enable us to break from the window resize loop.
-// This allows properly sending events to people while the user is resizing the window
-// allowing for smooth content updates (usually apps implement this with WM_PAINT,
-// but since we are doing graphics outside the message loop, we can't rely on this).
-//
-// Things that are not emulated: shaking and snapping.
-// These can be implemented and the author of the original piece of code has implemented them,
-// but we just haven't bothered including them here.
-// @TODO For completeness..
-//
-// https://sourceforge.net/projects/win32loopl/
-//
-
-/*
-    LooplessSizeMove.c
-    Implements functions for modal-less window resizing and movement in Windows
-
-    Author: Nathaniel J Fries
-
-    The author asserts no copyright, this work is released into the public domain.
-*/
-
-#define LSM_LEFT 0x01
-#define LSM_TOP 0x02
-#define LSM_RIGHT 0x04
-#define LSM_BOTTOM 0x08
-#define LSM_CAPTION 0x00
-#define LSM_NOGRAB 0xF0
-
-struct SIZEMOVEDATA {
-    HWND hWnd;
-    MINMAXINFO minmax;
-    RECT rcWin;
-    RECT rcOrig;
-    POINT ptCapture;
-    LONG grab;
-};
-
-file_scope thread_local SIZEMOVEDATA *sizemove;
-
-void GetMinMaxInfo(HWND hWnd, PMINMAXINFO info) {
-    RECT rc;
-    LONG style    = GetWindowLongW(hWnd, GWL_STYLE);
-    LONG altStyle = ((style & WS_CAPTION) == WS_CAPTION) ? (style & ~WS_BORDER) : (style);
-
-    /* calculate the default values in case WindowProc does not respond */
-    GetClientRect(GetParent(hWnd), &rc);
-    AdjustWindowRectEx(&rc, altStyle, ((style & WS_POPUP) && GetMenu(hWnd)), GetWindowLongW(hWnd, GWL_EXSTYLE));
-    info->ptMaxPosition.x = rc.left;
-    info->ptMaxPosition.y = rc.top;
-    info->ptMaxSize.x     = rc.right - rc.left;
-    info->ptMaxSize.y     = rc.bottom - rc.top;
-    if (style & WS_CAPTION) {
-        info->ptMinTrackSize.x = GetSystemMetrics(SM_CXMINTRACK);
-        info->ptMaxTrackSize.y = GetSystemMetrics(SM_CYMINTRACK);
-    } else {
-        /* why not zero? this is what ReactOS and presumably Wine do,
-        and they're the experts at replicating Windows UI behavior */
-        info->ptMinTrackSize.x = info->ptMaxPosition.x * -2;
-        info->ptMaxTrackSize.y = info->ptMaxPosition.y * -2;
-    }
-    info->ptMaxTrackSize.x = GetSystemMetrics(SM_CXMAXTRACK);
-    info->ptMaxTrackSize.y = GetSystemMetrics(SM_CYMAXTRACK);
-
-    /* ask Window proc to make any changes */
-    SendMessageW(hWnd, WM_GETMINMAXINFO, 0, (LPARAM) info);
-}
-
-LRESULT PrepareSizeMove(HWND hWnd, WPARAM action, DWORD dwPos) {
-    WINDOWINFO winfo;
-    SIZEMOVEDATA *sm;
-    RECT rcClipCursor;
-
-    winfo.cbSize = sizeof(WINDOWINFO);
-    /* most likely not a valid window */
-    if (GetWindowInfo(hWnd, &winfo) == 0)
-        return 0;
-    /* can't move or resize a maximized or invisible window */
-    if (winfo.dwStyle & WS_MAXIMIZE || !IsWindowVisible(hWnd))
-        return 0;
-    /* can't resize a window without the resizing border */
-    if ((action & 0xfff0) == SC_MOVE && !(winfo.dwStyle & WS_SIZEBOX))
-        return 0;
-
-    /*
-      if another window on this thread has capture,
-      it might be using this too...
-      tell it to clean up before setting the tls value
-    */
-    ReleaseCapture();
-
-    sm = (SIZEMOVEDATA *) LocalAlloc(0, sizeof(SIZEMOVEDATA));
-    if (!sm) {
-        /* error */
-        return 1;
-    }
-    sizemove = sm;
-
-    sm->grab = action & 0x000f;
-    sm->hWnd = hWnd;
-    GetMinMaxInfo(hWnd, &sm->minmax);
-    sm->rcWin = winfo.rcWindow;
-    if (winfo.dwStyle & WS_CHILD) {
-        /* map points into the parent's coordinate space */
-        HWND parent = GetParent(hWnd);
-        MapWindowPoints(0, parent, (LPPOINT) &sm->rcWin, 2);
-        GetWindowRect(parent, &rcClipCursor);
-        MapWindowPoints(parent, HWND_DESKTOP, (LPPOINT) &rcClipCursor, 2);
-    } else if (!(winfo.dwExStyle & WS_EX_TOPMOST)) {
-        SystemParametersInfoW(SPI_GETWORKAREA, 0, &rcClipCursor, 0);
-    } else {
-        rcClipCursor.left = rcClipCursor.top = 0;
-        rcClipCursor.right                   = GetSystemMetrics(SM_CXSCREEN);
-        rcClipCursor.bottom                  = GetSystemMetrics(SM_CYSCREEN);
-    }
-    sm->rcOrig = sm->rcWin;
-
-    sm->ptCapture.x = (short) LOWORD(dwPos);
-    sm->ptCapture.y = (short) HIWORD(dwPos);
-    ClipCursor(&rcClipCursor);
-    /* notify WinProc we're beginning, but return instead of looping */
-    SendMessageW(hWnd, WM_ENTERSIZEMOVE, 0, 0);
-    if (GetCapture() != hWnd) {
-        SetCapture(hWnd);
-    }
-    return 0;
-}
-
-#define RECTWIDTH(r) ((r).right - (r).left)
-#define RECTHEIGHT(r) ((r).bottom - (r).top)
-
-bool SizingCheck(const MSG *lpmsg) {
-    POINT pt = lpmsg->pt;
-    int dx = 0, dy = 0;
-    /*
-        Discussion of rev3 changes.
-        There was a bug in previous revisions that would cause
-            the resize state to continue even if the Window lost
-            mouse capture. Windows provides notification of losing
-            mouse capture, but it crashes the program to take capture
-            back while processing that message.
-            So, we choose to yield to this other program and stop resizing.
-            This is probably user32 behavior anyway.
-            Windows also sends this notification in response to calling ReleaseCapture,
-                so all clean-up code has been moved to the handler.
-            This also allowed us to eliminate the function StopSizing.
-	*/
-    if (!sizemove) /* not sizing */
-        return 0;
-    if (sizemove->grab == LSM_NOGRAB) /* not sizing */
-        return 0;
-    if (lpmsg->hwnd != sizemove->hWnd) /* wrong window */
-        return 0;
-    if (lpmsg->message == WM_NCLBUTTONUP || lpmsg->message == WM_LBUTTONUP) {
-        ReleaseCapture();
-        return 1;
-    }
-
-    if (lpmsg->message == WM_KEYDOWN) {
-        switch (lpmsg->wParam) {
-            case VK_RETURN:
-                ReleaseCapture();
-                return 1;
-            case VK_ESCAPE: {
-                SetWindowPos(sizemove->hWnd, 0, sizemove->rcOrig.left, sizemove->rcOrig.top, RECTWIDTH(sizemove->rcOrig), RECTHEIGHT(sizemove->rcOrig), 0);
-                ReleaseCapture();
-                return 1;
-            }
-            case VK_UP:
-                pt.y -= 8;
-                break;
-            case VK_DOWN:
-                pt.y += 8;
-                break;
-            case VK_LEFT:
-                pt.x -= 8;
-                break;
-            case VK_RIGHT:
-                pt.x += 8;
-                break;
-            default:
-                break;
-        }
-    }
-
-    /* used to handle WM_MOUSEMOVE. This was unnecessary code  */
-
-    dx = pt.x - sizemove->ptCapture.x;
-    dy = pt.y - sizemove->ptCapture.y;
-    if (dx || dy) {
-        BOOL changeCursor = (lpmsg->message == WM_KEYDOWN);
-        WPARAM wpHit      = 0;
-
-        if (sizemove->grab == LSM_CAPTION) {
-            OffsetRect(&sizemove->rcWin, dx, dy);
-        } else {
-            /* note on minmax correction
-                if you do not correct the capture pos (set later from `pt`),
-                window will expand massively if user pulls back mouse
-                after failing to shrink when resizing from the
-                bottom or the right borders.
-            */
-            /* when resizing using keys, Windows also moves the cursor */
-            if (sizemove->grab & LSM_LEFT) {
-                int lmax = sizemove->rcWin.right - sizemove->minmax.ptMaxTrackSize.x;
-                int lmin = sizemove->rcWin.right - sizemove->minmax.ptMinTrackSize.x;
-                if (sizemove->rcWin.left + dx < lmax) {
-                    sizemove->rcWin.left = lmax;
-                } else if (sizemove->rcWin.left + dx > lmin) {
-                    sizemove->rcWin.left = lmin;
-                } else {
-                    sizemove->rcWin.left += dx;
-                }
-                pt.x  = sizemove->rcWin.left;
-                wpHit = WMSZ_LEFT;
-            } else if (sizemove->grab & LSM_RIGHT) {
-                int rmax = sizemove->rcWin.left + sizemove->minmax.ptMaxTrackSize.x;
-                int rmin = sizemove->rcWin.left + sizemove->minmax.ptMinTrackSize.x;
-                if (sizemove->rcWin.right + dx > rmax) {
-                    sizemove->rcWin.right = rmax;
-                } else if (sizemove->rcWin.right + dx < rmin) {
-                    sizemove->rcWin.right = rmin;
-                } else {
-                    sizemove->rcWin.right += dx;
-                }
-                pt.x  = sizemove->rcWin.right;
-                wpHit = WMSZ_RIGHT;
-            }
-            if (sizemove->grab & LSM_TOP) {
-                int tmax = sizemove->rcWin.bottom - sizemove->minmax.ptMaxTrackSize.y;
-                int tmin = sizemove->rcWin.bottom - sizemove->minmax.ptMinTrackSize.y;
-                if (sizemove->rcWin.top + dy < tmax) {
-                    sizemove->rcWin.top = tmax;
-                } else if (sizemove->rcWin.top + dy > tmin) {
-                    sizemove->rcWin.top = tmin;
-                } else {
-                    sizemove->rcWin.top += dy;
-                }
-                pt.y = sizemove->rcWin.top;
-                if (wpHit == WMSZ_LEFT) {
-                    wpHit = WMSZ_TOPLEFT;
-                } else if (wpHit == WMSZ_RIGHT) {
-                    wpHit = WMSZ_TOPRIGHT;
-                } else {
-                    wpHit = WMSZ_TOP;
-                }
-            } else if (sizemove->grab & LSM_BOTTOM) {
-                int bmax = sizemove->rcWin.top + sizemove->minmax.ptMaxTrackSize.y;
-                int bmin = sizemove->rcWin.top + sizemove->minmax.ptMinTrackSize.y;
-                if (sizemove->rcWin.bottom + dy > bmax) {
-                    sizemove->rcWin.bottom = bmax;
-                } else if (sizemove->rcWin.bottom + dy < bmin) {
-                    sizemove->rcWin.bottom = bmin;
-                } else {
-                    sizemove->rcWin.bottom += dy;
-                }
-                pt.y = sizemove->rcWin.bottom;
-                if (wpHit == WMSZ_LEFT) {
-                    wpHit = WMSZ_BOTTOMLEFT;
-                } else if (wpHit == WMSZ_RIGHT) {
-                    wpHit = WMSZ_BOTTOMRIGHT;
-                } else {
-                    wpHit = WMSZ_BOTTOM;
-                }
-            }
-        }
-        SendMessageW(sizemove->hWnd, WM_SIZING, wpHit, (LPARAM) &sizemove->rcWin);
-        SetWindowPos(sizemove->hWnd, 0, sizemove->rcWin.left, sizemove->rcWin.top, RECTWIDTH(sizemove->rcWin), RECTHEIGHT(sizemove->rcWin), 0);
-
-        sizemove->ptCapture = pt;
-
-        /* when resizing using keys, Windows also moves the cursor */
-        if (changeCursor) SetCursorPos(pt.x, pt.y);
-    }
-    return 1;
-}
-
 void update_windows() {
     MSG message;
     while (PeekMessageW(&message, null, 0, 0, PM_REMOVE) > 0) {
@@ -668,7 +385,6 @@ void update_windows() {
             }
         } else {
             TranslateMessage(&message);
-            SizingCheck(&message);
             DispatchMessageW(&message);
         }
     }
@@ -705,9 +421,9 @@ void update_windows() {
     }
 
     if (DisabledCursorWindow) {
-        int2 size = DisabledCursorWindow.get_size();
+        int2 size = get_size(DisabledCursorWindow);
         if (get_window_data(DisabledCursorWindow)->LastCursorPos != size / 2) {
-            DisabledCursorWindow.set_cursor_pos(size / 2);
+            set_cursor_pos(DisabledCursorWindow, size / 2);
         }
     }
 }
@@ -738,15 +454,14 @@ file_scope void release_monitor(window_data *win) {
         SystemParametersInfoW(SPI_SETMOUSETRAILS, MouseTrailSize, 0, 0);
     }
 
-    win->Monitor->Window = {};
+    win->Monitor->Window = null;
     restore_display_mode(win->Monitor);
 }
 
 file_scope void uninit(window handle) {
+    if (!handle) return;
+
     auto *win = get_window_data(handle);
-
-    if (handle.ID == window::INVALID_ID) return;
-
     win->IsDestroying = true;
 
     event e;
@@ -755,12 +470,12 @@ file_scope void uninit(window handle) {
     emit_while_false(&win->Event, e);
 
     if (win->Monitor) release_monitor(win);
-    if (DisabledCursorWindow == handle) DisabledCursorWindow = {};
+    if (DisabledCursorWindow == handle) DisabledCursorWindow = null;
 
-    if (win->hWnd) {
-        RemovePropW(win->hWnd, L"LSTD");
-        DestroyWindow(win->hWnd);
-        win->hWnd = null;
+    if (handle) {
+        RemovePropW(handle, L"LSTD");
+        DestroyWindow(handle);
+        handle = null;
     }
 
     if (win->BigIcon) DestroyIcon(win->BigIcon);
@@ -768,7 +483,7 @@ file_scope void uninit(window handle) {
 
     free_signal(&win->Event);
 
-    win->Handle.ID = handle.ID = window::INVALID_ID;
+    win->Handle = null;
 }
 
 void free_window(window handle) {
@@ -783,8 +498,8 @@ void free_window(window handle) {
     free(win);
 }
 
-string window::get_title() {
-    auto *win = get_window_data(*this);
+string get_title(window w) {
+    auto *win = get_window_data(w);
 
     s32 length = GetWindowTextLengthW(win->hWnd) + 1;
 
@@ -796,8 +511,8 @@ string window::get_title() {
     return platform_utf16_to_utf8(titleUtf16, platform_get_persistent_allocator());
 }
 
-void window::set_title(string title) {
-    auto *win = get_window_data(*this);
+void set_title(window w, string title) {
+    auto *win = get_window_data(w);
 
     // title.Length * 2 because one unicode character might take 2 wide chars.
     // This is just an approximation, not all space will be used!
@@ -813,8 +528,8 @@ file_scope void fit_to_monitor(window_data *win) {
     SetWindowPos(win->hWnd, HWND_TOPMOST, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
 }
 
-void window::set_fullscreen(monitor *mon, s32 width, s32 height, s32 refreshRate) {
-    auto *win = get_window_data(*this);
+void set_fullscreen(window w, monitor *mon, s32 width, s32 height, s32 refreshRate) {
+    auto *win = get_window_data(w);
 
     win->DisplayMode.Width       = width;
     win->DisplayMode.Height      = height;
@@ -822,7 +537,7 @@ void window::set_fullscreen(monitor *mon, s32 width, s32 height, s32 refreshRate
 
     if (win->Monitor == mon) {
         if (mon) {
-            if (mon->Window == *this) {
+            if (mon->Window == w) {
                 acquire_monitor(win);
                 fit_to_monitor(win);
             }
@@ -888,8 +603,8 @@ void window::set_fullscreen(monitor *mon, s32 width, s32 height, s32 refreshRate
     }
 }
 
-bool window::is_fullscreen() const {
-    auto win = get_window_data(*this);
+bool is_fullscreen(window w) {
+    auto win = get_window_data(w);
     return win->Monitor;
 }
 
@@ -975,8 +690,8 @@ file_scope s64 choose_icon(array<bitmap> icons, s32 width, s32 height) {
     return closest;
 }
 
-void window::set_icon(array<bitmap> icons) {
-    auto win = get_window_data(*this);
+void set_icon(window w, array<bitmap> icons) {
+    auto win = get_window_data(w);
 
     HICON bigIcon = null, smallIcon = null;
 
@@ -1018,14 +733,14 @@ file_scope void update_clip_rect(window_data *win) {
 
 // Updates the cursor image according to its cursor mode
 file_scope void update_cursor_image(window_data *win) {
-    if (win->CursorMode == window::CURSOR_NORMAL) {
+    if (win->CursorMode == CURSOR_NORMAL) {
         if (win->Cursor) {
             SetCursor(win->Cursor->PlatformData.Win32.hCursor);
         } else {
             SetCursor(LoadCursorW(null, IDC_ARROW));
         }
     } else {
-        SetCursor(null);  // We get here when the cursor mode is window::CURSOR_HIDDEN
+        SetCursor(null);  // We get here when the cursor mode is CURSOR_HIDDEN
     }
 }
 
@@ -1048,9 +763,10 @@ file_scope void disable_raw_mouse_motion() {
 // Apply disabled cursor mode to a focused window
 file_scope void disable_cursor(window_data *win) {
     DisabledCursorWindow = win->Handle;
-    RestoreCursorPos     = win->Handle.get_cursor_pos();
+    RestoreCursorPos     = get_cursor_pos(win->Handle);
     update_cursor_image(win);
-    win->Handle.set_cursor_pos(win->Handle.get_size() / 2);
+    set_cursor_pos(win->Handle, get_size(win->Handle) / 2);
+
     update_clip_rect(win);
 
     if (win->RawMouseMotion) enable_raw_mouse_motion(win);
@@ -1060,21 +776,21 @@ file_scope void disable_cursor(window_data *win) {
 file_scope void enable_cursor(window_data *win) {
     if (win->RawMouseMotion) disable_raw_mouse_motion();
 
-    DisabledCursorWindow = {};
+    DisabledCursorWindow = null;
     update_clip_rect(null);
-    win->Handle.set_cursor_pos(RestoreCursorPos);
+    set_cursor_pos(win->Handle, RestoreCursorPos);
     update_cursor_image(win);
 }
 
-void window::set_cursor(cursor *curs) {
-    auto win = get_window_data(*this);
+void set_cursor(window w, cursor *curs) {
+    auto win = get_window_data(w);
 
     win->Cursor = curs;
-    if (is_hovered()) update_cursor_image(win);
+    if (is_hovered(w)) update_cursor_image(win);
 }
 
-int2 window::get_cursor_pos() const {
-    auto win = get_window_data(*this);
+int2 get_cursor_pos(window w) {
+    auto win = get_window_data(w);
 
     POINT pos;
     if (GetCursorPos(&pos)) {
@@ -1085,10 +801,10 @@ int2 window::get_cursor_pos() const {
     return {};
 }
 
-void window::set_cursor_pos(int2 pos) {
-    if (pos == get_cursor_pos()) return;
+void set_cursor_pos(window w, int2 pos) {
+    if (pos == get_cursor_pos(w)) return;
 
-    auto win = get_window_data(*this);
+    auto win = get_window_data(w);
 
     win->LastCursorPos = pos;
 
@@ -1097,18 +813,18 @@ void window::set_cursor_pos(int2 pos) {
     SetCursorPos(point.x, point.y);
 }
 
-int2 window::get_pos() const {
-    auto win = get_window_data(*this);
+int2 get_pos(window w) {
+    auto win = get_window_data(w);
 
     POINT pos = {0, 0};
     ClientToScreen(win->hWnd, &pos);
     return {pos.x, pos.y};
 }
 
-void window::set_pos(int2 pos) {
-    if (pos == get_pos()) return;
+void set_pos(window w, int2 pos) {
+    if (pos == get_pos(w)) return;
 
-    auto win = get_window_data(*this);
+    auto win = get_window_data(w);
 
     RECT rect = {pos.x, pos.y, pos.x, pos.y};
 
@@ -1120,24 +836,24 @@ void window::set_pos(int2 pos) {
     SetWindowPos(win->hWnd, null, rect.left, rect.top, 0, 0, SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOSIZE);
 }
 
-int2 window::get_size() const {
-    auto win = get_window_data(*this);
+int2 get_size(window w) {
+    auto win = get_window_data(w);
 
     RECT rect;
     GetClientRect(win->hWnd, &rect);
     return {rect.right, rect.bottom};
 }
 
-void window::set_size(int2 size) {
-    auto win = get_window_data(*this);
+void set_size(window w, int2 size) {
+    auto win = get_window_data(w);
 
     win->DisplayMode.Width  = size.x;
     win->DisplayMode.Height = size.y;
 
-    if (size == get_size()) return;
+    if (size == get_size(w)) return;
 
     if (win->Monitor) {
-        if (win->Monitor->Window == *this) {
+        if (win->Monitor->Window == w) {
             acquire_monitor(win);
             fit_to_monitor(win);
         }
@@ -1154,12 +870,12 @@ void window::set_size(int2 size) {
     }
 }
 
-int2 window::get_framebuffer_size() const { return get_size(); }
+int2 get_framebuffer_size(window w) { return get_size(w); }
 
-rect window::get_adjusted_bounds() const {
-    auto win = get_window_data(*this);
+rect get_adjusted_bounds(window w) {
+    auto win = get_window_data(w);
 
-    int2 size = get_size();
+    int2 size = get_size(w);
 
     RECT rect;
     SetRect(&rect, 0, 0, size.x, size.y);
@@ -1176,12 +892,10 @@ rect window::get_adjusted_bounds() const {
     r.bottom = rect.bottom;
     r.right  = rect.right;
     return r;
-
-    // return {-rect.left, -rect.top, rect.right, rect.bottom};
 }
 
-void window::set_size_limits(int2 minDimension, int2 maxDimension) {
-    auto win = get_window_data(*this);
+void set_size_limits(window w, int2 minDimension, int2 maxDimension) {
+    auto win = get_window_data(w);
 
     if (minDimension.x != DONT_CARE && minDimension.y != DONT_CARE) {
         if (minDimension.x < 0 || minDimension.y < 0) {
@@ -1227,8 +941,8 @@ file_scope void apply_aspect_ratio(window_data *win, s32 edge, RECT *area) {
     }
 }
 
-void window::set_forced_aspect_ratio(s32 numerator, s32 denominator) {
-    auto win = get_window_data(*this);
+void set_forced_aspect_ratio(window w, s32 numerator, s32 denominator) {
+    auto win = get_window_data(w);
 
     if (numerator != DONT_CARE && denominator != DONT_CARE) {
         if (numerator <= 0 || denominator <= 0) {
@@ -1248,12 +962,12 @@ void window::set_forced_aspect_ratio(s32 numerator, s32 denominator) {
     MoveWindow(win->hWnd, area.left, area.top, area.right - area.left, area.bottom - area.top, true);
 }
 
-void window::set_raw_mouse(bool enabled) {
-    auto win = get_window_data(*this);
+void set_raw_mouse(window w, bool enabled) {
+    auto win = get_window_data(w);
 
     if (win->RawMouseMotion == enabled) return;
 
-    if (DisabledCursorWindow != *this) {
+    if (DisabledCursorWindow != w) {
         win->RawMouseMotion = enabled;
         if (enabled) {
             enable_raw_mouse_motion(win);
@@ -1263,30 +977,30 @@ void window::set_raw_mouse(bool enabled) {
     }
 }
 
-void window::set_cursor_mode(cursor_mode mode) {
-    auto win = get_window_data(*this);
+void set_cursor_mode(window w, cursor_mode mode) {
+    auto win = get_window_data(w);
 
     if (win->CursorMode == mode) return;
 
     win->CursorMode       = mode;
-    win->VirtualCursorPos = get_cursor_pos();
+    win->VirtualCursorPos = get_cursor_pos(w);
 
     if (mode == CURSOR_DISABLED) {
         if (win->Flags & FOCUSED) disable_cursor(win);
-    } else if (DisabledCursorWindow == *this) {
+    } else if (DisabledCursorWindow == w) {
         enable_cursor(win);
-    } else if (is_hovered()) {
+    } else if (is_hovered(w)) {
         update_cursor_image(win);
     }
 }
 
-window::cursor_mode window::get_cursor_mode() const {
-    auto win = get_window_data(*this);
+cursor_mode get_cursor_mode(window w) {
+    auto win = get_window_data(w);
     return win->CursorMode;
 }
 
-f32 window::get_opacity() const {
-    auto win = get_window_data(*this);
+f32 get_opacity(window w) {
+    auto win = get_window_data(w);
 
     BYTE alpha;
     DWORD flags;
@@ -1298,8 +1012,8 @@ f32 window::get_opacity() const {
     return 1.f;
 }
 
-void window::set_opacity(f32 opacity) {
-    auto win = get_window_data(*this);
+void set_opacity(window w, f32 opacity) {
+    auto win = get_window_data(w);
 
     assert(opacity >= 0 && opacity <= 1.0f);
 
@@ -1340,57 +1054,57 @@ file_scope u32 set_bit(u32 number, u32 mask, bool enabled) {
     return number & ~mask | mask & (enabled ? 0xFFFFFFFF : 0);
 }
 
-void window::set_borderless(bool enabled) {
-    auto win = get_window_data(*this);
+void set_borderless(window w, bool enabled) {
+    auto win = get_window_data(w);
 
-    win->Flags = set_bit(win->Flags, window::BORDERLESS, enabled);
+    win->Flags = set_bit(win->Flags, BORDERLESS, enabled);
     if (!win->Monitor) update_window_style(win);
 }
 
-void window::set_resizable(bool enabled) {
-    auto win = get_window_data(*this);
+void set_resizable(window w, bool enabled) {
+    auto win = get_window_data(w);
 
-    win->Flags = set_bit(win->Flags, window::RESIZABLE, enabled);
+    win->Flags = set_bit(win->Flags, RESIZABLE, enabled);
     if (!win->Monitor) update_window_style(win);
 }
 
-void window::set_always_on_top(bool enabled) {
-    auto win = get_window_data(*this);
+void set_always_on_top(window w, bool enabled) {
+    auto win = get_window_data(w);
 
-    win->Flags = set_bit(win->Flags, window::ALWAYS_ON_TOP, enabled);
+    win->Flags = set_bit(win->Flags, ALWAYS_ON_TOP, enabled);
     if (!win->Monitor) {
         HWND after = enabled ? HWND_TOPMOST : HWND_NOTOPMOST;
         SetWindowPos(win->hWnd, after, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
     }
 }
 
-void window::set_auto_minimize(bool enabled) {
-    auto win   = get_window_data(*this);
-    win->Flags = set_bit(win->Flags, window::AUTO_MINIMIZE, enabled);
+void set_auto_minimize(window w, bool enabled) {
+    auto win   = get_window_data(w);
+    win->Flags = set_bit(win->Flags, AUTO_MINIMIZE, enabled);
 }
 
-void window::set_focus_on_show(bool enabled) {
-    auto win   = get_window_data(*this);
-    win->Flags = set_bit(win->Flags, window::FOCUS_ON_SHOW, enabled);
+void set_focus_on_show(window w, bool enabled) {
+    auto win   = get_window_data(w);
+    win->Flags = set_bit(win->Flags, FOCUS_ON_SHOW, enabled);
 }
 
-void window::set_vsync(bool enabled) {
-    auto win   = get_window_data(*this);
-    win->Flags = set_bit(win->Flags, window::VSYNC, enabled);
+void set_vsync(window w, bool enabled) {
+    auto win   = get_window_data(w);
+    win->Flags = set_bit(win->Flags, VSYNC, enabled);
 }
 
-void window::set_close_on_alt_f4(bool enabled) {
-    auto win   = get_window_data(*this);
-    win->Flags = set_bit(win->Flags, window::CLOSE_ON_ALT_F4, enabled);
+void set_close_on_alt_f4(window w, bool enabled) {
+    auto win   = get_window_data(w);
+    win->Flags = set_bit(win->Flags, CLOSE_ON_ALT_F4, enabled);
 }
 
-void window::set_mouse_pass_through(bool enabled) {
-    auto win   = get_window_data(*this);
-    win->Flags = set_bit(win->Flags, window::MOUSE_PASS_THROUGH, enabled);
+void set_mouse_pass_through(window w, bool enabled) {
+    auto win   = get_window_data(w);
+    win->Flags = set_bit(win->Flags, MOUSE_PASS_THROUGH, enabled);
 }
 
-bool window::is_hovered() const {
-    auto win = get_window_data(*this);
+bool is_hovered(window w) {
+    auto win = get_window_data(w);
 
     POINT pos;
     if (!GetCursorPos(&pos)) return false;
@@ -1404,51 +1118,53 @@ bool window::is_hovered() const {
     return PtInRect(&area, pos);
 }
 
-bool window::is_visible() const {
-    auto win = get_window_data(*this);
+bool is_visible(window w) {
+    auto win = get_window_data(w);
 
     if ((win->Flags & MINIMIZED) || (win->Flags & HIDDEN)) return false;
-    if (get_size().x == 0 || get_size().y == 0) return false;
+
+    int2 s = get_size(w);
+    if (s.x == 0 || s.y == 0) return false;
     return true;
 }
 
-void window::show() {
-    auto win = get_window_data(*this);
+void show(window w) {
+    auto win = get_window_data(w);
 
     ShowWindow(win->hWnd, SW_SHOWNA);
-    if (win->Flags & FOCUS_ON_SHOW) focus();
+    if (win->Flags & FOCUS_ON_SHOW) focus(w);
 }
 
-void window::hide() {
-    auto win = get_window_data(*this);
+void hide(window w) {
+    auto win = get_window_data(w);
     ShowWindow(win->hWnd, SW_HIDE);
 }
 
-void window::minimize() {
-    auto win = get_window_data(*this);
+void minimize(window w) {
+    auto win = get_window_data(w);
     ShowWindow(win->hWnd, SW_MINIMIZE);
 }
 
-void window::restore() {
-    auto win = get_window_data(*this);
+void restore(window w) {
+    auto win = get_window_data(w);
     ShowWindow(win->hWnd, SW_RESTORE);
 }
 
-void window::maximize() {
-    auto win = get_window_data(*this);
+void maximize(window w) {
+    auto win = get_window_data(w);
     ShowWindow(win->hWnd, SW_MAXIMIZE);
 }
 
-void window::focus() {
-    auto win = get_window_data(*this);
+void focus(window w) {
+    auto win = get_window_data(w);
 
     BringWindowToTop(win->hWnd);
     SetForegroundWindow(win->hWnd);
     SetFocus(win->hWnd);
 }
 
-void window::request_attention() {
-    auto win = get_window_data(*this);
+void request_attention(window w) {
+    auto win = get_window_data(w);
     FlashWindow(win->hWnd, true);
 }
 
@@ -1490,52 +1206,21 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
     emit_while_false(&win->Event, e);
 
     switch (message) {
-        case WM_NCLBUTTONDOWN:
-            switch (wParam) {
-                case HTLEFT:
-                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_LEFT, lParam);
-                case HTTOPLEFT:
-                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_LEFT | LSM_TOP, lParam);
-                case HTBOTTOMLEFT:
-                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_LEFT | LSM_BOTTOM, lParam);
-                case HTRIGHT:
-                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_RIGHT, lParam);
-                case HTTOPRIGHT:
-                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_RIGHT | LSM_TOP, lParam);
-                case HTBOTTOMRIGHT:
-                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_RIGHT | LSM_BOTTOM, lParam);
-                case HTTOP:
-                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_TOP, lParam);
-                case HTBOTTOM:
-                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_SIZE | LSM_BOTTOM, lParam);
-                case HTCAPTION:
-                    return SendMessageW(hWnd, WM_SYSCOMMAND, SC_MOVE | LSM_CAPTION, lParam);
-                default:
-                    break;
-            }
         case WM_MOUSEACTIVATE:
             if (HIWORD(lParam) == WM_LBUTTONDOWN) {
                 if (LOWORD(lParam) != HTCLIENT) win->FrameAction = true;
             }
             break;
         case WM_CAPTURECHANGED:
-            /* nothing we can do; stop resizing & do clean-up */
-            if (sizemove && (HWND) lParam != sizemove->hWnd) {
-                SendMessageW(sizemove->hWnd, WM_EXITSIZEMOVE, 0, 0);
-                LocalFree(sizemove);
-                sizemove = null;
-                ClipCursor(NULL);
-            }
-
             // Hack: Disable the cursor once the caption button action has been completed or cancelled
             if (lParam == 0 && win->FrameAction) {
-                if (win->CursorMode == window::CURSOR_DISABLED) disable_cursor(win);
+                if (win->CursorMode == CURSOR_DISABLED) disable_cursor(win);
                 win->FrameAction = false;
             }
 
             break;
         case WM_SETFOCUS:
-            win->Flags |= window::FOCUSED;
+            win->Flags |= FOCUSED;
 
             {
                 event e;
@@ -1547,12 +1232,12 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
 
             // Hack: Do not disable cursor while the user is interacting with a caption button
             if (win->FrameAction) break;
-            if (win->CursorMode == window::CURSOR_DISABLED) disable_cursor(win);
+            if (win->CursorMode == CURSOR_DISABLED) disable_cursor(win);
             return 0;
         case WM_KILLFOCUS:
-            win->Flags &= ~window::FOCUSED;
-            if (win->CursorMode == window::CURSOR_DISABLED) enable_cursor(win);
-            if (win->Monitor && win->Flags & window::AUTO_MINIMIZE) win->Handle.minimize();
+            win->Flags &= ~FOCUSED;
+            if (win->CursorMode == CURSOR_DISABLED) enable_cursor(win);
+            if (win->Monitor && win->Flags & AUTO_MINIMIZE) minimize(win->Handle);
 
             {
                 event e;
@@ -1572,10 +1257,6 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             return 0;
         case WM_SYSCOMMAND:
             switch (wParam & 0xfff0) {
-                case SC_MOVE:
-                case SC_SIZE:
-                    /* begin resize 'loop' */
-                    return PrepareSizeMove(hWnd, wParam, (DWORD) lParam);
                 case SC_SCREENSAVE:
                 case SC_MONITORPOWER: {
                     if (win->Monitor) {
@@ -1634,7 +1315,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             if (!pressed && wParam == VK_SHIFT) {
                 // :ShiftHack: Release both Shift keys on Shift up event, as when both
                 //             are pressed the first release does not emit any event
-                // :ShiftHack: The other half of this is in window::update
+                // :ShiftHack: The other half of this is in update
                 do_key_input_event(win, Key_LeftShift, false);
                 do_key_input_event(win, Key_RightShift, false);
             } else if (wParam == VK_SNAPSHOT) {
@@ -1645,7 +1326,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 do_key_input_event(win, keyHid, pressed);
             }
 
-            if (win->Flags & window::CLOSE_ON_ALT_F4 && message == WM_SYSKEYDOWN && keyHid == Key_F4) {
+            if (win->Flags & CLOSE_ON_ALT_F4 && message == WM_SYSKEYDOWN && keyHid == Key_F4) {
                 SendMessageW(win->hWnd, WM_CLOSE, 0, 0);
             }
             break;
@@ -1724,7 +1405,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 emit_while_false(&win->Event, e);
             }
 
-            if (win->CursorMode == window::CURSOR_DISABLED) {
+            if (win->CursorMode == CURSOR_DISABLED) {
                 if (DisabledCursorWindow != win->Handle) break;
                 if (win->RawMouseMotion) break;
 
@@ -1796,25 +1477,25 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
         case WM_ENTERSIZEMOVE:
         case WM_ENTERMENULOOP:
             if (win->FrameAction) break;
-            if (win->CursorMode == window::CURSOR_DISABLED) enable_cursor(win);
+            if (win->CursorMode == CURSOR_DISABLED) enable_cursor(win);
             break;
         case WM_EXITSIZEMOVE:
         case WM_EXITMENULOOP:
             if (win->FrameAction) break;
-            if (win->CursorMode == window::CURSOR_DISABLED) disable_cursor(win);
+            if (win->CursorMode == CURSOR_DISABLED) disable_cursor(win);
             break;
         case WM_SIZE: {
             bool minimized = wParam == SIZE_MINIMIZED;
-            bool maximized = wParam == SIZE_MAXIMIZED || (win->Flags & window::MAXIMIZED && wParam != SIZE_RESTORED);
+            bool maximized = wParam == SIZE_MAXIMIZED || (win->Flags & MAXIMIZED && wParam != SIZE_RESTORED);
 
             if (DisabledCursorWindow == win->Handle) update_clip_rect(win);
 
-            bool windowMinimized = win->Flags & window::MINIMIZED;
-            bool windowMaximized = win->Flags & window::MAXIMIZED;
+            bool windowMinimized = win->Flags & MINIMIZED;
+            bool windowMaximized = win->Flags & MAXIMIZED;
 
             if (minimized && !windowMinimized) {
-                win->Flags |= window::MINIMIZED;
-                win->Handle.minimize();
+                win->Flags |= MINIMIZED;
+                minimize(win->Handle);
 
                 event e;
                 e.Window    = win->Handle;
@@ -1823,7 +1504,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 emit_while_false(&win->Event, e);
             }
             if (windowMinimized && !minimized) {
-                win->Flags &= ~window::MINIMIZED;
+                win->Flags &= ~MINIMIZED;
 
                 event e;
                 e.Window    = win->Handle;
@@ -1833,8 +1514,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             }
 
             if (maximized && !windowMaximized) {
-                win->Flags |= window::MAXIMIZED;
-                win->Handle.maximize();
+                win->Flags |= MAXIMIZED;
+                maximize(win->Handle);
 
                 event e;
                 e.Window    = win->Handle;
@@ -1843,7 +1524,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
                 emit_while_false(&win->Event, e);
             }
             if (windowMaximized && !maximized) {
-                win->Flags &= ~window::MAXIMIZED;
+                win->Flags &= ~MAXIMIZED;
 
                 event e;
                 e.Window    = win->Handle;
@@ -1881,8 +1562,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             return 0;
         }
         case WM_SHOWWINDOW:
-            win->Flags = set_bit(win->Flags, window::SHOWN, (bool) wParam);
-            win->Flags = set_bit(win->Flags, window::HIDDEN, (bool) !wParam);
+            win->Flags = set_bit(win->Flags, SHOWN, (bool) wParam);
+            win->Flags = set_bit(win->Flags, HIDDEN, (bool) !wParam);
             break;
         case WM_MOVE:
             if (DisabledCursorWindow == win->Handle) update_clip_rect(win);
@@ -1897,7 +1578,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             return 0;
 
         case WM_SIZING:
-            if (win->AspectRatioNumerator == window::DONT_CARE || win->AspectRatioDenominator == window::DONT_CARE) {
+            if (win->AspectRatioNumerator == DONT_CARE || win->AspectRatioDenominator == DONT_CARE) {
                 break;
             }
             apply_aspect_ratio(win, (s32) wParam, (RECT *) lParam);
@@ -1911,13 +1592,13 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             auto *mmi = (MINMAXINFO *) lParam;
 
             int2 off = get_full_window_size(get_window_style(win), get_window_ex_style(win), 0, 0, dpi);
-            if (win->MinH != window::DONT_CARE) mmi->ptMinTrackSize.x = win->MinW + off.x;
-            if (win->MinW != window::DONT_CARE) mmi->ptMinTrackSize.y = win->MinH + off.y;
+            if (win->MinH != DONT_CARE) mmi->ptMinTrackSize.x = win->MinW + off.x;
+            if (win->MinW != DONT_CARE) mmi->ptMinTrackSize.y = win->MinH + off.y;
 
-            if (win->MaxW != window::DONT_CARE) mmi->ptMaxTrackSize.x = win->MaxW + off.x;
-            if (win->MinW != window::DONT_CARE) mmi->ptMaxTrackSize.y = win->MaxH + off.y;
+            if (win->MaxW != DONT_CARE) mmi->ptMaxTrackSize.x = win->MaxW + off.x;
+            if (win->MinW != DONT_CARE) mmi->ptMaxTrackSize.y = win->MaxH + off.y;
 
-            if (win->Flags & window::BORDERLESS) {
+            if (win->Flags & BORDERLESS) {
                 HMONITOR mh = MonitorFromWindow(win->hWnd, MONITOR_DEFAULTTONEAREST);
 
                 MONITORINFO mi;
@@ -1943,13 +1624,13 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
         case WM_NCACTIVATE:
         case WM_NCPAINT:
             // Prevent title bar from being drawn after restoring a minimized undecorated window
-            if (win->Flags & window::BORDERLESS) return true;
+            if (win->Flags & BORDERLESS) return true;
             break;
         case WM_NCHITTEST:
-            if (win->Flags & window::MOUSE_PASS_THROUGH) return HTTRANSPARENT;
+            if (win->Flags & MOUSE_PASS_THROUGH) return HTTRANSPARENT;
             break;
         case WM_GETDPISCALEDSIZE: {
-            if (!(win->Flags & window::SCALE_TO_MONITOR))
+            if (!(win->Flags & SCALE_TO_MONITOR))
                 break;
 
             // Adjust the window size to keep the content area size constant
@@ -1973,7 +1654,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
 
             // Only apply the suggested size if the OS is new enough to have
             // sent a WM_GETDPISCALEDSIZE before this
-            if (!win->Monitor && (win->Flags & window::SCALE_TO_MONITOR || IS_WINDOWS_10_CREATORS_UPDATE_OR_GREATER())) {
+            if (!win->Monitor && (win->Flags & SCALE_TO_MONITOR || IS_WINDOWS_10_CREATORS_UPDATE_OR_GREATER())) {
                 RECT *suggested = (RECT *) lParam;
                 SetWindowPos(win->hWnd, HWND_TOP, suggested->left, suggested->top, suggested->right - suggested->left, suggested->bottom - suggested->top, SWP_NOACTIVATE | SWP_NOZORDER);
             }
@@ -1992,7 +1673,7 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
             InvalidateRect(hWnd, null, true);
 
             if (message == WM_DWMCOMPOSITIONCHANGED) {
-                if (win->Flags & window::ALPHA) update_framebuffer_transparency(win);
+                if (win->Flags & ALPHA) update_framebuffer_transparency(win);
                 return 0;
             }
             break;
