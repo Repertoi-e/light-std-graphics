@@ -11,7 +11,7 @@ struct camera {
     s32 DirectionUD = 0;
 
     float3 RotationEuler = {};  // pitch, roll, yaw
-    float4 Rotation = {}, TargetRotation = {}; 
+    float4 Rotation = {0, 0, 0, 1}, TargetRotation = {0, 0, 0, 1}; 
 
     float4x4 PerspectiveMatrix;
     float4x4 ViewMatrix;

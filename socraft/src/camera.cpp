@@ -3,29 +3,33 @@
 void camera_update() {
     auto *c = &Game->Camera;
 
-    c->Velocity = math::lerp(c->Velocity, c->TargetVelocity, 0.7f);
+    c->Velocity = math::lerp(c->Velocity, c->TargetVelocity, 0.1f);
     c->Position += c->Velocity * Memory->FrameDelta;
 
-    c->Rotation = math::slerp(c->Rotation, c->TargetRotation, 0.3f);
-    c->ViewMatrix = math::mul(math::rotation_matrix(c->Rotation), math::translation_matrix(-c->Position));
+    c->Rotation = math::qslerp(c->Rotation, c->TargetRotation, 0.5f);
+    c->update_target_velocity_from_dirs();
+
+    c->ViewMatrix = math::mul(math::rotation_matrix(math::qconj(c->Rotation)), math::translation_matrix(-c->Position));
 }
 
 void camera::update_target_velocity_from_dirs() {
-    float4 qy = math::rotation_quat(float3(0, 1, 0), -RotationEuler.y);
+    float3 forward = math::qrot(Rotation, float3(0, 0, -1));
+    
+    forward.y = 0;
+    forward = math::normalize(forward);
 
-    float3 ns = math::qrot(qy, float3(0, 0, (f32) DirectionNS));
-    float3 ew = math::qrot(qy, float3((f32) DirectionEW, 0, 0));
+    float3 right = { -forward.z, 0, forward.x};
+    float3 up = float3(0, 1, 0);
 
-    TargetVelocity = (ns + ew + float3(0, (f32) DirectionUD, 0)) * MovementSpeed;
+    auto targetDir = forward * DirectionNS + right * DirectionEW + up * DirectionUD;
+    TargetVelocity = targetDir * MovementSpeed; 
 }
 
 void camera::update_target_quat_from_euler() {
-    float4 qx = math::rotation_quat(float3(1, 0, 0), RotationEuler.x);
-    float4 qy = math::rotation_quat(float3(0, 1, 0), RotationEuler.y);
-    float4 qz = math::rotation_quat(float3(0, 0, 1), RotationEuler.z);
-
-    float4 q          = math::qmul(math::qmul(qx, qy), qz);
-    TargetRotation = q;
+    float4 qx = math::rotation_quat(float3(1, 0, 0), -RotationEuler.x);
+    float4 qy = math::rotation_quat(float3(0, 1, 0), -RotationEuler.y);
+    float4 qz = math::rotation_quat(float3(0, 0, 1), -RotationEuler.z);
+    TargetRotation = math::qmul(math::qmul(qz, qy), qx);
 }
 
 camera::camera() {
@@ -55,11 +59,11 @@ bool camera_event(event e) {
 
     if (e.Type == event::Key_Pressed) {
         if (e.KeyCode == Key_W) {
-            c->DirectionNS += 1;
+            c->DirectionNS -= 1;
         } else if (e.KeyCode == Key_A) {
             c->DirectionEW -= 1;
         } else if (e.KeyCode == Key_S) {
-            c->DirectionNS -= 1;
+            c->DirectionNS += 1;
         } else if (e.KeyCode == Key_D) {
             c->DirectionEW += 1;
         } else if (e.KeyCode == Key_LeftShift) {
@@ -69,18 +73,16 @@ bool camera_event(event e) {
         } else {
             return false;
         }
-
-        c->update_target_velocity_from_dirs();
         // Should we return true here (that we handled the event, so stop propagating to other listeners)?
     }
 
     if (e.Type == event::Key_Released) {
         if (e.KeyCode == Key_W) {
-            c->DirectionNS -= 1;
+            c->DirectionNS += 1;
         } else if (e.KeyCode == Key_A) {
             c->DirectionEW += 1;
         } else if (e.KeyCode == Key_S) {
-            c->DirectionNS += 1;
+            c->DirectionNS -= 1;
         } else if (e.KeyCode == Key_D) {
             c->DirectionEW -= 1;
         } else if (e.KeyCode == Key_LeftShift) {
@@ -90,8 +92,6 @@ bool camera_event(event e) {
         } else {
             return false;
         }
-
-        c->update_target_velocity_from_dirs();
         // Should we return true here (that we handled the event, so stop propagating to other listeners)?
     }
 
