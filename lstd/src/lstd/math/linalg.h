@@ -493,7 +493,7 @@
     template<class T> constexpr vec<T,3> cross    (const vec<T,3> & a, const vec<T,3> & b)      { return {a.y*b.z-a.z*b.y, a.z*b.x-a.x*b.z, a.x*b.y-a.y*b.x}; }
     template<class T, int M> constexpr T dot      (const vec<T,M> & a, const vec<T,M> & b)      { return sum(a*b); }
     template<class T, int M> constexpr T length2  (const vec<T,M> & a)                          { return dot(a,a); }
-    template<class T, int M> T           length   (const vec<T,M> & a)                          { return sqrt(length2(a)); }
+    template<class T, int M> T           length   (const vec<T,M> & a)                          { return (T) sqrt(length2(a)); }
     template<class T, int M> vec<T,M>    normalize(const vec<T,M> & a)                          { return a / length(a); }
     template<class T, int M> constexpr T distance2(const vec<T,M> & a, const vec<T,M> & b)      { return length2(b-a); }
     template<class T, int M> T           distance (const vec<T,M> & a, const vec<T,M> & b)      { return length(b-a); }

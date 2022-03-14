@@ -6,7 +6,8 @@ void camera_update() {
     c->Velocity = math::lerp(c->Velocity, c->TargetVelocity, 0.1f);
     c->Position += c->Velocity * Memory->FrameDelta;
 
-    c->Rotation = math::qslerp(c->Rotation, c->TargetRotation, 0.5f);
+    c->Rotation = math::qslerp(c->Rotation, c->TargetRotation, 0.4f);
+    
     c->update_target_velocity_from_dirs();
 
     c->ViewMatrix = math::mul(math::rotation_matrix(math::qconj(c->Rotation)), math::translation_matrix(-c->Position));
@@ -15,6 +16,7 @@ void camera_update() {
 void camera::update_target_velocity_from_dirs() {
     float3 forward = math::qrot(Rotation, float3(0, 0, -1));
     
+    // Get rid of y component so the camera doesn't fly up when looking downwards/upwards
     forward.y = 0;
     forward = math::normalize(forward);
 
@@ -49,6 +51,7 @@ bool camera_event(event e) {
         f32 dx = -c->MouseSensitivity * e.DX;
         f32 dy = -c->MouseSensitivity * e.DY;
         
+        // @TODO: Add a bit of space before limits (for aesthetic purposes)
         c->RotationEuler.y = (f32) fmod(c->RotationEuler.y + dx, M_TAU);
         c->RotationEuler.x = clamp(c->RotationEuler.x + dy, -M_PI, M_PI);
 
