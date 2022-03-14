@@ -113,10 +113,10 @@ struct win32_memory_state {
 };
 
 // :GlobalStateNoConstructors:
-byte State[sizeof(win32_memory_state)];
+byte MemoryState[sizeof(win32_memory_state)];
 
 // Short-hand macro for sanity
-#define S ((win32_memory_state *) &State[0])
+#define S ((win32_memory_state *) &MemoryState[0])
 
 export {
     // @TODO: Print call stack

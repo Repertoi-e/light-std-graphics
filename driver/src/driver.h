@@ -86,7 +86,9 @@ struct memory {
     T *get_state(string name) {
         bool created = false;
         auto *result = (T *) GetStateImpl(name, sizeof(T), &created);
-        if (created) new (result) T;  // initialize
+        if (created) {
+            *result = T{};
+        }
         return result;
     }
 };

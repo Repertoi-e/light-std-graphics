@@ -10,7 +10,7 @@ import lstd.path;
 
 // These can be modified with command line arguments.
 s64 MemoryInBytes = 64_MiB;
-u32 WindowWidth = 800, WindowHeight = 400, TargetFPS = 60;
+u32 WindowWidth = 1152, WindowHeight = 648, TargetFPS = 60;
 
 window MainWindow;
 

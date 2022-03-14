@@ -1306,8 +1306,8 @@ file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPA
         case WM_SYSKEYDOWN:
         case WM_KEYUP:
         case WM_SYSKEYUP: {
-            u32 key = ((lParam >> 16) & 0x7f) | ((lParam & (1 << 24)) != 0 ? 0x80 : 0);
-            if (key >= 256) break;
+            u32 key = (u32) wParam;
+            if (key > 255) break;
 
             u32 keyHid   = internal::g_KeycodeNativeToHid[key];
             bool pressed = ((lParam >> 31) & 1) ? false : true;

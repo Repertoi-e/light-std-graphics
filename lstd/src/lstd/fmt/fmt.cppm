@@ -3,6 +3,7 @@ module;
 #include "../common.h"
 
 export module lstd.fmt;
+import "lstd/math/linalg.h";
 
 //
 // Format specification:
@@ -304,81 +305,69 @@ export {
     //
     // Formatters for math types:
     //
-    /*
+    
     // Formats vector in the following way: [1, 2, ...]
-    template <typename T, s32 Dim, bool Packed>
-    struct formatter<vec<T, Dim, Packed>> {
-        void format(const vec<T, Dim, Packed> &src, fmt_context *f) {
-            format_list(f).entries(src.Data, src.DIM)->finish();
-        }
-    };
+    template <typename T, s32 Dim>
+    void write_custom(fmt_context * f, const vec<T, Dim> *src) {
+        format_list(f).entries(&src->x, Dim)->finish();
+    }
     
     // Formats in the following way: [ 1, 2, 3; 4, 5, 6; 7, 8, 9]
     // Alternate (using # specifier):
     // [  1,   2,   3
     //    3,  41,   5
     //  157,   8,   9]
-    template <typename T, s64 R, s64 C, bool Packed>
-    struct formatter<mat<T, R, C, Packed>> {
-        void format(const mat<T, R, C, Packed> &src, fmt_context *f) {
-            write(f, "[");
-    
-            bool alternate = f->Specs && f->Specs->Hash;
-            s64 max        = 0;
-            if (alternate) {
-                for (s32 i = 0; i < src.Height; ++i) {
-                    for (s32 j = 0; j < src.Width; ++j) {
-                        s64 s;
-                        if constexpr (types::is_floating_point<T>) {
-                            s = fmt_calculate_length("{:f}", src(i, j));
-                        } else {
-                            s = fmt_calculate_length("{}", src(i, j));
-                        }
-                        if (s > max) max = s;
-                    }
-                }
-            }
-    
-            auto *old = f->Specs;
-            f->Specs  = null;
-            for (s32 i = 0; i < src.Height; ++i) {
-                for (s32 j = 0; j < src.Width; ++j) {
-                    if (alternate) {
-                        if constexpr (types::is_floating_point<T>) {
-                            fmt_to_writer(f, "{0:<{1}f}", src(i, j), max);
-                        } else {
-                            fmt_to_writer(f, "{0:<{1}}", src(i, j), max);
-                        }
+    template <typename T, s64 R, s64 C>
+    void write_custom(fmt_context * f, const mat<T, R, C> *src) {
+        write(f, string("["));
+
+        bool alternate = f->Specs && f->Specs->Hash;
+        s64 max        = 0;
+        if (alternate) {
+            for (s32 i = 0; i < C; ++i) {
+                for (s32 j = 0; j < R; ++j) {
+                    s64 s;
+                    if constexpr (types::is_floating_point<T>) {
+                        s = fmt_calculate_length("{:f}", (*src)[i][j]);
                     } else {
-                        if constexpr (types::is_floating_point<T>) {
-                            fmt_to_writer(f, "{0:f}", src(i, j));
-                        } else {
-                            fmt_to_writer(f, "{0:}", src(i, j));
-                        }
+                        s = fmt_calculate_length("{}", (*src)[i][j]);
                     }
-                    if (j != src.Width - 1) write(f, ", ");
+                    if (s > max) max = s;
                 }
-                if (i < src.R - 1) write(f, alternate ? "\n " : "; ");
             }
-            f->Specs = old;
-            write(f, "]");
         }
-    };
     
-    // (This is for mat views)
-    // Formats in the following way: [ 1, 2, 3; 4, 5, 6; 7, 8, 9]
-    // Alternate (using # specifier):
-    // [  1,   2,   3
-    //    3,  41,   5
-    //  157,   8,   9]
-    template <typename T, s64 R, s64 C, bool Packed, s64 SR, s64 SC>
-    struct formatter<mat_view<mat<T, R, C, Packed>, SR, SC>> {
-        void format(const mat_view<mat<T, R, C, Packed>, SR, SC> &src, fmt_context *f) {
-            mat<T, SR, SC, Packed> v = src;
-            fmt_to_writer(f, "{}", v);  // yES. We are lazy.
+        auto *old = f->Specs;
+        f->Specs  = null;
+        for (s32 i = 0; i < C; ++i) {
+            for (s32 j = 0; j < R; ++j) {
+                if (alternate) {
+                    if constexpr (types::is_floating_point<T>) {
+                        fmt_to_writer(f, "{0:<{1}f}", (*src)[i][j], max);
+                    } else {
+                        fmt_to_writer(f, "{0:<{1}}", (*src)[i][j], max);
+                    }
+                } else {
+                    if constexpr (types::is_floating_point<T>) {
+                        fmt_to_writer(f, "{0:f}", (*src)[i][j]);
+                    } else {
+                        fmt_to_writer(f, "{0:}", (*src)[i][j]);
+                    }
+                }
+                if (j != C - 1) write(f, string(", "));
+            }
+            if (i < R - 1) write(f, alternate ? string("\n ") : string("; "));
         }
-    };
-    
+        f->Specs = old;
+        write(f, string("]"));
+    }
+
+    /*
+    * Our new math library has quats which are just float4s,
+    * (not a separate type). Maybe find a way to bring this back with a format specifier?
+    */
+
+    /*
     // Formats in the following way: quat(1, 0, 0, 0)
     // Alternate (using # specifier): [ 60 deg @ [0, 1, 0] ] (rotation in degrees around axis)
     template <typename T, bool Packed>

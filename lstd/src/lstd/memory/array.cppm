@@ -75,8 +75,9 @@ export {
         constexpr array(const initializer_list<T> &items) {
             // A bug caused by this bit me hard...
 
-            static_assert(false, "Don't create arrays which are views into initializer lists (they get optimized in Release).");
-            static_assert(false, "Use dynamic arrays or store the values on the stack - e.g. make_stack_array(1, 4, 9...)");
+            assert(false);
+            // static_assert(false, "Don't create arrays which are views into initializer lists (they get optimized in Release).");
+            // static_assert(false, "Use dynamic arrays or store the values on the stack - e.g. make_stack_array(1, 4, 9...)");
         }
 
         constexpr auto operator[](s64 index) { return get_operator_square_brackets(this, index); }

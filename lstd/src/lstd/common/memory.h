@@ -79,9 +79,13 @@ using size_t = u64;  // We don't support 32 bits, do we?
 // You probably need to define it globally, because not all headers from this library might see the macro.
 inline void *__cdecl operator new(size_t, void *p) noexcept { return p; }
 inline void *__cdecl operator new[](size_t, void *p) noexcept { return p; }
+inline void *__cdecl operator new(size_t, std::align_val_t, void *p) noexcept { return p; }
+inline void *__cdecl operator new[](size_t, std::align_val_t, void *p) noexcept { return p; }
 #else
 inline void *operator new(size_t, void *p) noexcept { return p; }
 inline void *operator new[](size_t, void *p) noexcept { return p; }
+inline void *operator new(size_t, std::align_val_t, void *p) noexcept { return p; }
+inline void *operator new[](size_t, std::align_val_t, void *p) noexcept { return p; }
 #endif
 #endif
 

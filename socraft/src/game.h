@@ -4,12 +4,24 @@
 
 struct camera {
     float3 Position = {0, 0, -4};  // x, y, z
-    float3 Rotation = {};  // pitch, roll, yaw
+    float3 Velocity = {}, TargetVelocity = {};
+
+    s32 DirectionNS = 0;
+    s32 DirectionEW = 0;
+    s32 DirectionUD = 0;
+
+    float3 RotationEuler = {};  // pitch, roll, yaw
+    float4 Rotation = {}, TargetRotation = {}; 
 
     float4x4 PerspectiveMatrix;
     float4x4 ViewMatrix;
 
-    f32 Sensitivity = 0.003f;
+    f32 MovementSpeed = 2;
+    f32 MouseSensitivity = 0.003f;
+
+    void update_target_velocity_from_dirs();
+    void update_target_quat_from_euler();
+    camera();
 };
 
 void camera_update();
@@ -40,7 +52,7 @@ inline chunk *get_chunk() {
 }
 
 struct player {
-   //  float3 Position;
+    // float3 Position;
     int3 Chunk;
 };
 

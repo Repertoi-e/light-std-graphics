@@ -497,11 +497,11 @@
     template<class T, int M> vec<T,M>    normalize(const vec<T,M> & a)                          { return a / length(a); }
     template<class T, int M> constexpr T distance2(const vec<T,M> & a, const vec<T,M> & b)      { return length2(b-a); }
     template<class T, int M> T           distance (const vec<T,M> & a, const vec<T,M> & b)      { return length(b-a); }
-    template<class T, int M> T           uangle   (const vec<T,M> & a, const vec<T,M> & b)      { T d=dot(a,b); return d > 1 ? 0 : acos(d < -1 ? -1 : d); }
+    template<class T, int M> T           uangle   (const vec<T,M> & a, const vec<T,M> & b)      { T d=dot(a,b); return d > 1 ? 0 : (T) acos(d < -1 ? -1 : d); }
     template<class T, int M> T           angle    (const vec<T,M> & a, const vec<T,M> & b)      { return uangle(normalize(a), normalize(b)); }
     template<class T> vec<T,2>           rot      (T a, const vec<T,2> & v)                     { const T s = sin(a), c = cos(a); return {v.x*c - v.y*s, v.x*s + v.y*c}; }
     template<class T, int M> vec<T,M>    nlerp    (const vec<T,M> & a, const vec<T,M> & b, T t) { return normalize(lerp(a,b,t)); }
-    template<class T, int M> vec<T,M>    slerp    (const vec<T,M> & a, const vec<T,M> & b, T t) { T th=uangle(a,b); return th == 0 ? a : a*(sin(th*(1-t))/sin(th)) + b*(sin(th*t)/sin(th)); }
+    template<class T, int M> vec<T,M>    slerp    (const vec<T,M> & a, const vec<T,M> & b, T t) { f64 th=uangle(a,b); return th == 0 ? a : a*((T) sin(th*(1-t))/(T) sin(th)) + b*((T) sin(th*t)/(T) sin(th)); }
 
     // Support for quaternion algebra using 4D vectors, representing xi + yj + zk + w
     template<class T> constexpr vec<T,4> qconj(const vec<T,4> & q)                     { return {-q.x,-q.y,-q.z,q.w}; }

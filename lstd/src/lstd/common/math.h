@@ -86,7 +86,8 @@ requires(types::is_scalar<T> &&types::is_scalar<U>) constexpr T cast_numeric_saf
     } else if constexpr (types::is_integral<T> && types::is_integral<U>) {
         static_assert(sizeof(T) > sizeof(U) || sizeof(T) == sizeof(U) && are_same_signage<T, U>, "Both T and U are integers. T must be larger than U, or if they have the same size, they must have the same signage. Otherwise information may be lost when casting.");
     } else {
-        static_assert(false, "T was an integer, but U was a floating point. Information may be lost when casting.");
+        // static_assert(false, "T was an integer, but U was a floating point. Information may be lost when casting.");
+        assert(false);
     }
     return (T) y;
 }
