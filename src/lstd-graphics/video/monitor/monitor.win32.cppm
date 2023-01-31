@@ -1,11 +1,12 @@
-#include "lstd/common.h"
-
-#if OS == WINDOWS
+module;
 
 #include "lstd/platform/windows.h"
-#include "lstd_graphics/video/monitor.h"
-#include "lstd_graphics/video/window.h"
 
+export module g.video.monitor.win32;
+
+export import g.video.monitor.general;
+
+#if OS == WINDOWS
 import lstd.os;
 import lstd.fmt;
 import lstd.signal;

@@ -1,10 +1,12 @@
-#include "lstd/common.h"
-
-#if OS == WINDOWS
+module;
 
 #include "lstd/platform/windows.h"
-#include "lstd_graphics/video/window.h"
 
+export module g.video.window.win32;
+
+export import g.video.window.general;
+
+#if OS == WINDOWS
 import lstd.path;
 import lstd.os;
 import lstd.fmt;

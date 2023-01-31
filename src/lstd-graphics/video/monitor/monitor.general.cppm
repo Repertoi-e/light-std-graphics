@@ -1,8 +1,7 @@
-#pragma once
+export module g.video.monitor.general;
 
-#include "window.h"
-
-import lstd.delegate;
+export import g.video.window.event;
+export import lstd.delegate;
 
 struct display_mode {
     // Use this on RGB bits or refresh rate when setting the display mode for a monitor
@@ -34,7 +33,8 @@ struct display_mode {
     bool operator<(const display_mode &other) const { return compare_lexicographically(other) == -1; }
 };
 
-// These don't get created or freed but instead get managed by the platform layer.
+// These don't get created or freed in a straight-forward way, but instead callers 
+// should know that they are managed by the platform layer.
 struct monitor {
     union platform_data {
         struct {
@@ -55,7 +55,7 @@ struct monitor {
 
     // The handle to the window whose video mode is current on this monitor
     // i.e. fullscreen. By default it's an invalid handle - if no window is fullscreen.
-    void *Window;
+    window Window;
 
     array<display_mode> DisplayModes;
     display_mode CurrentMode;

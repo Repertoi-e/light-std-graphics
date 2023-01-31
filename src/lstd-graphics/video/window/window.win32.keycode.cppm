@@ -1,4 +1,6 @@
-#include "lstd/common.h"
+export module window.win32.keycode.cppm;
+
+import "lstd.h";
 
 // This file has been automatically generated
 
