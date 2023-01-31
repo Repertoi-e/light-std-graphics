@@ -10,7 +10,7 @@ import lstd.path;
 
 // These can be modified with command line arguments.
 s64 MemoryInBytes = 64_MiB;
-u32 WindowWidth = 800, WindowHeight = 600, TargetFPS = 60;
+u32 WindowWidth = 1152, WindowHeight = 648, TargetFPS = 60;
 
 window MainWindow;
 
@@ -239,22 +239,20 @@ s32 main() {
     parse_arguments();
     setup_paths();
 
-    string windowTitle = "Crypto";
+    string windowTitle = "Socraft";
 
     auto windowFlags = SHOWN | RESIZABLE | VSYNC | FOCUS_ON_SHOW | CLOSE_ON_ALT_F4 | SCALE_TO_MONITOR;
     MainWindow = create_window(windowTitle, DONT_CARE, DONT_CARE, WindowWidth, WindowHeight, windowFlags);
 
     // Setup API the DLL can use
-	m->MainWindow.GetPos = []() { return get_pos(MainWindow); };
-	m->MainWindow.GetSize = []() { return get_size(MainWindow); };
+    m->MainWindow.GetSize = []() { return get_size(MainWindow); };
     m->MainWindow.IsVisible = []() { return is_visible(MainWindow); };
     m->MainWindow.IsVsync   = []() -> bool { return get_flags(MainWindow) & VSYNC; };
     m->MainWindow.SetVsync  = [](bool enabled) { set_vsync(MainWindow, enabled); };
-	m->MainWindow.GetCursorPos = []() { return get_cursor_pos(MainWindow); };
-	m->MainWindow.GrabMouse = []() { set_cursor_mode(MainWindow, CURSOR_DISABLED); };
+    m->MainWindow.GrabMouse = []() { set_cursor_mode(MainWindow, CURSOR_DISABLED); };
     m->MainWindow.UngrabMouse = []() { set_cursor_mode(MainWindow, CURSOR_NORMAL); };
 
-    auto icon = make_bitmap("data/calc.png", false, pixel_format::RGBA);
+    auto icon = make_bitmap("data/icon.png", false, pixel_format::RGBA);
 
     array<bitmap> icons;
     make_dynamic(&icons, 1);
@@ -314,15 +312,12 @@ s32 main() {
 
     g->set_target_window(MainWindow);
 
-    reload_code();
-	m->ReloadedThisFrame = true;
-
     while (true) {
-        /*m->ReloadedThisFrame = check_for_dll_change();
+        m->ReloadedThisFrame = check_for_dll_change();
         if (m->RequestReloadNextFrame) {
             m->ReloadedThisFrame      = reload_code();
             m->RequestReloadNextFrame = false;
-        }*/
+        }
 
         update_windows();
         if (is_destroying(MainWindow)) break;
@@ -337,8 +332,6 @@ s32 main() {
             imguiRenderer.draw(ImGui::GetDrawData());
             g->swap();
         }
-
-		m->ReloadedThisFrame = false;
     }
 }
 

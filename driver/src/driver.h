@@ -29,6 +29,7 @@ LSTD_USING_NAMESPACE;  // The library is in it's own namespace for the sake of n
 // The .dll gets it's own lstd. We could somehow tell it to share the state but that gets messy.
 // Instead we let the exe manage the main window, the dll can create and do it's own stuff with windows, etc.
 struct main_window_api {
+    int2 (*GetPos)();
     int2 (*GetSize)();
 
     bool (*IsVisible)();
@@ -36,6 +37,7 @@ struct main_window_api {
     bool (*IsVsync)();
     void (*SetVsync)(bool enabled);
 
+	int2 (*GetCursorPos)();
     void (*GrabMouse)();
     void (*UngrabMouse)();
 };
