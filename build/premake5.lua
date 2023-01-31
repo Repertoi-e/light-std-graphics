@@ -137,13 +137,6 @@ project "lstd"
 	
     common_settings()
 
-project "test_suite"
-    kind "ConsoleApp"
-	
-    -- excludes "%{prj.name}/src/build_test_table.cpp"
-
-    links { "lstd" }
-    
-    common_settings()
+include "premake5_graphics.lua"
 
      
