@@ -384,7 +384,7 @@ export {
 	template<class A> using scalar_t = typename scalar_type<A>::type; // Underlying scalar type when performing elementwise operations
 
 	// apply(f,...) applies the provided function in an elementwise fashion to its arguments, producing an object of the same dimensions
-	template<class F, class... A> constexpr apply_t<F, A...> apply(F func, const A & ... args) { return details_apply<F, void, A...>::impl(make_seq<0, apply<F, void, A...>::size>{}, func, args...); }
+	template<class F, class... A> constexpr apply_t<F, A...> apply(F func, const A & ... args) { return details_apply<F, void, A...>::impl(make_seq<0, details_apply<F, void, A...>::size>{}, func, args...); }
 
 	// map(a,f) is equivalent to apply(f,a)
 	template<class A, class F> constexpr apply_t<F, A> map(const A& a, F func) { return apply(func, a); }
@@ -393,13 +393,15 @@ export {
 	template<class A, class B, class F> constexpr apply_t<F, A, B> zip(const A& a, const B& b, F func) { return apply(func, a, b); }
 
 	// Relational operators are defined to compare the elements of two vectors or matrices lexicographically, in column-major order
-	template<class A, class B> constexpr typename any_compare<A, B>::type compare(const A& a, const B& b) { return any_compare<A, B>()(a, b); }
-	template<class A, class B> constexpr auto operator == (const A& a, const B& b) -> decltype(compare(a, b) == 0) { return compare(a, b) == 0; }
-	template<class A, class B> constexpr auto operator != (const A& a, const B& b) -> decltype(compare(a, b) != 0) { return compare(a, b) != 0; }
-	template<class A, class B> constexpr auto operator <  (const A& a, const B& b) -> decltype(compare(a, b) < 0) { return compare(a, b) < 0; }
-	template<class A, class B> constexpr auto operator >  (const A& a, const B& b) -> decltype(compare(a, b) > 0) { return compare(a, b) > 0; }
-	template<class A, class B> constexpr auto operator <= (const A& a, const B& b) -> decltype(compare(a, b) <= 0) { return compare(a, b) <= 0; }
-	template<class A, class B> constexpr auto operator >= (const A& a, const B& b) -> decltype(compare(a, b) >= 0) { return compare(a, b) >= 0; }
+	// :WEMODIFIED: For floating-point templates, we use an epsilon to test if the values are really close.
+	// This is more useful, cause that's what you normally want to test anyway.
+	template<class A, class B> constexpr typename any_compare<A, B>::type details_compare(const A& a, const B& b) { return any_compare<A, B>()(a, b); }
+	template<class A, class B> requires(requires { any_compare<A, B>::type; }) constexpr auto operator == (const A& a, const B& b) { return details_compare(a, b) == 0; }
+	template<class A, class B> requires(requires { any_compare<A, B>::type; }) constexpr auto operator != (const A& a, const B& b) { return details_compare(a, b) != 0; }										  
+	template<class A, class B> requires(requires { any_compare<A, B>::type; }) constexpr auto operator <  (const A& a, const B& b) { return details_compare(a, b) < 0; }										  
+	template<class A, class B> requires(requires { any_compare<A, B>::type; }) constexpr auto operator >  (const A& a, const B& b) { return details_compare(a, b) > 0; }										  
+	template<class A, class B> requires(requires { any_compare<A, B>::type; }) constexpr auto operator <= (const A& a, const B& b) { return details_compare(a, b) <= 0; }										  
+	template<class A, class B> requires(requires { any_compare<A, B>::type; }) constexpr auto operator >= (const A& a, const B& b) { return details_compare(a, b) >= 0; }
 
 	// Functions for coalescing scalar values
 	template<class A> constexpr bool any(const A& a) { return fold(op_or{}, false, a); }

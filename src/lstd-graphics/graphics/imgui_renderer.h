@@ -4,7 +4,7 @@
 #include "buffer.h"
 #include "shader.h"
 #include "texture.h"
-#include "vendor/imgui/imgui.h"
+#include "lstd-graphics/third_party/imgui/imgui.h"
 
 struct imgui_renderer {
     graphics *Graphics = null;

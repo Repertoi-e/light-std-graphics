@@ -3,6 +3,8 @@ export module g.video.window.general;
 export import g.video.window.event;
 export import g.bitmap;
 
+struct monitor;
+
 export {
 	enum cursor_type : u32 {
 		CURSOR_APPSTARTING,  // Standard arrow and small hourglass
@@ -46,9 +48,6 @@ export {
 	// @ThreadSafety.
 	// Right now, functions dealing with windows must be called from the main thread only.
 	//
-
-	struct event;
-	struct monitor;
 
 	// Used to indicate that you don't care about the starting position of the window.
 	// Also used in the forced aspect ratio.

@@ -14,14 +14,13 @@
 #include <d3dcompiler.h>
 
 #include "lstd_graphics/graphics/api.h"
-#include "lstd_graphics/graphics/bitmap.h"
 #include "lstd_graphics/graphics/texture.h"
 
 void d3d_texture_2D_init(texture_2D *t) {
     if (t->Width == 0 || t->Height == 0) return;
 
     D3D11_TEXTURE2D_DESC textureDesc;
-    zero_memory(&textureDesc, sizeof(textureDesc));
+    memset0(&textureDesc, sizeof(textureDesc));
     {
         textureDesc.Width              = t->Width;
         textureDesc.Height             = t->Height;
@@ -37,7 +36,7 @@ void d3d_texture_2D_init(texture_2D *t) {
     DX_CHECK(t->Graphics->D3D.Device->CreateTexture2D(&textureDesc, null, &t->D3D.Texture));
 
     D3D11_SHADER_RESOURCE_VIEW_DESC rvDesc;
-    zero_memory(&rvDesc, sizeof(rvDesc));
+    memset0(&rvDesc, sizeof(rvDesc));
     {
         rvDesc.Format              = textureDesc.Format;
         rvDesc.ViewDimension       = D3D11_SRV_DIMENSION_TEXTURE2D;
@@ -47,7 +46,7 @@ void d3d_texture_2D_init(texture_2D *t) {
 
     if (t->RenderTarget) {
         D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
-        zero_memory(&rtvDesc, sizeof(rtvDesc));
+        memset0(&rtvDesc, sizeof(rtvDesc));
         {
             rtvDesc.Format        = textureDesc.Format;
             rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
@@ -55,7 +54,7 @@ void d3d_texture_2D_init(texture_2D *t) {
         DX_CHECK(t->Graphics->D3D.Device->CreateRenderTargetView(t->D3D.Texture, &rtvDesc, &t->D3D.RenderTargetView));
 
         D3D11_TEXTURE2D_DESC dsbDesc;
-        zero_memory(&dsbDesc, sizeof(dsbDesc));
+        memset0(&dsbDesc, sizeof(dsbDesc));
         {
             dsbDesc.Width            = t->Width;
             dsbDesc.Height           = t->Height;
@@ -86,7 +85,7 @@ void d3d_texture_2D_init(texture_2D *t) {
     }
 
     D3D11_SAMPLER_DESC samplerDesc;
-    zero_memory(&samplerDesc, sizeof(samplerDesc));
+    memset0(&samplerDesc, sizeof(samplerDesc));
     {
         samplerDesc.Filter =
             t->Filter == texture_filter::Linear ? D3D11_FILTER_MIN_MAG_MIP_LINEAR : D3D11_FILTER_MIN_MAG_MIP_POINT;
@@ -106,7 +105,7 @@ void d3d_texture_2D_set_data(texture_2D *t, bitmap data) {
     assert(t->Width == data.Width && t->Height == data.Height && data.BPP == 4);
 
     D3D11_MAPPED_SUBRESOURCE mappedData;
-    zero_memory(&mappedData, sizeof(mappedData));
+    memset0(&mappedData, sizeof(mappedData));
 
     DX_CHECK(t->Graphics->D3D.DeviceContext->Map(t->D3D.Texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedData));
 
@@ -114,7 +113,7 @@ void d3d_texture_2D_set_data(texture_2D *t, bitmap data) {
 
     auto *dest = (u8 *) mappedData.pData, *p = data.Pixels;
     For(range(data.Height)) {
-        copy_memory(dest, p, sourceRow);
+        memcpy(dest, p, sourceRow);
         dest += mappedData.RowPitch;
         p += sourceRow;
     }

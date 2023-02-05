@@ -114,6 +114,8 @@ import lstd.range;
 #define TAU 6.283185307179586476925286766559
 #define PI (TAU / 2)
 
+#define NULL 0
+
 //
 // Convenience storage literal operators, allows for specifying sizes like this:
 //  s64 a = 10_MiB;
@@ -147,14 +149,14 @@ constexpr u64 operator"" _billion(u64 i) { return i * 1000000000; }
 LSTD_BEGIN_NAMESPACE
 
 template <typename T>
-inline void swap(T &a, T &b) {
+void swap(T &a, T &b) {
 	T c = a;
 	a = b;
 	b = c;
 }
 
 template <typename T, s64 N>
-inline void swap(T(&a)[N], T(&b)[N]) {
+void swap(T(&a)[N], T(&b)[N]) {
 	For(range(N)) swap(a[it], b[it]);
 }
 
@@ -223,13 +225,13 @@ inline void swap(T(&a)[N], T(&b)[N]) {
 //
 
 template <typename T>
-inline T *memmove(T *dst, const T *src, s64 numInBytes) {
+T *memmove(T *dst, const T *src, s64 numInBytes) {
 	For(range(numInBytes / sizeof(T) - 1, -1, -1)) dst[it] = src[it];
 	return dst;
 }
 
 template <typename T>
-inline T *memcpy(T *dst, const T *src, s64 numInBytes) {
+T *memcpy(T *dst, const T *src, s64 numInBytes) {
 	if (dst > src && (s64)(dst - src) < (numInBytes / (s64)sizeof(T))) {
 		//
 		// Careful. Buffers overlap. You should use memmove in this case.
@@ -250,19 +252,17 @@ inline T *memcpy(T *dst, const T *src, s64 numInBytes) {
 }
 
 template <typename T>
-inline T *memset(T *dst, T value, u64 numInBytes) {
+T *memset(T *dst, T value, u64 numInBytes) {
 	For(range(numInBytes / sizeof(T))) dst[it] = value;
 	return dst;
 }
 
-// Non-standard, but useful.
-template <typename T>
-inline T *memset0(T *dst, u64 numInBytes) {
-	return memset(dst, T(0), numInBytes);
+inline void *memset0(void *dst, u64 numInBytes) {
+	return memset((char *) dst, (char) 0, numInBytes);
 }
 
 template <typename T>
-inline s32 memcmp(const T *s1, const T *s2, s64 numInBytes) {
+s32 memcmp(const T *s1, const T *s2, s64 numInBytes) {
 	For(range(numInBytes / sizeof(T))) {
 		if (!(*s1 == *s2)) return *s1 - *s2;
 		++s1, ++s2;

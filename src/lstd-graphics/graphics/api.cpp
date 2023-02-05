@@ -1,6 +1,7 @@
 #include "api.h"
 
-#include "../video/window.h"
+import g.video;
+
 #include "buffer.h"
 #include "shader.h"
 #include "texture.h"
@@ -16,10 +17,8 @@ void graphics::init(graphics_api api) {
     }
     Impl.Init(this);
 
-    make_dynamic(&TargetWindows, 8);
-
     auto predicate = [](auto x) { return !x.Window; };
-    if (find(TargetWindows, &predicate) == -1) add(&TargetWindows, target_window{});  // Add a null target
+    if (search(TargetWindows, &predicate) == -1) add(TargetWindows, target_window{});  // Add a null target
     set_target_window({});
 }
 
@@ -29,11 +28,11 @@ void graphics::init(graphics_api api) {
 
 void graphics::set_target_window(window win) {
     auto predicate = [&](auto x) { return x.Window == win; };
-    s64 index      = find(TargetWindows, &predicate);
+    s64 index      = search(TargetWindows, &predicate);
 
     target_window *targetWindow;
     if (index == -1) {
-        targetWindow         = add(&TargetWindows, target_window{});
+        targetWindow         = add(TargetWindows, target_window{});
         targetWindow->Window = win;
         if (win) {
             targetWindow->CallbackID = connect_event(win, {this, &graphics::window_event_handler});
@@ -91,10 +90,10 @@ void graphics::set_custom_render_target(texture_2D *target) {
     if (target) size = {target->Width, target->Height};
 
     rect r;
-    r.top = 0;
-    r.left = 0;
-    r.bottom = size.y;
-    r.right  = size.x;
+    r.Top = 0;
+    r.Left = 0;
+    r.Bottom = size.y;
+    r.Right  = size.x;
     set_viewport(r);
     set_scissor_rect(r);
 }
@@ -132,17 +131,17 @@ void graphics::swap() {
 bool graphics::window_event_handler(const event &e) {
     if (e.Type == event::Window_Closed) {
         auto predicate = [&](auto x) { return x.Window == e.Window; };
-        s64 index      = find(TargetWindows, &predicate);
+        s64 index      = search(TargetWindows, &predicate);
         assert(index != -1);
 
         target_window *targetWindow = TargetWindows.Data + index;
         disconnect_event(targetWindow->Window, targetWindow->CallbackID);
         Impl.ReleaseTargetWindow(this, targetWindow);
 
-        remove_unordered_at_index(&TargetWindows, index);
+        remove_unordered_at_index(TargetWindows, index);
     } else if (e.Type == event::Window_Resized) {
         auto predicate = [&](auto x) { return x.Window == e.Window; };
-        s64 index      = find(TargetWindows, &predicate);
+        s64 index      = search(TargetWindows, &predicate);
         assert(index != -1);
 
         if (!is_visible(e.Window)) return false;
@@ -163,5 +162,5 @@ void graphics::free() {
             Impl.ReleaseTargetWindow(this, &it);
         }
     }
-    ::free(TargetWindows.Data);
+    ::free(TargetWindows);
 }

@@ -1,107 +1,113 @@
 export module g.video.monitor.general;
 
-export import g.video.window.event;
-export import lstd.delegate;
+export import g.math;
 
-struct display_mode {
-    // Use this on RGB bits or refresh rate when setting the display mode for a monitor
-    static constexpr s32 DONT_CARE = -1;
+import "lstd.h";
+import lstd.delegate;
 
-    s32 Width = 0, Height = 0;
-    s32 RedBits = 0, GreenBits = 0, BlueBits = 0;
-    s32 RefreshRate = 0;
+export {
+	struct display_mode {
+		// Use this on RGB bits or refresh rate when setting the display mode for a monitor
+		static constexpr s32 DONT_CARE = -1;
 
-    s32 compare_lexicographically(const display_mode &other) const {
-        s32 bpp      = RedBits + GreenBits + BlueBits;
-        s32 otherBPP = other.RedBits + other.GreenBits + other.BlueBits;
+		s32 Width = 0, Height = 0;
+		s32 RedBits = 0, GreenBits = 0, BlueBits = 0;
+		s32 RefreshRate = 0;
 
-        // First sort on color bits per pixel
-        if (bpp != otherBPP) return (bpp > otherBPP) - (otherBPP > bpp);
+		s32 compare_lexicographically(display_mode no_copy other) const {
+			s32 bpp = RedBits + GreenBits + BlueBits;
+			s32 otherBPP = other.RedBits + other.GreenBits + other.BlueBits;
 
-        s32 area      = Width * Height;
-        s32 otherArea = other.Width * other.Height;
+			// First sort on color bits per pixel
+			if (bpp != otherBPP) return (bpp > otherBPP) - (otherBPP > bpp);
 
-        // Then sort on screen area
-        if (area != otherArea) return (area > otherArea) - (otherArea > area);
+			s32 area = Width * Height;
+			s32 otherArea = other.Width * other.Height;
 
-        return (RefreshRate > other.RefreshRate) - (other.RefreshRate - RefreshRate);
-    }
+			// Then sort on screen area
+			if (area != otherArea) return (area > otherArea) - (otherArea > area);
 
-    bool operator==(const display_mode &other) const { return compare_lexicographically(other) == 0; }
-    bool operator!=(const display_mode &other) const { return !(*this == other); }
-    bool operator>(const display_mode &other) const { return compare_lexicographically(other) == 1; }
-    bool operator<(const display_mode &other) const { return compare_lexicographically(other) == -1; }
-};
+			return (RefreshRate > other.RefreshRate) - (other.RefreshRate - RefreshRate);
+		}
 
-// These don't get created or freed in a straight-forward way, but instead callers 
-// should know that they are managed by the platform layer.
-struct monitor {
-    union platform_data {
-        struct {
-            void *hMonitor = null;
+		bool operator==(display_mode no_copy other) const { return compare_lexicographically(other) == 0; }
+		bool operator!=(display_mode no_copy other) const { return !(*this == other); }
+		bool operator>(display_mode no_copy other) const { return compare_lexicographically(other) == 1; }
+		bool operator<(display_mode no_copy other) const { return compare_lexicographically(other) == -1; }
+	};
 
-            // 32 matches the static size of DISPLAY_DEVICE.DeviceName
-            wchar_t AdapterName[32]{}, DisplayName[32]{};
-            char PublicAdapterName[32]{}, PublicDisplayName[32]{};
+	// These don't get created or freed in a straight-forward way, but instead callers 
+	// should know that they are managed by the platform layer.
+	struct monitor {
+		union platform_data {
+			struct {
+				void* hMonitor = null;
 
-            bool ModesPruned = false, ModeChanged = false;
-        } Win32;
-    } PlatformData{};
+				// 32 matches the static size of DISPLAY_DEVICE.DeviceName
+				wchar_t AdapterName[32]{}, DisplayName[32]{};
+				char PublicAdapterName[32]{}, PublicDisplayName[32]{};
 
-    string Name;
+				bool ModesPruned = false, ModeChanged = false;
+			} Win32;
+		} PlatformData{};
 
-    // Physical dimensions in millimeters
-    s32 WidthMM = 0, HeightMM = 0;
+		string Name;
 
-    // The handle to the window whose video mode is current on this monitor
-    // i.e. fullscreen. By default it's an invalid handle - if no window is fullscreen.
-    window Window;
+		// Physical dimensions in millimeters
+		s32 WidthMM = 0, HeightMM = 0;
 
-    array<display_mode> DisplayModes;
-    display_mode CurrentMode;
-};
+		// The handle to the window whose video mode is current on this monitor
+		// i.e. fullscreen. By default it's an invalid handle - if no window is fullscreen.
+		void *Window;
 
-struct monitor_event {
-    enum action { CONNECTED,
-                  DISCONNECTED };
+		array<display_mode> DisplayModes;
+		display_mode CurrentMode;
+	};
 
-    monitor *Monitor = null;
-    action Action;
-};
+	struct monitor_event {
+		enum action {
+			CONNECTED,
+			DISCONNECTED
+		};
 
-// For monitor connect/disconnect events
-s64 monitor_connect_callback(delegate<void(monitor_event)> cb);
-bool monitor_disconnect_callback(s64 cb);
+		monitor* Monitor = null;
+		action Action;
+	};
 
-display_mode monitor_get_current_display_mode(monitor *mon);
+	// For monitor connect/disconnect events
+	s64 monitor_connect_callback(delegate<void(monitor_event)> cb);
+	bool monitor_disconnect_callback(s64 cb);
 
-// Work area is the screen excluding taskbar and other docked bars
-rect get_work_area(monitor *mon);
+	display_mode monitor_get_current_display_mode(monitor* mon);
 
-bool set_display_mode(monitor *mon, display_mode desired);
-void restore_display_mode(monitor *mon);
+	// Work area is the screen excluding taskbar and other docked bars
+	rect get_work_area(monitor* mon);
 
-int2 get_pos(monitor *mon);
-float2 get_content_scale(monitor *mon);
+	bool set_display_mode(monitor* mon, display_mode desired);
+	void restore_display_mode(monitor* mon);
 
-// You usually don't need to do this, but if for some reason _get_monitors()_ returns an empty array, call this.
-// Note: We register windows to receive notifications on device connected/disconnected, which means this will get
-// called automatically if your window is already running.
-// The problem described above might happen when initializing code.
-// @Cleanup: Figure this out!
-void poll_monitors();
+	int2 get_pos(monitor* mon);
+	float2 get_content_scale(monitor* mon);
 
-// Returns a pointer to the monitor which contains the window _win_.
-//
-// Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
-monitor *monitor_from_window(window win);
+	// You usually don't need to do this, but if for some reason _get_monitors()_ returns an empty array, call this.
+	// Note: We register windows to receive notifications on device connected/disconnected, which means this will get
+	// called automatically if your window is already running.
+	// The problem described above might happen when initializing code.
+	// @Cleanup: Figure this out!
+	void poll_monitors();
 
-// Returns an array of all available monitors connected to the computer.
-//
-// Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
-array<monitor *> get_monitors();
+	// Returns a pointer to the monitor which contains the window _win_.
+	//
+	// Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
+	monitor* monitor_from_window(void *win);
 
-// Returns get_monitors()[0]
-//
-// Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
-monitor *get_primary_monitor();
+	// Returns an array of all available monitors connected to the computer.
+	//
+	// Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
+	array<monitor*> get_monitors();
+
+	// Returns get_monitors()[0]
+	//
+	// Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
+	monitor* get_primary_monitor();
+}

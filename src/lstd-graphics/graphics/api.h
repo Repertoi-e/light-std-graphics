@@ -3,8 +3,7 @@
 /// Defines the graphics API that can be used to draw stuff on windows.
 /// Implementations of it can be switched dynamically.
 
-#include "../math.h"
-#include "../video/window.h"
+import g.video;
 
 #if OS == WINDOWS
 struct ID3D11Device;

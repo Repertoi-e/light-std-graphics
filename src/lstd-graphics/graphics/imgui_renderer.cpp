@@ -1,7 +1,6 @@
 #include "imgui_renderer.h"
 
-#include "../graphics/bitmap.h"
-#include "../video/window.h"
+import g.video;
 
 void imgui_renderer::init(graphics *g) {
     assert(!Graphics);
@@ -72,8 +71,8 @@ void imgui_renderer::draw(ImDrawData *drawData) {
 
     For_as(it_index, range(drawData->CmdListsCount)) {
         auto *it = drawData->CmdLists[it_index];
-        copy_memory(vb, it->VtxBuffer.Data, it->VtxBuffer.Size * sizeof(ImDrawVert));
-        copy_memory(ib, it->IdxBuffer.Data, it->IdxBuffer.Size * sizeof(u32));
+        memcpy(vb, it->VtxBuffer.Data, it->VtxBuffer.Size * sizeof(ImDrawVert));
+        memcpy(ib, it->IdxBuffer.Data, it->IdxBuffer.Size * sizeof(u32));
         vb += it->VtxBuffer.Size;
         ib += it->IdxBuffer.Size;
     }
@@ -91,7 +90,7 @@ void imgui_renderer::draw(ImDrawData *drawData) {
         {0.0f, 0.0f, 0.5f, 0.0f},
         {(R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f},
     };
-    copy_memory_fast(ub, &mvp, sizeof(mvp));
+    memcpy_fast(ub, &mvp, sizeof(mvp));
     unmap(&UB);
 
     set_render_state();

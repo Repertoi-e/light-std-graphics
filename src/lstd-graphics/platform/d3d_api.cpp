@@ -13,9 +13,10 @@
 #include <d3d11.h>
 #include <dxgi.h>
 
+import g.video;
+
 #include "lstd_graphics/graphics/api.h"
 #include "lstd_graphics/graphics/texture.h"
-#include "lstd_graphics/video.h"
 
 import lstd.os;
 import lstd.fmt;
@@ -64,7 +65,7 @@ void d3d_init(graphics *g) {
     // @TODO: g->D3D.Device->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, sampleCount, &sampleQuality);
 
     D3D11_BLEND_DESC blendDest;
-    zero_memory(&blendDest, sizeof(blendDest));
+    memset0(&blendDest, sizeof(blendDest));
     {
         blendDest.AlphaToCoverageEnable  = false;
         blendDest.IndependentBlendEnable = false;
@@ -81,7 +82,7 @@ void d3d_init(graphics *g) {
     }
     DX_CHECK(g->D3D.Device->CreateBlendState(&blendDest, &g->D3D.BlendStates[0]));
 
-    zero_memory(&blendDest, sizeof(blendDest));
+    memset0(&blendDest, sizeof(blendDest));
     {
         blendDest.RenderTarget[0].BlendEnable           = false;
         blendDest.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
@@ -89,7 +90,7 @@ void d3d_init(graphics *g) {
     DX_CHECK(g->D3D.Device->CreateBlendState(&blendDest, &g->D3D.BlendStates[1]));
 
     D3D11_DEPTH_STENCIL_DESC stencilDesc;
-    zero_memory(&stencilDesc, sizeof(stencilDesc));
+    memset0(&stencilDesc, sizeof(stencilDesc));
     {
         stencilDesc.DepthEnable    = true;
         stencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
@@ -111,7 +112,7 @@ void d3d_init(graphics *g) {
     }
     DX_CHECK(g->D3D.Device->CreateDepthStencilState(&stencilDesc, &g->D3D.DepthStencilStates[0]));
 
-    zero_memory(&stencilDesc, sizeof(stencilDesc));
+    memset0(&stencilDesc, sizeof(stencilDesc));
     {
         stencilDesc.DepthEnable    = false;
         stencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
@@ -137,7 +138,7 @@ void d3d_init_target_window(graphics *g, graphics::target_window *targetWindow) 
     int2 windowSize = get_size(win);
 
     DXGI_SWAP_CHAIN_DESC desc;
-    zero_memory(&desc, sizeof(desc));
+    memset0(&desc, sizeof(desc));
     {
         desc.BufferCount       = 1;
         desc.BufferDesc.Width  = windowSize.x;
@@ -207,7 +208,7 @@ void d3d_target_window_resized(graphics *g, graphics::target_window *targetWindo
     COM_SAFE_RELEASE(swapChainBackBuffer);
 
     D3D11_TEXTURE2D_DESC textureDesc;
-    zero_memory(&textureDesc, sizeof(textureDesc));
+    memset0(&textureDesc, sizeof(textureDesc));
     {
         textureDesc.Width            = width;
         textureDesc.Height           = height;
@@ -223,7 +224,7 @@ void d3d_target_window_resized(graphics *g, graphics::target_window *targetWindo
     DX_CHECK(g->D3D.Device->CreateDepthStencilView(targetWindow->D3D.DepthStencilBuffer, null, &targetWindow->D3D.DepthStencilView));
 
     D3D11_RASTERIZER_DESC rDesc;
-    zero_memory(&rDesc, sizeof(rDesc));
+    memset0(&rDesc, sizeof(rDesc));
     {
         rDesc.FillMode        = D3D11_FILL_SOLID;
         rDesc.CullMode        = D3D11_CULL_NONE;

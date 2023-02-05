@@ -24,9 +24,9 @@ void d3d_buffer_init(gbuffer *b, const char *data) {
     }
 
     D3D11_BUFFER_DESC desc;
-    zero_memory(&desc, sizeof(desc));
+    memset0(&desc, sizeof(desc));
     {
-        assert(b->Size <= numeric_info<u32>::max());
+        assert(b->Size <= numeric<u32>::max());
         desc.ByteWidth = (u32) b->Size;
 
         if (b->Usage == gbuffer_usage::Immutable) desc.Usage = D3D11_USAGE_IMMUTABLE;
