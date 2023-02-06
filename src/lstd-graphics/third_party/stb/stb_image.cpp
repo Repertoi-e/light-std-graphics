@@ -1,4 +1,4 @@
-#include "lstd_graphics/graphics.h"
+#include "lstd-graphics/graphics.h"
 
 #define STBI_ASSERT assert
 

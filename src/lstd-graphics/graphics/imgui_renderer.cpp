@@ -26,7 +26,7 @@ void imgui_renderer::init(graphics *g) {
     Shader.Name = "UI Shader";
     Shader.init_from_file(g, "data/UI.hlsl");
 
-    graphics_init_buffer(&UB, g, gbuffer_type::Shader_Uniform_Buffer, gbuffer_usage::Dynamic, sizeof(mat<f32, 4, 4>));
+    graphics_init_buffer(&UB, g, gbuffer_type::Shader_Uniform_Buffer, gbuffer_usage::Dynamic, sizeof(float4x4));
 
     s32 width, height;
     u8 *pixels = null;
@@ -50,10 +50,9 @@ void imgui_renderer::draw(ImDrawData *drawData) {
         Shader.bind();
 
         gbuffer_layout layout;
-        make_dynamic(&layout, 3);
-        add(&layout, layout_element("POSITION", gtype::F32_2));
-        add(&layout, layout_element("TEXCOORD", gtype::F32_2));
-        add(&layout, layout_element("COLOR", gtype::U32, 1, true));
+        add(layout, layout_element("POSITION", gtype::F32_2));
+        add(layout, layout_element("TEXCOORD", gtype::F32_2));
+        add(layout, layout_element("COLOR", gtype::U32, 1, true));
         set_layout(&VB, layout);
 
         free(layout.Data);
@@ -90,7 +89,7 @@ void imgui_renderer::draw(ImDrawData *drawData) {
         {0.0f, 0.0f, 0.5f, 0.0f},
         {(R + L) / (L - R), (T + B) / (B - T), 0.5f, 1.0f},
     };
-    memcpy_fast(ub, &mvp, sizeof(mvp));
+    memcpy((f32 *) ub, (f32 *) &mvp, sizeof(mvp));
     unmap(&UB);
 
     set_render_state();
@@ -117,10 +116,10 @@ void imgui_renderer::draw(ImDrawData *drawData) {
                 s32 bot   = (s32) (it.ClipRect.w - drawData->DisplayPos.y);
 
                 rect r;
-                r.top    = top;
-                r.left   = left;
-                r.bottom = bot;
-                r.right  = right;
+                r.Top    = top;
+                r.Left   = left;
+                r.Bottom = bot;
+                r.Right  = right;
                 Graphics->set_scissor_rect(r);
 
                 if (it.TextureId) ((texture_2D *) it.TextureId)->bind(0);

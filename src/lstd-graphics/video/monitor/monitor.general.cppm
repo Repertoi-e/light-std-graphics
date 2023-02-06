@@ -14,26 +14,24 @@ export {
 		s32 RedBits = 0, GreenBits = 0, BlueBits = 0;
 		s32 RefreshRate = 0;
 
-		s32 compare_lexicographically(display_mode no_copy other) const {
+		auto operator<=>(display_mode no_copy other) const {
 			s32 bpp = RedBits + GreenBits + BlueBits;
 			s32 otherBPP = other.RedBits + other.GreenBits + other.BlueBits;
 
 			// First sort on color bits per pixel
-			if (bpp != otherBPP) return (bpp > otherBPP) - (otherBPP > bpp);
+			if (bpp != otherBPP) return bpp <=> otherBPP;
 
 			s32 area = Width * Height;
 			s32 otherArea = other.Width * other.Height;
 
 			// Then sort on screen area
-			if (area != otherArea) return (area > otherArea) - (otherArea > area);
+			if (area != otherArea) return area <=> otherArea;
 
-			return (RefreshRate > other.RefreshRate) - (other.RefreshRate - RefreshRate);
+			return RefreshRate <=> other.RefreshRate;
 		}
 
-		bool operator==(display_mode no_copy other) const { return compare_lexicographically(other) == 0; }
+		bool operator==(display_mode no_copy other) const { return (*this <=> other) == 0; }
 		bool operator!=(display_mode no_copy other) const { return !(*this == other); }
-		bool operator>(display_mode no_copy other) const { return compare_lexicographically(other) == 1; }
-		bool operator<(display_mode no_copy other) const { return compare_lexicographically(other) == -1; }
 	};
 
 	// These don't get created or freed in a straight-forward way, but instead callers 
@@ -58,7 +56,7 @@ export {
 
 		// The handle to the window whose video mode is current on this monitor
 		// i.e. fullscreen. By default it's an invalid handle - if no window is fullscreen.
-		void *Window;
+		void* Window;
 
 		array<display_mode> DisplayModes;
 		display_mode CurrentMode;
@@ -99,7 +97,7 @@ export {
 	// Returns a pointer to the monitor which contains the window _win_.
 	//
 	// Don't free the result of this function. This library follows the convention that if the function is not marked as [[nodiscard]], the returned value should not be freed.
-	monitor* monitor_from_window(void *win);
+	monitor* monitor_from_window(void* win);
 
 	// Returns an array of all available monitors connected to the computer.
 	//

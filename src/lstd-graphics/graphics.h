@@ -5,5 +5,4 @@
 #include "graphics/imgui_renderer.h"
 #include "graphics/shader.h"
 #include "graphics/texture.h"
-#include "vendor/imgui/imgui.h"
-#include "vendor/imguizmo/ImGuizmo.h"
+#include "third_party/imgui/imgui.h"

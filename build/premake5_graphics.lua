@@ -1,15 +1,21 @@
+function common_settings_graphics()
+	links { "lstd" }
+
+	-- FreeType
+	includedirs { BASE_DIR .. "third_party/freetype2/include" }
+	links { BASE_DIR .. "third_party/freetype2/freetype.lib" }
+
+    common_settings()
+end
+
 project "lstd-graphics"
     kind "StaticLib"
     
-	links { "lstd" }
-
 	files {
 		BASE_DIR .. "src/lstd-graphics/imgui.natvis"
 	}
 	
-    common_settings()
-
-    excludes { BASE_DIR .. "src/lstd-graphics/third_party/imguizmo/**" }
+	common_settings_graphics()
 
 
 -- Which DLL should the driver run, should be the name of one of the projects here in premake
@@ -20,12 +26,12 @@ project "driver"
 	
 	defines { "BUILDING_DRIVER", "VEHICLE=" .. VEHICLE }
 	
-    links { "lstd", "lstd-graphics" }
+    links { "lstd-graphics" }
 	
 	dependson { VEHICLE }
-	debugdir(VEHICLE .. "/")
+	debugdir(BASE_DIR .. "../src/" .. VEHICLE .. "/")
 	
-    common_settings()
+    common_settings_graphics()
 	
 	filter "system:windows"
 		links { "imm32", "dxgi.lib", "d3d11.lib", "d3dcompiler.lib", "d3d11.lib", "d3d10.lib" }
@@ -35,9 +41,10 @@ project "graph"
 	-- hot-reload it after doing changes, without losing state.
     kind "SharedLib" 
 
-    links { "lstd", "lstd-graphics" }
+    links { "lstd-graphics" }
+	includedirs(BASE_DIR .. "src/driver/")
     
-    common_settings()
+    common_settings_graphics()
 
 	-- Output dll in the same location as the driver
     targetdir( BASE_DIR .. "bin/%{cfg.buildcfg}/driver" )

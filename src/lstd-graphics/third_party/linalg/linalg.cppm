@@ -440,7 +440,7 @@ export {
 	//
 	// For these reasons, binary `operator *` is now DEPRECATED between pairs of matrices. Users may call `cmul(...)` for component-wise multiplication,
 	// or `mul(...)` for matrix multiplication. Binary `operator *` continues to be available for vector * vector, vector * scalar, matrix * scalar, etc.
-	template<class A, class B> requires (details_apply<op_mul, void, A, B>::mm) constexpr apply_t<op_mul, A, B> operator * (const A& a, const B& b) { return cmul(a, b); }
+	template<class A, class B> requires (! ((bool) details_apply<op_mul, void, A, B>::mm)) constexpr apply_t<op_mul, A, B> operator * (const A& a, const B& b) { return cmul(a, b); }
 #ifndef LINALG_FORWARD_COMPATIBLE
 	template<class A, class B> [[deprecated("`operator *` between pairs of matrices is deprecated. See the source text for details.")]] constexpr mm_apply_t<op_mul, A, B> operator * (const A& a, const B& b) { return cmul(a, b); }
 #endif

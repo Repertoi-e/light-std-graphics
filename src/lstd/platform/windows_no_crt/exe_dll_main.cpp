@@ -140,21 +140,6 @@ extern "C" int main();
 // * be initialized at process startup for the primary thread.
 extern "C" const PIMAGE_TLS_CALLBACK __dyn_tls_init_callback;
 
-// God fucking bless Raymond Chen
-// https://devblogs.microsoft.com/oldnewthing/20181107-00/?p=100155
-
-#pragma section("LSTD_THINGS_THAT_SHOULD_RUN_BEFORE_MAIN$a", read, write)  
-__declspec(allocate("LSTD_THINGS_THAT_SHOULD_RUN_BEFORE_MAIN$a")) _PVFV *g_LSTDFirstInit = null;
-
-#pragma section("LSTD_THINGS_THAT_SHOULD_RUN_BEFORE_MAIN$z", read, write)  
-__declspec(allocate("LSTD_THINGS_THAT_SHOULD_RUN_BEFORE_MAIN$z")) _PVFV *g_LSTDLastInit = null;
-
-#pragma section("LSTD_THINGS_THAT_SHOULD_RUN_AFTER_MAIN$a", read, write)  
-__declspec(allocate("LSTD_THINGS_THAT_SHOULD_RUN_AFTER_MAIN$a")) _PVFV *g_LSTDFirstUninit = null;
- 
-#pragma section("LSTD_THINGS_THAT_SHOULD_RUN_AFTER_MAIN$z", read, write)  
-__declspec(allocate("LSTD_THINGS_THAT_SHOULD_RUN_AFTER_MAIN$z")) _PVFV *g_LSTDLastUninit = null; 
-
 LSTD_BEGIN_NAMESPACE
 void win32_crash_handler_init();
 LSTD_END_NAMESPACE

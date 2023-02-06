@@ -13,8 +13,8 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 
-#include "lstd_graphics/graphics/api.h"
-#include "lstd_graphics/graphics/texture.h"
+#include "lstd-graphics/graphics/api.h"
+#include "lstd-graphics/graphics/texture.h"
 
 void d3d_texture_2D_init(texture_2D *t) {
     if (t->Width == 0 || t->Height == 0) return;

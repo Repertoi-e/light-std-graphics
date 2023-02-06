@@ -3,9 +3,9 @@ export module g.video.window.general;
 export import g.video.window.event;
 export import g.bitmap;
 
-struct monitor;
-
 export {
+	struct monitor;
+
 	enum cursor_type : u32 {
 		CURSOR_APPSTARTING,  // Standard arrow and small hourglass
 

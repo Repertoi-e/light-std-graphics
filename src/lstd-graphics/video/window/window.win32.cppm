@@ -4,8 +4,8 @@ module;
 
 export module g.video.window.win32;
 
-import g.video.window.general;
-import g.video.monitor;
+export import g.video.window.general;
+export import g.video.monitor;
 
 #if OS == WINDOWS
 import lstd.path;
@@ -97,9 +97,9 @@ struct window_data {
 	signal<bool(event)> Event;
 };
 
-file_scope window_data* get_window_data(window handle) { return (window_data*)GetWindowLongPtrW(handle, 0); }
+window_data* get_window_data(window handle) { return (window_data*)GetWindowLongPtrW(handle, 0); }
 
-file_scope auto MonitorCallback = [](const monitor_event& e) {
+auto MonitorCallback = [](const monitor_event& e) {
 	if (e.Action == monitor_event::CONNECTED) return;
 
 	auto* win = WindowsList;
@@ -112,9 +112,9 @@ file_scope auto MonitorCallback = [](const monitor_event& e) {
 	}
 };
 
-file_scope void uninit(window handle);
+void uninit(window handle);
 
-file_scope DWORD get_window_style(window_data* win) {
+DWORD get_window_style(window_data* win) {
 	DWORD style = WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
 
 	if (win->Monitor) {
@@ -135,13 +135,13 @@ file_scope DWORD get_window_style(window_data* win) {
 	return style;
 }
 
-file_scope DWORD get_window_ex_style(window_data* win) {
+DWORD get_window_ex_style(window_data* win) {
 	DWORD style = WS_EX_APPWINDOW;
 	if (win->Monitor || win->Flags & ALWAYS_ON_TOP) style |= WS_EX_TOPMOST;
 	return style;
 }
 
-file_scope void update_framebuffer_transparency(window_data* win) {
+void update_framebuffer_transparency(window_data* win) {
 	BOOL enabled;
 	if (SUCCEEDED(DwmIsCompositionEnabled(&enabled)) && enabled) {
 		HRGN region = CreateRectRgn(0, 0, -1, -1);
@@ -180,7 +180,7 @@ file_scope void update_framebuffer_transparency(window_data* win) {
 	}
 }
 
-file_scope int2 get_full_window_size(DWORD style, DWORD exStyle, s32 contentWidth, s32 contentHeight, u32 dpi) {
+int2 get_full_window_size(DWORD style, DWORD exStyle, s32 contentWidth, s32 contentHeight, u32 dpi) {
 	RECT rect = { 0, 0, contentWidth, contentHeight };
 
 	if (IS_WINDOWS_10_ANNIVERSARY_UPDATE_OR_GREATER()) {
@@ -192,7 +192,7 @@ file_scope int2 get_full_window_size(DWORD style, DWORD exStyle, s32 contentWidt
 	return { rect.right - rect.left, rect.bottom - rect.top };
 }
 
-file_scope void do_key_input_event(window_data* win, u32 key, bool pressed, bool asyncMods = false) {
+void do_key_input_event(window_data* win, u32 key, bool pressed, bool asyncMods = false) {
 	assert(key <= Key_Last);
 
 	if (!pressed && !win->Keys[key]) return;
@@ -215,7 +215,7 @@ file_scope void do_key_input_event(window_data* win, u32 key, bool pressed, bool
 	emit_while_false(win->Event, e);
 }
 
-file_scope void do_mouse_input_event(window_data* win, u32 button, bool pressed, bool doubleClick = false) {
+void do_mouse_input_event(window_data* win, u32 button, bool pressed, bool doubleClick = false) {
 	assert(button <= Mouse_Button_Last);
 	win->MouseButtons[button] = pressed;
 
@@ -229,7 +229,7 @@ file_scope void do_mouse_input_event(window_data* win, u32 button, bool pressed,
 	emit_while_false(win->Event, e);
 }
 
-file_scope void do_mouse_move(window_data* win, int2 pos) {
+void do_mouse_move(window_data* win, int2 pos) {
 	if (win->VirtualCursorPos == pos) return;
 
 	int2 delta = pos - win->VirtualCursorPos;
@@ -245,7 +245,7 @@ file_scope void do_mouse_move(window_data* win, int2 pos) {
 	emit_while_false(win->Event, e);
 }
 
-file_scope void acquire_monitor(window_data* win) {
+void acquire_monitor(window_data* win) {
 	if (!AcquiredMonitorCount) {
 		SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED);
 
@@ -260,7 +260,7 @@ file_scope void acquire_monitor(window_data* win) {
 }
 
 // Remove the window and restore the original video mode
-file_scope void release_monitor(window_data* win) {
+void release_monitor(window_data* win) {
 	if (win->Monitor->Window != win->Handle) return;
 
 	--AcquiredMonitorCount;
@@ -275,7 +275,7 @@ file_scope void release_monitor(window_data* win) {
 	restore_display_mode(win->Monitor);
 }
 
-file_scope void uninit(window handle) {
+void uninit(window handle) {
 	if (!handle) return;
 
 	auto* win = get_window_data(handle);
@@ -303,14 +303,14 @@ file_scope void uninit(window handle) {
 	win->Handle = null;
 }
 
-file_scope void fit_to_monitor(window_data* win) {
+void fit_to_monitor(window_data* win) {
 	MONITORINFO mi = { sizeof(mi) };
 	GetMonitorInfoW(win->Monitor->PlatformData.Win32.hMonitor, &mi);
 	SetWindowPos(win->hWnd, HWND_TOPMOST, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS);
 }
 
 // Creates an RGBA icon or cursor
-file_scope HICON create_icon(bitmap* image, int xhot, int yhot, bool icon) {
+HICON create_icon(bitmap* image, int xhot, int yhot, bool icon) {
 	BITMAPV5HEADER bi;
 	memset0(&bi, sizeof(bi));
 	{
@@ -377,7 +377,7 @@ file_scope HICON create_icon(bitmap* image, int xhot, int yhot, bool icon) {
 	return handle;
 }
 
-file_scope s64 choose_icon(array<bitmap> icons, s32 width, s32 height) {
+s64 choose_icon(array<bitmap> icons, s32 width, s32 height) {
 	s32 leastDiff = numeric<s32>::max();
 
 	s64 closest = -1;
@@ -393,7 +393,7 @@ file_scope s64 choose_icon(array<bitmap> icons, s32 width, s32 height) {
 }
 
 // Updates the cursor clip rect
-file_scope void update_clip_rect(window_data* win) {
+void update_clip_rect(window_data* win) {
 	if (win) {
 		RECT clipRect;
 		GetClientRect(win->hWnd, &clipRect);
@@ -407,7 +407,7 @@ file_scope void update_clip_rect(window_data* win) {
 }
 
 // Updates the cursor image according to its cursor mode
-file_scope void update_cursor_image(window_data* win) {
+void update_cursor_image(window_data* win) {
 	if (win->CursorMode == CURSOR_NORMAL) {
 		if (win->Cursor) {
 			SetCursor(win->Cursor->PlatformData.Win32.hCursor);
@@ -422,7 +422,7 @@ file_scope void update_cursor_image(window_data* win) {
 }
 
 // Enables WM_INPUT messages for the mouse for the specified window
-file_scope void enable_raw_mouse_motion(window_data* win) {
+void enable_raw_mouse_motion(window_data* win) {
 	RAWINPUTDEVICE rid = { 0x01, 0x02, 0, win->hWnd };
 	if (!RegisterRawInputDevices(&rid, 1, sizeof(rid))) {
 		print(">>> {}:{} Failed to register raw input device. Raw mouse input may be unsupported.\n", __FILE__, __LINE__);
@@ -430,7 +430,7 @@ file_scope void enable_raw_mouse_motion(window_data* win) {
 }
 
 // Disables WM_INPUT messages for the mouse
-file_scope void disable_raw_mouse_motion() {
+void disable_raw_mouse_motion() {
 	RAWINPUTDEVICE rid = { 0x01, 0x02, RIDEV_REMOVE, null };
 	if (!RegisterRawInputDevices(&rid, 1, sizeof(rid))) {
 		print(">>> {}:{} Failed to remove raw input device.\n", __FILE__, __LINE__);
@@ -438,7 +438,7 @@ file_scope void disable_raw_mouse_motion() {
 }
 
 // Apply disabled cursor mode to a focused window
-file_scope void disable_cursor(window_data* win) {
+void disable_cursor(window_data* win) {
 	DisabledCursorWindow = win->Handle;
 	RestoreCursorPos = get_cursor_pos(win->Handle);
 	update_cursor_image(win);
@@ -450,7 +450,7 @@ file_scope void disable_cursor(window_data* win) {
 }
 
 // Exit disabled cursor mode for the specified window
-file_scope void enable_cursor(window_data* win) {
+void enable_cursor(window_data* win) {
 	if (win->RawMouseMotion) disable_raw_mouse_motion();
 
 	DisabledCursorWindow = null;
@@ -459,7 +459,7 @@ file_scope void enable_cursor(window_data* win) {
 	update_cursor_image(win);
 }
 
-file_scope void apply_aspect_ratio(window_data* win, s32 edge, RECT* area) {
+void apply_aspect_ratio(window_data* win, s32 edge, RECT* area) {
 	f32 ratio = (f32)win->AspectRatioNumerator / (f32)win->AspectRatioDenominator;
 
 	u32 dpi = USER_DEFAULT_SCREEN_DPI;
@@ -478,7 +478,7 @@ file_scope void apply_aspect_ratio(window_data* win, s32 edge, RECT* area) {
 	}
 }
 
-file_scope void update_window_style(window_data* win) {
+void update_window_style(window_data* win) {
 	DWORD style = GetWindowLongW(win->hWnd, GWL_STYLE);
 	style &= ~(WS_OVERLAPPEDWINDOW | WS_POPUP);
 	style |= get_window_style(win);
@@ -499,11 +499,11 @@ file_scope void update_window_style(window_data* win) {
 	SetWindowPos(win->hWnd, HWND_TOP, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOZORDER);
 }
 
-file_scope u32 set_bit(u32 number, u32 mask, bool enabled) {
+u32 set_bit(u32 number, u32 mask, bool enabled) {
 	return number & ~mask | mask & (enabled ? 0xFFFFFFFF : 0);
 }
 
-file_scope LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPARAM lParam) {
+LRESULT __stdcall wnd_proc(HWND hWnd, u32 message, WPARAM wParam, LPARAM lParam) {
 	auto* win = (window_data*)GetPropW(hWnd, L"LSTD");
 	if (!win) {
 		// This is the message handling for the hidden helper window
@@ -1534,8 +1534,6 @@ export {
 		auto* titleUtf16 = platform_utf8_to_utf16(title);
 		SetWindowTextW(win->hWnd, titleUtf16);
 	}
-
-
 
 	void set_fullscreen(window w, monitor* mon, s32 width, s32 height, s32 refreshRate) {
 		auto* win = get_window_data(w);

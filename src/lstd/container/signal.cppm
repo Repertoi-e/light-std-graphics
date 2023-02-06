@@ -28,6 +28,7 @@ export {
 	// Add a new callback, returns a handler ID which you can use to remove the callback later
 	template <typename F>
 	s64 connect(signal<F> ref s, delegate<F> cb) {
+		reserve(s.Callbacks);
 		if (cb) add(s.Callbacks, cb);
 		return s.Callbacks.Count - 1;
 	}

@@ -15,8 +15,8 @@
 
 import g.video;
 
-#include "lstd_graphics/graphics/api.h"
-#include "lstd_graphics/graphics/texture.h"
+#include "lstd-graphics/graphics/api.h"
+#include "lstd-graphics/graphics/texture.h"
 
 import lstd.os;
 import lstd.fmt;
@@ -250,10 +250,10 @@ void d3d_target_window_resized(graphics *g, graphics::target_window *targetWindo
 
 void d3d_set_viewport(graphics *g, rect viewport) {
     D3D11_VIEWPORT rect;
-    rect.TopLeftX = (f32) viewport.left;
-    rect.TopLeftY = (f32) viewport.top;
-    rect.Width    = (f32) viewport.right - viewport.left;
-    rect.Height   = (f32) viewport.bottom - viewport.top;
+    rect.TopLeftX = (f32) viewport.Left;
+    rect.TopLeftY = (f32) viewport.Top;
+    rect.Width    = (f32) viewport.Right - viewport.Left;
+    rect.Height   = (f32) viewport.Bottom - viewport.Top;
     rect.MinDepth = 0.0f;
     rect.MaxDepth = 1.0f;
 
@@ -262,10 +262,10 @@ void d3d_set_viewport(graphics *g, rect viewport) {
 
 void d3d_set_scissor_rect(graphics *g, rect scissorRect) {
     D3D11_RECT rect;
-    rect.top    = scissorRect.top;
-    rect.left   = scissorRect.left;
-    rect.bottom = scissorRect.bottom;
-    rect.right  = scissorRect.right;
+    rect.top    = scissorRect.Top;
+    rect.left   = scissorRect.Left;
+    rect.bottom = scissorRect.Bottom;
+    rect.right  = scissorRect.Right;
 
     g->D3D.DeviceContext->RSSetScissorRects(1, &rect);
 }

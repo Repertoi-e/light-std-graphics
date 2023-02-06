@@ -60,7 +60,8 @@ Index of this file:
 #include <float.h>                  // FLT_MIN, FLT_MAX
 #include <stdarg.h>                 // va_list, va_start, va_end
 #include <stddef.h>                 // ptrdiff_t, NULL
-// #include <string.h>                 // memset, memmove, memcpy, strlen, strchr, strcpy, strcmp :WEMODIFIEDIMGUI:
+// #include <string.h>                 // memset, memmove, memcpy, strlen, strchr, strcpy, strcmp :WEMODIFIEDIMGUI: Also replaced any memset which fills 0 with memset0
+// :WEMODIFIEDIMGUI: Also added casts to bytes in memcmp
 
 // Version
 // (Integer encoded as XYYZZ for use in #if preprocessor conditionals. Work in progress versions typically starts at XYY99 then bounce up to XYY00, XYY01 etc. when release tagging happens)
@@ -316,7 +317,7 @@ namespace ImGui
     IMGUI_API void          ShowMetricsWindow(bool* p_open = NULL);     // create Metrics/Debugger window. display Dear ImGui internals: windows, draw commands, various internal state, etc.
     IMGUI_API void          ShowStackToolWindow(bool* p_open = NULL);   // create Stack Tool window. hover items with mouse to query information about the source of their unique ID.
     IMGUI_API void          ShowAboutWindow(bool* p_open = NULL);       // create About window. display Dear ImGui version, credits and build/system information.
-    IMGUI_API void          ShowStyleEditor(ImGuiStyle* ref = NULL);    // add style editor block (not a window). you can pass in a reference ImGuiStyle structure to compare to, revert to and save to (else it uses the default style)
+    IMGUI_API void          ShowStyleEditor(ImGuiStyle* theref = NULL);    // add style editor block (not a window). you can pass in a reference ImGuiStyle structure to compare to, revert to and save to (else it uses the default style)
     IMGUI_API bool          ShowStyleSelector(const char* label);       // add style selector block (not a window), essentially a combo listing the default styles.
     IMGUI_API void          ShowFontSelector(const char* label);        // add font selector block (not a window), essentially a combo listing the loaded fonts.
     IMGUI_API void          ShowUserGuide();                            // add basic help/info block (not a window): how to manipulate ImGui as a end-user (mouse/keyboard controls).
@@ -2108,7 +2109,7 @@ struct ImGuiWindowClass
     bool                DockingAlwaysTabBar;        // Set to true to enforce single floating windows of this class always having their own docking node (equivalent of setting the global io.ConfigDockingAlwaysTabBar)
     bool                DockingAllowUnclassed;      // Set to true to allow windows of this class to be docked/merged with an unclassed window. // FIXME-DOCK: Move to DockNodeFlags override?
 
-    ImGuiWindowClass() { memset(this, 0, sizeof(*this)); ParentViewportId = (ImGuiID)-1; DockingAllowUnclassed = true; }
+    ImGuiWindowClass() { memset0(this, sizeof(*this)); ParentViewportId = (ImGuiID)-1; DockingAllowUnclassed = true; }
 };
 
 // Data payload for Drag and Drop operations: AcceptDragDropPayload(), GetDragDropPayload()
@@ -2127,7 +2128,7 @@ struct ImGuiPayload
     bool            Delivery;           // Set when AcceptDragDropPayload() was called and mouse button is released over the target item.
 
     ImGuiPayload()  { Clear(); }
-    void Clear()    { SourceId = SourceParentId = 0; Data = NULL; DataSize = 0; memset(DataType, 0, sizeof(DataType)); DataFrameCount = -1; Preview = Delivery = false; }
+    void Clear()    { SourceId = SourceParentId = 0; Data = NULL; DataSize = 0; memset0(DataType, sizeof(DataType)); DataFrameCount = -1; Preview = Delivery = false; }
     bool IsDataType(const char* type) const { return DataFrameCount != -1 && strcmp(type, DataType) == 0; }
     bool IsPreview() const                  { return Preview; }
     bool IsDelivery() const                 { return Delivery; }
@@ -2141,7 +2142,7 @@ struct ImGuiTableColumnSortSpecs
     ImS16                       SortOrder;          // Index within parent ImGuiTableSortSpecs (always stored in order starting from 0, tables sorted on a single criteria will always have a 0 here)
     ImGuiSortDirection          SortDirection : 8;  // ImGuiSortDirection_Ascending or ImGuiSortDirection_Descending (you can use this or SortSign, whichever is more convenient for your sort function)
 
-    ImGuiTableColumnSortSpecs() { memset(this, 0, sizeof(*this)); }
+    ImGuiTableColumnSortSpecs() { memset0(this, sizeof(*this)); }
 };
 
 // Sorting specifications for a table (often handling sort specs for a single column, occasionally more)
@@ -2154,7 +2155,7 @@ struct ImGuiTableSortSpecs
     int                         SpecsCount;     // Sort spec count. Most often 1. May be > 1 when ImGuiTableFlags_SortMulti is enabled. May be == 0 when ImGuiTableFlags_SortTristate is enabled.
     bool                        SpecsDirty;     // Set to true when specs have changed since last time! Use this to sort again, then clear the flag.
 
-    ImGuiTableSortSpecs()       { memset(this, 0, sizeof(*this)); }
+    ImGuiTableSortSpecs()       { memset0(this, sizeof(*this)); }
 };
 
 //-----------------------------------------------------------------------------
@@ -2317,7 +2318,7 @@ struct ImGuiListClipper
     IMGUI_API void  ForceDisplayRangeByIndices(int item_min, int item_max); // item_max is exclusive e.g. use (42, 42+1) to make item 42 always visible BUT due to alignment/padding of certain items it is likely that an extra item may be included on either end of the display range.
 
 #ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
-    inline ImGuiListClipper(int items_count, float items_height = -1.0f) { memset(this, 0, sizeof(*this)); ItemsCount = -1; Begin(items_count, items_height); } // [removed in 1.79]
+    inline ImGuiListClipper(int items_count, float items_height = -1.0f) { memset0(this, sizeof(*this)); ItemsCount = -1; Begin(items_count, items_height); } // [removed in 1.79]
 #endif
 };
 
@@ -2403,7 +2404,7 @@ struct ImDrawCmd
     ImDrawCallback  UserCallback;       // 4-8  // If != NULL, call the function instead of rendering the vertices. clip_rect and texture_id will be set normally.
     void*           UserCallbackData;   // 4-8  // The draw callback code can access this.
 
-    ImDrawCmd() { memset(this, 0, sizeof(*this)); } // Also ensure our padding fields are zeroed
+    ImDrawCmd() { memset0(this, sizeof(*this)); } // Also ensure our padding fields are zeroed
 
     // Since 1.83: returns ImTextureID associated with this draw call. Warning: DO NOT assume this is always same as 'TextureId' (we will change this function for an upcoming feature)
     inline ImTextureID GetTexID() const { return TextureId; }
@@ -2449,7 +2450,7 @@ struct ImDrawListSplitter
     int                         _Count;      // Number of active channels (1+)
     ImVector<ImDrawChannel>     _Channels;   // Draw channels (not resized down so _Count might be < Channels.Size)
 
-    inline ImDrawListSplitter()  { memset(this, 0, sizeof(*this)); }
+    inline ImDrawListSplitter()  { memset0(this, sizeof(*this)); }
     inline ~ImDrawListSplitter() { ClearFreeMemory(); }
     inline void                 Clear() { _Current = 0; _Count = 1; } // Do not clear Channels[] so our allocations are reused next frame
     IMGUI_API void              ClearFreeMemory();
@@ -2520,7 +2521,7 @@ struct ImDrawList
     float                   _FringeScale;       // [Internal] anti-alias fringe is scaled by this value, this helps to keep things sharp while zooming at vertex buffer content
 
     // If you want to create ImDrawList instances, pass them ImGui::GetDrawListSharedData() or create and use your own ImDrawListSharedData (so you can use ImDrawList without ImGui)
-    ImDrawList(const ImDrawListSharedData* shared_data) { memset(this, 0, sizeof(*this)); _Data = shared_data; }
+    ImDrawList(const ImDrawListSharedData* shared_data) { memset0(this, sizeof(*this)); _Data = shared_data; }
 
     ~ImDrawList() { _ClearFreeMemory(); }
     IMGUI_API void  PushClipRect(ImVec2 clip_rect_min, ImVec2 clip_rect_max, bool intersect_with_current_clip_rect = false);  // Render-level scissoring. This is passed down to your render function but not used for CPU-side coarse clipping. Prefer using higher-level ImGui::PushClipRect() to affect logic (hit-testing and widget culling)
@@ -2567,7 +2568,7 @@ struct ImDrawList
     // Stateful path API, add points then finish with PathFillConvex() or PathStroke()
     inline    void  PathClear()                                                 { _Path.Size = 0; }
     inline    void  PathLineTo(const ImVec2& pos)                               { _Path.push_back(pos); }
-    inline    void  PathLineToMergeDuplicate(const ImVec2& pos)                 { if (_Path.Size == 0 || memcmp(&_Path.Data[_Path.Size - 1], &pos, 8) != 0) _Path.push_back(pos); }
+    inline    void  PathLineToMergeDuplicate(const ImVec2& pos)                 { if (_Path.Size == 0 || memcmp((byte *) & _Path.Data[_Path.Size - 1], (const byte *) &pos, 8) != 0) _Path.push_back(pos); }
     inline    void  PathFillConvex(ImU32 col)                                   { AddConvexPolyFilled(_Path.Data, _Path.Size, col); _Path.Size = 0; }  // Note: Anti-aliased filling requires points to be in clockwise order.
     inline    void  PathStroke(ImU32 col, ImDrawFlags flags = 0, float thickness = 1.0f) { AddPolyline(_Path.Data, _Path.Size, col, flags, thickness); _Path.Size = 0; }
     IMGUI_API void  PathArcTo(const ImVec2& center, float radius, float a_min, float a_max, int num_segments = 0);
@@ -2638,7 +2639,7 @@ struct ImDrawData
 
     // Functions
     ImDrawData()    { Clear(); }
-    void Clear()    { memset(this, 0, sizeof(*this)); }     // The ImDrawList are owned by ImGuiContext!
+    void Clear()    { memset0(this, sizeof(*this)); }     // The ImDrawList are owned by ImGuiContext!
     IMGUI_API void  DeIndexAllBuffers();                    // Helper to convert all buffers from indexed to non-indexed, in case you cannot render indexed. Note: this is slow and most likely a waste of resources. Always prefer indexed rendering!
     IMGUI_API void  ScaleClipRects(const ImVec2& fb_scale); // Helper to scale the ClipRect field of each ImDrawCmd. Use if your final output buffer is at a different scale than Dear ImGui expects, or if there is a difference between your window resolution and framebuffer resolution.
 };
@@ -2693,7 +2694,7 @@ struct ImFontGlyphRangesBuilder
     ImVector<ImU32> UsedChars;            // Store 1-bit per Unicode code point (0=unused, 1=used)
 
     ImFontGlyphRangesBuilder()              { Clear(); }
-    inline void     Clear()                 { int size_in_bytes = (IM_UNICODE_CODEPOINT_MAX + 1) / 8; UsedChars.resize(size_in_bytes / (int)sizeof(ImU32)); memset(UsedChars.Data, 0, (size_t)size_in_bytes); }
+    inline void     Clear()                 { int size_in_bytes = (IM_UNICODE_CODEPOINT_MAX + 1) / 8; UsedChars.resize(size_in_bytes / (int)sizeof(ImU32)); memset0(UsedChars.Data, (size_t)size_in_bytes); }
     inline bool     GetBit(size_t n) const  { int off = (int)(n >> 5); ImU32 mask = 1u << (n & 31); return (UsedChars[off] & mask) != 0; }  // Get bit n in the array
     inline void     SetBit(size_t n)        { int off = (int)(n >> 5); ImU32 mask = 1u << (n & 31); UsedChars[off] |= mask; }               // Set bit n in the array
     inline void     AddChar(ImWchar c)      { SetBit(c); }                      // Add character
@@ -2948,7 +2949,7 @@ struct ImGuiViewport
     bool                PlatformRequestResize;  // Platform window requested resize (e.g. window was resized by the OS / host window manager, authoritative size will be OS window size)
     bool                PlatformRequestClose;   // Platform window requested closure (e.g. window was moved by the OS / host window manager, e.g. pressing ALT-F4)
 
-    ImGuiViewport()     { memset(this, 0, sizeof(*this)); }
+    ImGuiViewport()     { memset0(this, sizeof(*this)); }
     ~ImGuiViewport()    { IM_ASSERT(PlatformUserData == NULL && RendererUserData == NULL); }
 
     // Helpers
@@ -3065,7 +3066,7 @@ struct ImGuiPlatformIO
     // Viewports list (the list is updated by calling ImGui::EndFrame or ImGui::Render)
     // (in the future we will attempt to organize this feature to remove the need for a "main viewport")
     ImVector<ImGuiViewport*>        Viewports;                              // Main viewports, followed by all secondary viewports.
-    ImGuiPlatformIO()               { memset(this, 0, sizeof(*this)); }     // Zero clear
+    ImGuiPlatformIO()               { memset0(this, sizeof(*this)); }     // Zero clear
 };
 
 // (Optional) This is required when enabling multi-viewport. Represent the bounds of each connected monitor/display and their DPI.

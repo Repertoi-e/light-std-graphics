@@ -14,9 +14,9 @@ import lstd.context;
 
 #include <d3d11.h>
 
-#include "lstd_graphics/graphics/api.h"
-#include "lstd_graphics/graphics/buffer.h"
-#include "lstd_graphics/graphics/shader.h"
+#include "lstd-graphics/graphics/api.h"
+#include "lstd-graphics/graphics/buffer.h"
+#include "lstd-graphics/graphics/shader.h"
 
 void d3d_buffer_init(gbuffer *b, const char *data) {
     if (b->Usage == gbuffer_usage::Immutable) {
@@ -124,7 +124,7 @@ void d3d_buffer_set_input_layout(gbuffer *b, gbuffer_layout layout) {
 
         assert(it.Count > 0);
 
-        const char *name = string_to_c_string(it.Name, TemporaryAllocator);
+        const char *name = to_c_string_temp(it.Name);
 
         *p++ = {name,
                 0,

@@ -1,23 +1,6 @@
 import g.video.window;
 import g.video.monitor;
 
-typedef void(__cdecl* _PVFV)(void);
-
-#pragma section("LSTD_THINGS_THAT_SHOULD_RUN_BEFORE_MAIN$b", read)
-#pragma section("LSTD_THINGS_THAT_SHOULD_RUN_BEFORE_MAIN$c", read)
-#pragma section("LSTD_THINGS_THAT_SHOULD_RUN_AFTER_MAIN$b", read)
-#pragma section("LSTD_THINGS_THAT_SHOULD_RUN_AFTER_MAIN$c", read)
-
-#define ADD_EARLY_INITIALIZER(fn) __declspec(allocate("LSTD_THINGS_THAT_SHOULD_RUN_BEFORE_MAIN$b")) \
-    const _PVFV initializer##fn = fn
-#define ADD_INITIALIZER(fn)       __declspec(allocate("LSTD_THINGS_THAT_SHOULD_RUN_BEFORE_MAIN$c")) \
-    const _PVFV initializer##fn = fn
-
-#define ADD_EARLY_UNINITIALIZER(fn) __declspec(allocate("LSTD_THINGS_THAT_SHOULD_RUN_AFTER_MAIN$b")) \
-    const _PVFV uninitializer##fn = fn
-#define ADD_UNINITIALIZER(fn)       __declspec(allocate("LSTD_THINGS_THAT_SHOULD_RUN_AFTER_MAIN$c")) \
-    const _PVFV uninitializer##fn = fn
-
 extern "C" {
 	void platform_hook_monitor_init() {
 		platform_monitor_init();
@@ -36,8 +19,16 @@ extern "C" {
 	}
 }
 
-ADD_EARLY_INITIALIZER(platform_hook_monitor_init);
-ADD_INITIALIZER(platform_hook_window_init);
+#pragma section("LSTD_B$b", read)
+#pragma section("LSTD_B$c", read)
+#pragma section("LSTD_A$b", read)
+#pragma section("LSTD_A$c", read)
 
-ADD_EARLY_UNINITIALIZER(platform_hook_window_uninit);
-ADD_UNINITIALIZER(platform_hook_monitor_uninit);
+LSTD_ADD_EARLY_INITIALIZER(platform_hook_monitor_init);
+LSTD_ADD_INITIALIZER(platform_hook_window_init);
+
+LSTD_ADD_EARLY_UNINITIALIZER(platform_hook_window_uninit);
+LSTD_ADD_UNINITIALIZER(platform_hook_monitor_uninit);
+
+#pragma comment(linker, "/SECTION:LSTD_B$b,s")
+

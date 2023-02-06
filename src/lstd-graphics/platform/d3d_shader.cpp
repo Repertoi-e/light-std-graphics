@@ -13,8 +13,8 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 
-#include "lstd_graphics/graphics/api.h"
-#include "lstd_graphics/graphics/shader.h"
+#include "lstd-graphics/graphics/api.h"
+#include "lstd-graphics/graphics/shader.h"
 
 import lstd.fmt;
 
@@ -30,10 +30,11 @@ static ID3DBlob *compile_shader(string source, const char *profile, const char *
 }
 
 static gtype string_to_gtype(string type) {
-    s64 digit = string_find_any_of(type, "0123456789");
+    auto p = [](auto ch) { return has(string("0123456789"), ch); };
+    s64 digit = search(type, &p);
     if (digit != -1) {
-        s64 x             = string_find(type, 'x');
-        string scalarType = substring(type, 0, digit);
+        s64 x             = search(type, 'x');
+        string scalarType = slice(type, 0, digit);
         s64 offset        = (type[digit] - '0' - 1) * 4 + (x == -1 ? 0 : type[x + 1] - '0' - 1);
         if (strings_match(scalarType, "bool")) return (gtype) ((u32) gtype::BOOL_1x1 + offset);
         if (strings_match(scalarType, "int") || strings_match(scalarType, "int32")) return (gtype) ((u32) gtype::S32_1x1 + offset);

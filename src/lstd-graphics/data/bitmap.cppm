@@ -39,8 +39,8 @@ export {
 	// set at _UNKNOWN_ if the load failed.
 	bitmap make_bitmap(string path, bool flipVertically = false, pixel_format format = pixel_format::UNKNOWN);
 
-	void free(bitmap* b);
-	bitmap clone(bitmap* src);
+	void free(bitmap ref b);
+	bitmap clone(bitmap no_copy src);
 }
 
 bitmap make_bitmap(u8* pixels, u32 width, u32 height, pixel_format format) {
@@ -77,23 +77,23 @@ bitmap make_bitmap(string p, bool flipVertically, pixel_format format) {
 	return b;
 }
 
-void free_bitmap(bitmap* b) {
-	if (b->Allocated) free(b->Pixels);
-	b->Pixels = null;
-	b->Format = pixel_format::UNKNOWN;
-	b->Width = 0;
-	b->Height = 0;
-	b->BPP = 0;
+void free(bitmap ref b) {
+	if (b.Allocated) free(b.Pixels);
+	b.Pixels = null;
+	b.Format = pixel_format::UNKNOWN;
+	b.Width = 0;
+	b.Height = 0;
+	b.BPP = 0;
 }
 
-bitmap clone(bitmap* src) {
+bitmap clone(bitmap no_copy src) {
 	bitmap b;
-	b = *src;
+	b = src;
 
-	s64 size = src->Width * src->Height * src->BPP;
+	s64 size = src.Width * src.Height * src.BPP;
 
 	b.Pixels = malloc<u8>({ .Count = size });
-	memcpy(b.Pixels, src->Pixels, size);
+	memcpy(b.Pixels, src.Pixels, size);
 
 	return b;
 }
