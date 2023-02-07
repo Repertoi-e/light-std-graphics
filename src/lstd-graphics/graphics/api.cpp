@@ -17,6 +17,8 @@ void graphics::init(graphics_api api) {
     }
     Impl.Init(this);
 
+    reserve(TargetWindows);
+
     auto predicate = [](auto x) { return !x.Window; };
     if (search(TargetWindows, &predicate) == -1) add(TargetWindows, target_window{});  // Add a null target
     set_target_window({});

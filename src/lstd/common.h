@@ -36,7 +36,6 @@ Copyright 1984, 1995, 2000 by Stephen L. Moshier
 #include "third_party/cephes/maths_cephes.h"
 
 #include "common/namespace.h"
-#include "common/hooks.h"
 #include "common/platform.h"
 #include "common/debug_break.h"
 #include "common/defer.h"

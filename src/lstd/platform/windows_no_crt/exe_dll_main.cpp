@@ -155,7 +155,6 @@ void platform_state_init() {
 	// Rest of stuff we need
 	LSTD_NAMESPACE::platform_init_global_state();
 	LSTD_NAMESPACE::win32_crash_handler_init();
-	lstd_initterm(g_LSTDFirstInit, g_LSTDLastInit);
 }
 
 extern "C" {
@@ -371,7 +370,6 @@ static BOOL __cdecl dllmain_crt_process_detach(bool const is_terminating) {
 
 	// :PlatformExitTermination
 	LSTD_NAMESPACE::exit_call_scheduled_functions();
-	lstd_initterm(g_LSTDFirstUninit, g_LSTDLastUninit);
 	LSTD_NAMESPACE::platform_uninit_state();
 
 	BOOL result = 1;

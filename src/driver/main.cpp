@@ -207,7 +207,20 @@ file_scope void parse_arguments() {
     }
 }
 
+void lstd_graphics_init() {
+	platform_monitor_init();
+	platform_window_init();
+}
+
+void lstd_graphics_uninit() {
+	platform_window_uninit();
+	platform_monitor_uninit();
+}
+
 s32 main() {
+    lstd_graphics_init();
+    exit_schedule(lstd_graphics_uninit);
+
     // We allocate all the state we need next to each other in order to reduce fragmentation.
     byte *pack = (byte *) os_allocate_block(sizeof(tlsf_allocator_data) + sizeof(memory) + sizeof(graphics) + MemoryInBytes);
 
@@ -243,7 +256,7 @@ s32 main() {
     parse_arguments();
     setup_paths();
 
-    string windowTitle = "Socraft";
+    string windowTitle = "Graph";
 
     auto windowFlags = SHOWN | RESIZABLE | VSYNC | FOCUS_ON_SHOW | CLOSE_ON_ALT_F4 | SCALE_TO_MONITOR;
     MainWindow = create_window(windowTitle, DONT_CARE, DONT_CARE, WindowWidth, WindowHeight, windowFlags);
@@ -262,6 +275,7 @@ s32 main() {
     auto icon = make_bitmap("data/icon.png", false, pixel_format::RGBA);
 
     array<bitmap> icons;
+    reserve(icons);
     add(icons, icon);
     set_icon(MainWindow, icons);
 
@@ -609,3 +623,4 @@ file_scope void imgui_for_our_windows_new_frame() {
         set_cursor_mode(win, CURSOR_NORMAL);
     }
 }
+

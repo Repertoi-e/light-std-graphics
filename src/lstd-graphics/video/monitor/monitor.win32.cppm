@@ -215,6 +215,8 @@ display_mode choose_video_mode(monitor* mon, display_mode desired) {
 
 // Doesn't add duplicates and doesn't sort _out_
 void get_display_modes(monitor* mon) {
+	reserve(mon->DisplayModes);
+
 	s32 modeIndex = 0;
 	while (true) {
 		DEVMODEW dm;
