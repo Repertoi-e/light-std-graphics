@@ -2,137 +2,128 @@
 workspace "light-std"
     architecture "x64"
     configurations { "Debug", "DebugOptimized", "Release" }
-	
-function common_settings()
-    architecture "x64"
+    location(_OPTIONS["to"] or "build/" .. _ACTION)
 
-    language "C++"
-    cppdialect "C++20" 
-
-    rtti "Off"
-    characterset "Unicode"
-	
-	-- We don't link with the runtime library but this makes certain warnings
-	-- having to do with us replacing malloc/free disappear. 
-	-- (Including certain CRT headers define those functions with 
-	-- __declspec(dllimport) which don't match with our definitions).
-	staticruntime "On"
-    
-    editandcontinue "Off"
-    exceptionhandling "Off" -- SEH still works
-	
-	outputFolder = "%{cfg.buildcfg}"
-
-	targetdir("bin/" .. outputFolder .. "/%{prj.name}")
-    objdir("bin/" .. outputFolder .. "/%{prj.name}/int")
-	
-	files {
-        "%{prj.name}/src/**.h",
-        "%{prj.name}/src/**.inc",
-        "%{prj.name}/src/**.c",
-        "%{prj.name}/src/**.cpp",
-        "%{prj.name}/src/**.def",
-        "%{prj.name}/src/**.cppm"
-    }
-	
-    -- Define this if you include headers from the normal standard library (STL).
-    -- If this macro is not defined we provide our own implementations of certain things 
-    -- that are normally defined in the STL and on which certain C++ features rely on.
-    -- (e.g. the compare header - required by the spaceship operator, placement new and initializer_lists)
-    -- defines { "LSTD_DONT_DEFINE_STD" }
-	
-    -- Uncomment this to build the library without a namespace
-    defines { "LSTD_NO_NAMESPACE" }
-    
-    -- Uncomment this to use a custom namespace name for the library
-    -- defines { "LSTD_NAMESPACE=my_lstd" }
-    
-    includedirs { "%{prj.name}/src" }
-	
-	-- FreeType
-	includedirs { "vendor/Windows/freetype/include" }
-	links { "vendor/Windows/freetype/freetype.lib" }
-
-	filter "system:windows"
-        systemversion "latest"
-        buildoptions { "/utf-8" }
-        
-        excludes "%{prj.name}/**/posix_*.cpp"
-
-        -- We need _CRT_SUPPRESS_RESTRICT for some dumb reason
-        defines { "LSTD_NO_CRT", "NOMINMAX", "WIN32_LEAN_AND_MEAN", "_CRT_SUPPRESS_RESTRICT" } 
-    
-		flags { "OmitDefaultLibrary", "NoRuntimeChecks", "NoBufferSecurityCheck" }
-		buildoptions { "/Gs9999999" }        
-    filter { "system:windows", "not kind:StaticLib" }
-		linkoptions { "/nodefaultlib", "/subsystem:windows", "/stack:\"0x100000\",\"0x100000\"" }
-        links { "kernel32", "shell32", "winmm", "ole32", "dwmapi", "dbghelp" }
-        
-    -- Setup entry point
-    filter { "system:windows", "kind:SharedLib" }
-	    entrypoint "main_no_crt_dll"
-    filter { "system:windows", "kind:ConsoleApp or WindowedApp" }
-	    entrypoint "main_no_crt"
- 
-    -- Setup configurations and optimization level
-    filter "configurations:Debug"
-        defines "DEBUG"
-		
-		-- Trips an assert if you try to access an element out of bounds.
-		-- Works for arrays and strings in the library. I don't think we can check raw C arrays...
-		defines "LSTD_ARRAY_BOUNDS_CHECK"
-		
-        symbols "On"
-        buildoptions { "/FS" }
-    filter "configurations:DebugOptimized"
-        defines { "DEBUG", "DEBUG_OPTIMIZED" }
-        
-		defines "LSTD_ARRAY_BOUNDS_CHECK"
-		
-		optimize "On"
-		
-		 -- Otherwise MSVC generates internal undocumented intrinsics which we can't provide .. shame
-		floatingpoint "Strict"
-
-        symbols "On"
-        
-		buildoptions { "/FS" }
-    filter "configurations:Release"
-        defines { "RELEASE", "NDEBUG" } 
-
-        optimize "Full"
-		floatingpoint "Strict"
-
-		symbols "Off"
+    filter { "action:gmake2" }
+        toolset "clang"
     filter {}
-end
 
-project "lstd"
+    startproject "driver"
+
+    -- Set this explicitly so LSTD knows which 
+    -- OS to do. Otherwise we try to guess the platform
+    -- based on compiler macros, which might not be 
+    -- the best. For example, set this to NO_OS if you are
+    -- programming for baremetal or something.
+    --
+    -- defines { "LSTD_NO_OS" }
+
+LSTD_INCLUDE_EXTRAS = { "guid", "signal" }
+
+OUT_DIR = "build/bin/%{cfg.buildcfg}/%{prj.name}"
+INT_DIR = "build/bin-int/%{cfg.buildcfg}/%{prj.name}"
+
+-- By default we build without namespace, so everything is global.
+-- Set for the name of the namespace (for example  LSTD_NAMESPACE = "lstd")
+-- to encapsulate the whole library.  
+-- LSTD_NAMESPACE = "lstd"
+
+-- These options are optional and control how much memory the platform allocators
+-- reserve upfront. Increase this if you get platform warnings with the message 
+-- "Not enough memory in the temporary/persistent allocator; expanding the pool".
+-- Decrease this if you want to tweak the memory footprint of your application.
+--
+-- Note: Feel free to modify the library source code however you like. We just try 
+-- to be as general as possible.
+--
+-- (KiB and MiB are literal operators that are defined in the library, 1_KiB = 1024, 1_MiB = 1024 * 1024)
+--
+-- @TODO: To have a clearer picture on memory usage. Persisent storage size can be calculated. 
+--        Allow turning off certain options in order to make the persistent block smaller,
+--        thus reducing the memory footprint of the library.
+-- LSTD_PLATFORM_TEMPORARY_STORAGE_STARTING_SIZE = "16_KiB"
+-- LSTD_PLATFORM_PERSISTENT_STORAGE_STARTING_SIZE = "1_MiB"
+
+group "lstd"
+    include "lstd/premake5-lstd"
+group ""
+
+group "core"
+
+-- Which dll should the driver run
+VEHICLE = "socraft"
+
+project "driver"
+	location "%{prj.name}"
+    kind "ConsoleApp"
+	
+	defines { "BUILDING_DRIVER", "VEHICLE=" .. VEHICLE }
+	
+	includedirs { "lstd/src" }     
+    links { "lstd" }
+	
+	dependson { VEHICLE }
+	debugdir(VEHICLE .. "/")
+	
+    targetdir("../" .. OUT_DIR)
+    objdir("../" .. INT_DIR)
+
+    link_lstd()
+	
+	filter "system:windows"
+		links { "imm32", "dxgi.lib", "d3d11.lib", "d3dcompiler.lib", "d3d11.lib", "d3d10.lib" }
+
+project "graph"
     location "%{prj.name}"
-    kind "StaticLib"
+    kind "SharedLib"
+
+	includedirs { "lstd/src", "driver/src" } 
+    links { "lstd" }
+    
+	targetdir("../build/bin/%{cfg.buildcfg}/driver") -- Output dll in the same location as the driver
+    objdir("../" .. INT_DIR)
+    
+    link_lstd()
 	
-    -- These options control how much memory the platform allocators reserve upfront.
-    -- Increase this if you get platform warnings with the message "Not enough memory in the temporary/persistent allocator".
-    -- Decrease this if you want to tweak the memory footprint of your application.
-    -- Note: Feel free to modify the library source code however you like. We just try to be as general as possible.
-    --
-    -- (KiB and MiB are literal operators that are defined in the library, 1_KiB = 1024, 1_MiB = 1024 * 1024)
-    --
-    -- @TODO: Have a clearer picture on memory usage. Persisent storage size can be calculated. 
-    --        Allow turning off certain options in order to make the persistent block smaller,
-    --        thus reducing the footprint of the library.
-    defines { "PLATFORM_TEMPORARY_STORAGE_STARTING_SIZE=16_KiB", "PLATFORM_PERSISTENT_STORAGE_STARTING_SIZE=1_MiB" }
+    filter "system:windows"
+		-- Unique PDB name each time we build (in order to support debugging while hot-swapping the game dll)
+        --symbolspath '$(OutDir)$(TargetName)-$([System.DateTime]::Now.ToString("ddMMyyyy_HHmmss_fff")).pdb'
+        links { "dxgi.lib", "d3d11.lib", "d3dcompiler.lib", "d3d11.lib", "d3d10.lib" }
+
+project "crypto"
+    location "%{prj.name}"
+    kind "SharedLib"
+
+	includedirs { "lstd/src", "driver/src" } 
+    links { "lstd" }
+    
+    targetdir("../build/bin/%{cfg.buildcfg}/driver") -- Output dll in the same location as the driver
+    objdir("../" .. INT_DIR)
+
+    link_lstd()
 	
-	files {
-		"lstd/lstd.natvis",
-		"lstd/imgui.natvis"
-	}
-	includedirs { "%{prj.name}/src/vendor/imgui" }	
-	
-    common_settings()
-	
-	excludes { "lstd/src/vendor/imguizmo/**" }
-	
-include "premake5_graphics.lua"
+    filter "system:windows"
+		-- Unique PDB name each time we build (in order to support debugging while hot-swapping the game dll)
+        -- symbolspath '$(OutDir)$(TargetName)-$([System.DateTime]::Now.ToString("ddMMyyyy_HHmmss_fff")).pdb'
+        links { "dxgi.lib", "d3d11.lib", "d3dcompiler.lib", "d3d11.lib", "d3d10.lib" }
+
+project "socraft"
+    location "%{prj.name}"
+    kind "SharedLib"
+
+	includedirs { "lstd/src", "driver/src" } 
+    links { "lstd" }
+    
+    targetdir("../build/bin/%{cfg.buildcfg}/driver") -- Output dll in the same location as the driver
+    objdir("../" .. INT_DIR)
+
+    link_lstd()
+
+    filter "system:windows"
+		-- Unique PDB name each time we build (in order to support debugging while hot-swapping the game dll)
+        -- symbolspath '$(OutDir)$(TargetName)-$([System.DateTime]::Now.ToString("ddMMyyyy_HHmmss_fff")).pdb'
+        links { "dxgi.lib", "d3d11.lib", "d3dcompiler.lib", "d3d11.lib", "d3d10.lib" }
+
+group ""
 
      
